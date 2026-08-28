@@ -1,0 +1,16 @@
+{
+  "name": "the-foundry",
+  "owner": {
+    "name": "Teren Bryson",
+    "url": "https://github.com/SomeClown"
+  },
+  "description": "Home of The Foundry, a portable nine-agent software-development team for Claude Code.",
+  "plugins": [
+    {
+      "name": "the-foundry",
+      "source": "./",
+      "description": "A portable software-development agent team for Claude Code: nine specialized subagents with enforced permissions, tiered models, and a documented pipeline.",
+      "license": "MIT"
+    }
+  ]
+}
