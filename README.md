@@ -12,16 +12,15 @@ tool allowlist, an assigned model tier, and opinionated working instructions.
 Install it, and every project you open gets an investigation specialist, an
 architect, a designer, two implementers, a test engineer, an adversarial
 reviewer, a devops hand, and a docs keeper: the session you're typing into acts
-as the lead that briefs them, integrates their results, and owns every commit.
+as the lead that briefs them, integrates their results, and owns every commit--essentially, your project manager, which is something I have thought about building as well (a PM agent). Not sure yet if I really need it, as I use Fable 5 as the orchestration layer, and it seems to do very well with minimal token consumption.
 
-To be fair, you do not need nine agents to write software. I wrote software for decades with zero agents and an amount of coffee that my doctor describes as "concerning." What you get from nine agents is the same thing you get from nine specialists anywhere: nobody has to be mediocre at everything, and the reviewer isn't grading their own homework.
+To be fair, you do not need nine agents to write software. I wrote software for decades with zero agents and an amount of coffee that my doctor politely describes as "concerning." What you get from nine agents is the same thing you get from nine specialists anywhere: nobody has to be mediocre at everything, and the reviewer isn't grading their own homework. You also need strict boundaries and guardrails, the same as managing any team, to keep the agents in their own lanes. I seem to have achieved that here, but I am still testing, so take your own safety precautions and make sure you feel comfortable with what the team is doing.
 
 ## Background
 
 This team wasn't designed on a whiteboard. It developed organically across two
 real projects running side by side: [PacketQueue](https://packetqueue.net), a
-15-year-old Hugo blog that needed repo surgery, a WordPress-migration content
-cleanup across 85 posts, CI hardening, and a full visual retheme; and a
+15-year-old WordPress blog, moving to Hugo, that needed repo surgery, a WordPress-migration content cleanup across 85 posts, CI hardening, and a full visual re-theme; and a
 [pool-league scheduler](https://github.com/SomeClown/pool-league-scheduler), a
 more traditional Flask web app with real users, a production deploy, and an
 honest-to-goodness constraint-satisfaction problem living in it. Agents were
@@ -34,7 +33,7 @@ the blog that every automated check had missed, then caught a CSRF hole in the
 scheduler before it shipped. Nothing builds faith in an adversarial reviewer
 quite like watching it catch you doing something half-assed. Twice.
 
-Design principles that fell out of that experience:
+Design principles that came out of that experience:
 
 - **Read-only means enforced read-only.** Advisory agents don't have edit
   tools at all: the boundary is the tool allowlist, not a polite instruction.
@@ -71,8 +70,7 @@ trade-offs, missed vulnerabilities); Sonnet everywhere execution follows a
 spec, a runbook, or established patterns. This is the same logic as staffing a
 hospital: the diagnostician gets paid more than the phlebotomist, and both of
 them would make a hash of the other's job. The orchestrating session keeps
-whatever top model you run, and can escalate any single spawn via the Agent
-tool's per-call `model` override.
+whatever top model you run--I have found success with Fable 5, myself... YMMV--and can escalate any single spawn via the Agent tool's per-call `model` override.
 
 **Permission policy:** Tool allowlists are the enforced boundary — read-only
 agents have no Edit/Write. Browser tools are held by `frontend` (full set, for
@@ -173,9 +171,9 @@ Then ask your session in natural language:
 > "Spawn teammates using the investigate, implement, and qa agent types to
 > work through this feature. investigate reports first; qa reviews at the end."
 
-Caveats current as of late 2026: teammates load fresh project context but not
+**Caveats current as of late 2026**: teammates load fresh project context but not
 the lead's conversation history (brief them in the spawn prompt); `skills:`
-frontmatter isn't applied to teammates (have them load skills via the Skill
+front-matter isn't applied to teammates (have them load skills via the Skill
 tool, which these definitions already do); teammates can't nest teams; and
 session resume doesn't restore in-process teammates.
 
@@ -195,7 +193,7 @@ use it when it's installed.
 
 ## Customization
 
-Everything is plain Markdown with YAML frontmatter — edit freely:
+Everything is plain Markdown with YAML front-matter — edit freely:
 
 - **Models:** change `model:` per agent (`sonnet`, `opus`, `haiku`, `inherit`).
 - **Tools:** the `tools:` allowlist is the security boundary; keep it tight.
@@ -214,9 +212,11 @@ back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 
 ## Credits
 
-Built by [Teren Bryson](https://packetqueue.net) — forged, fittingly, by the
+I'd be remiss not to mention Tony Mattke over at [Router Jockey](https://routerjockey.com), who not only is a great friend who inspired me to move to Hugo, but also has some amazing content on his blog. He deep dives into a variety of topics, all well worth a gander. One series of articles I'd highly recommend, if you're not overly comfortable with version control, begins here: [Git for Network Engineers](https://routerjockey.com/git-for-network-engineers-part-1/). 
+
+Project built by [Teren Bryson](https://packetqueue.net) — forged, fittingly, by the
 team building itself: the agents' own investigate/qa/docs runs shaped their
-final form. Developed with Claude Code.
+final form. Developed with Claude Code, mostly in my highly customized terminal (oh-my-zsh, heavily customized vim, etc., with a tad bit of a JetBrains IDE. More on that coming in a later entry).
 
 And yes, I know: a team of machines doing the software jobs, assembled by the
 machines themselves, distributed so more machines can do it elsewhere. Agent
