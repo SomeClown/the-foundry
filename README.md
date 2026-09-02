@@ -197,6 +197,13 @@ and [Material Design 3](https://m3.material.io/). Automated a11y scanning
 catches well under half of real WCAG issues, so keyboard and screen-reader
 passes still need a human — or at least an agent told to pretend to be one.
 
+**External requirements:** the axe scan is the only piece that needs anything
+installed — `npx @axe-core/cli` requires Node.js and a Chrome/Chromium install
+on the machine. The agents skip the scan (and say so in their reports) when
+either is missing, so nothing breaks without them. Lighthouse needs no extra
+install; it ships inside Chrome DevTools. The WCAG, HIG, and Material
+references are just documents — no tooling required.
+
 ## Customization
 
 Everything is plain Markdown with YAML front-matter — edit freely:

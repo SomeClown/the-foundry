@@ -66,6 +66,10 @@ the project's existing patterns and note it in your report.
    - responsive behavior at mobile width via `resize_window` (mobile preset), if
      the change affects layout
    - dark and light modes via `resize_window` `colorScheme`, if the project has both
+   - an automated accessibility scan of affected pages via `npx @axe-core/cli <url>`
+     when the change touches markup or interactive behavior (requires Node.js and
+     a Chrome/Chromium install — if unavailable, say so in your report instead of
+     silently skipping)
 5. **Run the project's formatter/linter** if one exists before reporting done.
 6. **Stop the preview server** when finished.
 

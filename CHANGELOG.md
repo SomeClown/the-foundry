@@ -4,6 +4,17 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.1.2] — 2026-09-02
+
+### Changed
+- Agents now practice what the README references: `qa` gained a WCAG 2.2
+  accessibility review category plus an axe-core CLI verification step,
+  `frontend` runs an axe scan on affected pages during visual verification,
+  and `uiux` names Apple's Human Interface Guidelines and Material Design 3
+  as its platform-idiom reference points (WCAG pinned to 2.2 throughout).
+- README documents the axe CLI's external requirements (Node.js and
+  Chrome/Chromium); agents skip the scan and say so when they're missing.
+
 ## [1.1.1] — 2026-09-02
 
 ### Changed

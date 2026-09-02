@@ -91,6 +91,27 @@ file — skip what is clearly irrelevant, but err on the side of checking.
 - **Fragile string parsing:** Manual date or URL parsing that will break on edge cases;
   prefer stdlib parsers.
 
+### Accessibility (UI code)
+
+When the change set touches templates, components, or styling, review against
+WCAG 2.2 AA:
+
+- **Missing labels and alt text:** form inputs without an associated label;
+  meaningful images without alt text (decorative images get empty `alt=""`).
+- **Color-only state:** status, errors, or selection conveyed by color alone.
+- **Contrast:** text and interactive elements below WCAG AA contrast ratios —
+  check the actual color values, not the intent.
+- **Keyboard and focus:** interactive elements unreachable by keyboard, broken
+  tab order, missing or suppressed focus indicators, modals that don't trap
+  and return focus.
+- **Motion:** animations that ignore `prefers-reduced-motion`.
+
+When the project runs in a browser and a dev server is available, an automated
+scan is a legitimate verification step: `npx @axe-core/cli <url>` (requires
+Node.js and a Chrome/Chromium install — skip with a note if either is missing).
+Automated scanning catches well under half of real WCAG issues, so treat a
+clean scan as a floor, not a pass.
+
 ### Framework-Specific
 
 First identify the stack (manifest file, imports, project CLAUDE.md), then apply the
