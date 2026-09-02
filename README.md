@@ -185,11 +185,17 @@ and the `dataviz` skill for chart specification. Both are optional: the agent
 checks for them and falls back to its own design knowledge when they're not
 installed. No skills are bundled in this repo.
 
-Worth pairing with the team but not part of it: Vercel's
-[web-interface-guidelines](https://github.com/vercel-labs/web-interface-guidelines)
-skill, which audits UI code against their published guidelines. The `frontend`
-agent checks the session for project-relevant skills before editing and will
-use it when it's installed.
+Worth pairing with the team but not part of it: an accessibility audit
+baseline. The `uiux` agent critiques against [WCAG 2.2](https://www.w3.org/TR/WCAG22/),
+and Deque's [axe-core](https://github.com/dequelabs/axe-core) — the engine
+under Lighthouse, Pa11y, and most other scanners — gives `qa` and `frontend`
+a runnable check (`@axe-core/cli`, or Lighthouse in Chrome DevTools) rather
+than an aspiration. For design judgment, the `uiux` agent's taste is anchored
+in the two references the industry actually agrees on:
+[Apple's Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines)
+and [Material Design 3](https://m3.material.io/). Automated a11y scanning
+catches well under half of real WCAG issues, so keyboard and screen-reader
+passes still need a human — or at least an agent told to pretend to be one.
 
 ## Customization
 

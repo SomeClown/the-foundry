@@ -4,6 +4,13 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.1.1] — 2026-09-02
+
+### Changed
+- Replaced the companion-skill recommendation in the README with
+  accessibility references (WCAG 2.2, axe-core) and design references
+  (Apple Human Interface Guidelines, Material Design 3).
+
 ## [1.1.0] — 2026-08-28
 
 ### Added
@@ -16,8 +23,6 @@ All notable changes to The Foundry. Format loosely follows
 - `docs/orchestrator.md` — a copy-paste CLAUDE.md block that teaches the
   orchestrating session to route work to the team, plus usage notes.
 - `CONTRIBUTING.md` and this changelog.
-- Reference to Vercel's web-interface-guidelines skill as a recommended
-  companion for UI auditing.
 
 ### Changed
 - README substantially expanded and rewritten: plugin install as the primary
