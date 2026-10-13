@@ -12,7 +12,10 @@ tool allowlist, an assigned model tier, and opinionated working instructions.
 Install it, and every project you open gets an investigation specialist, an
 architect, a designer, two implementers, a test engineer, an adversarial
 reviewer, a devops hand, and a docs keeper: the session you're typing into acts
-as the lead that briefs them, integrates their results, and owns every commit--essentially, your project manager, which is something I have thought about building as well (a PM agent). Not sure yet if I really need it, as I use Fable 5 as the orchestration layer, and it seems to do very well with minimal token consumption.
+as the lead that briefs them, integrates their results, and owns every commit.
+In other words, it's your project manager. I've thought about building a
+dedicated PM agent, but I'm not sure I need one: the orchestrating session does
+the job well, with minimal token consumption.
 
 To be fair, you do not need nine agents to write software. I wrote software for decades with zero agents and an amount of coffee that my doctor politely describes as "concerning." What you get from nine agents is the same thing you get from nine specialists anywhere: nobody has to be mediocre at everything, and the reviewer isn't grading their own homework. You also need strict boundaries and guardrails, the same as managing any team, to keep the agents in their own lanes. I seem to have achieved that here, but I am still testing, so take your own safety precautions and make sure you feel comfortable with what the team is doing.
 
@@ -70,7 +73,9 @@ trade-offs, missed vulnerabilities); Sonnet everywhere execution follows a
 spec, a runbook, or established patterns. This is the same logic as staffing a
 hospital: the diagnostician gets paid more than the phlebotomist, and both of
 them would make a hash of the other's job. The orchestrating session keeps
-whatever top model you run--I have found success with Fable 5, myself... YMMV--and can escalate any single spawn via the Agent tool's per-call `model` override.
+whatever top model you run (I've had good results with Fable 5, though your
+mileage may vary) and can escalate any single spawn via the Agent tool's
+per-call `model` override.
 
 **Permission policy:** Tool allowlists are the enforced boundary — read-only
 agents have no Edit/Write. Browser tools are held by `frontend` (full set, for
