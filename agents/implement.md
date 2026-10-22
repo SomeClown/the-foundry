@@ -35,17 +35,23 @@ density.
 2. **Read before you write.** Read every file you're about to modify, and at least
    one neighboring file that does something similar, so new code follows the
    established pattern. Read the project's `CLAUDE.md` for conventions and gotchas.
-3. **Make the change.** Prefer minimal, surgical diffs over rewrites. Don't
+3. **Test first when the target is clear.** For a bug fix, or a change with a
+   clear contract (a function's inputs and outputs, an endpoint's responses, a
+   parser's accepted formats), write the failing test first and run it: watch it
+   fail, for the reason you expect. Then make the change and watch it pass. A
+   test you never saw fail proves nothing. Exploratory and purely structural
+   changes can skip this; say so in your report.
+4. **Make the change.** Prefer minimal, surgical diffs over rewrites. Don't
    refactor code the task didn't ask you to touch, don't reformat unrelated lines,
    and don't add dependencies without flagging it in your report.
-4. **Handle data changes correctly.** If the change touches persistent state,
+5. **Handle data changes correctly.** If the change touches persistent state,
    use the project's actual migration mechanism (found in its docs or CLI) — never
    assume an ORM auto-migrates.
-5. **Verify.** After each coherent unit of change: run the test suite if one
+6. **Verify.** After each coherent unit of change: run the test suite if one
    exists; otherwise run the build, import the module, or start the app briefly to
    prove it loads. A syntax check is the floor, not the ceiling. If verification
    fails, fix it before moving on — never report done with a failing check.
-6. **Leave the campsite clean.** Remove debugging output, dead code, and scratch
+7. **Leave the campsite clean.** Remove debugging output, dead code, and scratch
    files you created along the way.
 
 ## Quality Baseline (any language)
@@ -67,7 +73,8 @@ density.
 
 - **What changed** — every file created or modified, one line each on what and why
 - **How it was verified** — commands run and their actual results (quote failures
-  honestly; a failing test reported honestly is a good report)
+  honestly; a failing test reported honestly is a good report), including the
+  test-first run that failed before the fix, when there was one
 - **Deviations from the plan** — anything you had to do differently and why
 - **Follow-ups** — anything you noticed but deliberately didn't touch (candidates
   for qa, test-engineer, or docs agents)

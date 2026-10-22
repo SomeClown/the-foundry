@@ -151,6 +151,40 @@ without justification; integer casts that can truncate.
 
 ---
 
+## Spec-Check Mode
+
+When the brief asks for a spec check, or hands you a task brief or design
+section together with a diff and asks whether the change matches, answer that
+question first, before the defect review above. Defect review asks "is this
+code safe and correct?"; spec check asks "is this what was agreed?" Both
+matter, and passing one says nothing about the other.
+
+- **Every requirement met.** Walk the brief or design line by line and find
+  where the diff satisfies each requirement. Cite file and line.
+- **Nothing extra.** Flag behavior, options, files, dependencies, or refactors
+  the brief didn't ask for, even when they look like improvements.
+- **Exact values match.** Names, limits, defaults, messages, and formats the
+  brief specifies must appear verbatim. "Close enough" is a gap.
+- **Required tests exist and assert something.** A test that can't fail, or
+  one that checks the mock instead of the behavior, doesn't count.
+- **The implementer's report is a claim, not evidence.** Check it against the
+  diff. When a requirement lives in code the diff doesn't show, say you can't
+  verify it from the diff rather than guessing.
+
+Put a spec section at the top of your report:
+
+```
+Spec: MATCHES | GAPS
+[MISSING]   requirement (brief ref) — what's absent
+[EXTRA]     file:line — what was added that wasn't asked for
+[DIFFERENT] file:line — brief says X, code does Y
+[CANNOT VERIFY] requirement — why, and where the orchestrator should look
+```
+
+Then continue with the usual findings, unless the dispatch says spec only.
+
+---
+
 ## How to Work
 
 1. **Read the files you were given.** Do not guess at content — use the Read tool.

@@ -7,8 +7,9 @@ A portable software-development agent team for [Claude Code](https://claude.com/
 raw requests go in, shipped features come out.
 
 The Foundry is nine specialized subagents plus your orchestrating Claude Code
-session as the tenth member. Each agent is a single Markdown file with a strict
-tool allowlist, an assigned model tier, and opinionated working instructions.
+session as the tenth member, and two skills that session runs itself. Each
+agent is a single Markdown file with a strict tool allowlist, an assigned model
+tier, and opinionated working instructions.
 Install it, and every project you open gets an investigation specialist, an
 architect, a designer, two implementers, a test engineer, an adversarial
 reviewer, a devops hand, and a docs keeper: the session you're typing into acts
@@ -87,15 +88,38 @@ visitor doing errands). `investigate` and `architect` additionally run with
 and tests, uiux needs to drive a browser — but their allowlists still bar file
 editing.
 
+## The skills
+
+> "If I had asked people what they wanted, they would have said faster horses."
+> — attributed to Henry Ford, who probably never said it
+
+Agents have one limitation that no prompt fixes: a subagent can't ask you a
+question and wait for the answer. It gets a brief, does the work, and reports
+back. That's fine for building and reviewing, and useless for the two jobs
+where the lead has to keep checking in with you, so those are skills, run by
+the orchestrating session itself:
+
+| Skill | What it does |
+|---|---|
+| `brainstorm` | Talks a new feature through with you before the architect sees it. Numbered questions with a recommended option (answer "1A, 2B" and move on), the design played back in numbered parts for approval, a cold read by a fresh subagent to catch what the design left out, and a written section in `docs/design.md`. Nothing gets built until you approve it. Say you're on your phone and it batches every question into one message. |
+| `run-plan` | Runs an architect plan task by task: the builder builds, `test-engineer` tries to break it, failures go back for at most three fix rounds, and the project's gate has to pass with a real exit code before the task is committed. Then a `qa` pass over the whole branch, fix batches, and `docs`. It keeps a build log in the plan file, so a session that loses its memory halfway through a twelve-task plan picks up where it left off instead of building task 3 twice. |
+
+Both came from watching how features actually got built on my own projects,
+and both are newer than the agents, so expect them to change as they meet more
+real work. `qa` gained a spec-check mode for `run-plan`'s benefit: it checks
+that a change does what the plan said, no more and no less, before it looks
+for bugs.
+
 ## The pipeline
 
 Typical full-feature flow (skip stages that don't apply):
 
 ```
-investigate → architect → implement / frontend (uiux advises) → test-engineer → qa → devops → docs
+brainstorm → investigate → architect → run-plan: [ implement / frontend (uiux advises) → test-engineer ] per task → qa → docs → devops
 ```
 
-- **New or unfamiliar project:** start with `investigate`.
+- **New feature with open questions:** start with `brainstorm`.
+- **New or unfamiliar project:** `investigate` before the architect.
 - **Small fix:** `implement` → `qa` is often enough.
 - **UI work:** `uiux` decides, `frontend` executes — spec first, then build.
 - **Bug fix:** `implement` fixes, `test-engineer` pins it with a regression test.
@@ -138,7 +162,9 @@ claude plugin marketplace add SomeClown/the-foundry
 claude plugin install the-foundry@the-foundry
 ```
 
-That's it. The nine agents are now available in every project, they update
+That's it. The nine agents and two skills are now available in every
+project (the skills as `/the-foundry:brainstorm` and `/the-foundry:run-plan`,
+though your session will usually reach for them on its own), they update
 when you ask the plugin manager to update, and uninstalling is one command
 instead of an archaeology expedition through your home directory.
 
@@ -153,7 +179,14 @@ mkdir -p ~/.claude/agents
 cp the-foundry/agents/*.md ~/.claude/agents/
 ```
 
-Or into a single project's `.claude/agents/` directory to scope them to that
+The skills go in your user-level skills directory the same way:
+
+```bash
+mkdir -p ~/.claude/skills
+cp -R the-foundry/skills/* ~/.claude/skills/
+```
+
+Or put either into a single project's `.claude/` directory to scope them to that
 repo. New Claude Code sessions pick them up automatically — agent definitions
 load at session start, so restart any running session. Note that user-level
 `.claude/agents/` definitions override same-named plugin agents, which is a
@@ -188,7 +221,8 @@ The `uiux` agent loads two skills when present — the `frontend-design` skill
 (from Anthropic's official plugin marketplace) for aesthetic-direction work,
 and the `dataviz` skill for chart specification. Both are optional: the agent
 checks for them and falls back to its own design knowledge when they're not
-installed. No skills are bundled in this repo.
+installed. Neither is bundled here; the plugin's own skills are the two
+described under [The skills](#the-skills).
 
 Worth pairing with the team but not part of it: an accessibility audit
 baseline. The `uiux` agent critiques against [WCAG 2.2](https://www.w3.org/TR/WCAG22/),

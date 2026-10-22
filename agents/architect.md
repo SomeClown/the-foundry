@@ -41,24 +41,45 @@ project's files — never assume conventions from another ecosystem.
 4. **Design for the project's conventions**, not for a textbook ideal. If the
    project does migrations with a custom CLI command, the plan uses that command.
    If error handling is done a particular way, new code follows it.
-5. **Size the steps for review.** Each step should be independently verifiable —
-   after it, the project still builds/runs and something checkable is true.
+5. **Size each task for one dispatch.** A task is one coherent change that a
+   single implement (or frontend) dispatch can finish and that leaves the
+   project's gate green. If a task needs two builders or a mid-task design
+   decision, split it; if several tasks are the same small edit in different
+   places, merge them.
 
 ---
 
 ## What to Produce
 
-Return a single plan with these sections:
+You're read-only, so the orchestrator saves your plan, as
+`docs/plans/YYYY-MM-DD-<topic>.md` unless the project's CLAUDE.md names another
+place. Open the plan with a header block:
+
+- **Plan file:** that path
+- **Source of truth:** the design section it implements (e.g. `docs/design.md` §16)
+- **Branch:** the branch to build on
+- **Gate:** the exact command chain that proves the project is healthy (from
+  CI config or CLAUDE.md), and any failures it's expected to show
+- **Rules for every agent:** anything that binds every task (tripwire tests,
+  no new dependencies, files no agent may read), so the orchestrator can copy
+  it verbatim into each dispatch
+
+Then these sections:
 
 ### 1. Goal and Approach
 One paragraph: what will exist when this is done, and the chosen approach with the
 key trade-off that decided it.
 
-### 2. Steps
-Numbered, ordered steps. For each:
+### 2. Tasks
+Numbered, ordered tasks, each under a heading of the form
+`### Task N: <title>` (the run-plan skill extracts each task by that heading, so
+keep it exact). For each:
 - **What to do** — specific enough to execute without design decisions
 - **Files** — every file created or modified, with what changes in each
-- **Verify** — how to confirm the step worked (command to run, behavior to check)
+- **Verify** — the exact commands to run and what they should show
+  (`pytest tests/test_parser.py -q` passes; the gate exits 0), never "check it
+  works"
+- **Builder** — implement or frontend, if it isn't obvious
 
 ### 3. Data / Schema Changes
 Any model, schema, or migration changes, and exactly how they get applied given the
@@ -69,7 +90,7 @@ What else shares the files being touched; what could break; anything that needs 
 human decision before starting (flag it clearly rather than guessing).
 
 ### 5. Testing Strategy
-Which of the steps need new tests, what kind (unit/integration/end-to-end), and what
+Which of the tasks need new tests, what kind (unit/integration/end-to-end), and what
 the test engineer should cover. If the project has no test infrastructure, note the
 minimal setup that would be needed.
 
@@ -82,7 +103,7 @@ What you deliberately excluded, so nobody wonders whether it was forgotten.
 
 - Do not write or edit files
 - Do not implement "while you're at it" scope the task didn't ask for
-- Do not produce a plan whose steps say "figure out X" — figuring out is your job;
+- Do not produce a plan whose tasks say "figure out X" — figuring out is your job;
   if you can't resolve something from the code, flag it as a decision for the user
 - Do not assume libraries or tools are available without checking the manifest
 - Do not skip reading the files the plan touches — a plan contradicted by the actual

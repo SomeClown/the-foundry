@@ -4,6 +4,39 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.2.0] — 2026-10-22
+
+### Added
+- Two skills, run by the orchestrating session because they have to talk
+  with you, which a subagent can't:
+  - `brainstorm` turns a request into an approved design before the
+    architect plans it: numbered questions with a recommended option, the
+    design played back in numbered parts, a batch mode for when you're on
+    your phone, a cold read of the written design by a fresh subagent, and a
+    new numbered section in `docs/design.md`. Nothing gets built until the
+    design is approved.
+  - `run-plan` executes a multi-task plan with the agents: per task, a brief
+    file, the builder, a test-engineer adversarial round, at most three fix
+    rounds, and the project's gate with its real exit code before the commit;
+    then a qa pass over the branch, fix batches, and docs. Progress and
+    rulings live in a build log at the end of the plan, so a compacted
+    session can resume. Ships a small `task-brief` script that copies one
+    task out of a plan.
+- `qa` spec-check mode: checks that a change does what its brief or design
+  says, no more and no less, before the usual defect review.
+
+### Changed
+- `architect` plans now open with a header (plan file path, design section,
+  branch, gate, rules for every agent), use `### Task N:` headings, give every
+  task exact verification commands, and size each task to one implement
+  dispatch.
+- `implement` writes the failing test first for bug fixes and changes with a
+  clear contract, and watches it fail before fixing.
+- The orchestrator block in `docs/orchestrator.md` routes new features through
+  `brainstorm` and long plans through `run-plan`, and adds three working rules:
+  evidence before claims, parallel dispatch of independent work, and checking
+  outside review comments before agreeing with them.
+
 ## [1.1.2] — 2026-09-02
 
 ### Changed

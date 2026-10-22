@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Copy one task out of a plan file into its own brief file, so the dispatch
+# prompt can point at the brief instead of pasting the task through the
+# orchestrator's context.
+#
+# Usage: task-brief PLAN_FILE TASK_NUMBER OUT_DIR
+#
+# A task starts at a heading like "### Task 3: Rendering" (any heading level)
+# and runs until the next task heading or the next heading of the same level
+# or higher. Fenced code blocks are skipped when looking for headings, so a
+# "# comment" inside a code sample doesn't end the task early.
+# Prints the path it wrote. Exit 2 on bad arguments, 3 if the task isn't found.
+set -euo pipefail
+
+if [ $# -ne 3 ]; then
+  echo "usage: task-brief PLAN_FILE TASK_NUMBER OUT_DIR" >&2
+  exit 2
+fi
+
+plan=$1
+n=$2
+outdir=$3
+
+[ -f "$plan" ] || { echo "task-brief: no such plan file: $plan" >&2; exit 2; }
+case $n in
+  ''|*[!0-9]*) echo "task-brief: task number must be a positive integer: $n" >&2; exit 2 ;;
+esac
+
+mkdir -p "$outdir"
+out="$outdir/task-$n-brief.md"
+
+awk -v n="$n" '
+  /^[ \t]*(```|~~~)/ { fence = !fence }
+  !fence && /^#+[ \t]/ {
+    match($0, /^#+/); level = RLENGTH
+    if ($0 ~ ("^#+[ \t]+Task[ \t]+" n "([^0-9]|$)")) {
+      inside = 1; start_level = level; print; next
+    }
+    if (inside && ($0 ~ /^#+[ \t]+Task[ \t]+[0-9]/ || level <= start_level)) {
+      inside = 0
+    }
+  }
+  inside { print }
+' "$plan" > "$out"
+
+if [ ! -s "$out" ]; then
+  rm -f "$out"
+  echo "task-brief: no heading for Task $n in $plan (expected something like '### Task $n: <title>')" >&2
+  exit 3
+fi
+
+echo "$out ($(wc -l < "$out" | tr -d ' ') lines)"
