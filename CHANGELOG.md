@@ -4,6 +4,24 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.3.0] — 2026-10-22
+
+### Added
+- `debug` skill: finds a failure's root cause before anything gets fixed. It
+  asks the user what they saw (numbered questions, or one batch when they're
+  away), reproduces the failure on demand and measures an intermittent one,
+  makes a hang fail with stack dumps instead of stalling, tests one
+  hypothesis at a time, and pins the cause with a deterministic failing test
+  before routing the fix to `implement` (or to `test-engineer` when the test
+  was the bug). Three failed fixes stop it to question the design with the
+  user. Production commands go to the user to run. A techniques reference
+  covers pollution, races, waiting on a condition, hangs, tracing values,
+  bisecting, and environment differences, and a `find-polluter` script
+  bisects a pytest suite for the test that leaves state behind.
+
+### Changed
+- The orchestrator block routes bugs and flaky tests through `debug`.
+
 ## [1.2.0] — 2026-10-22
 
 ### Added

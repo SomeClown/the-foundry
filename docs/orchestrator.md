@@ -22,10 +22,10 @@ they're free.
 ## The Foundry (dev agent team)
 
 A nine-agent development team is installed (investigate, architect, uiux,
-implement, frontend, test-engineer, qa, devops, docs), plus two skills this
-session runs itself (brainstorm, run-plan). This session is the orchestrator:
-brief agents with self-contained context, integrate their reports, and own
-all commits and pushes.
+implement, frontend, test-engineer, qa, devops, docs), plus three skills this
+session runs itself (brainstorm, run-plan, debug). This session is the
+orchestrator: brief agents with self-contained context, integrate their
+reports, and own all commits and pushes.
 
 Routing:
 - Unfamiliar codebase or post-context-gap → `investigate` first; pass its
@@ -39,6 +39,9 @@ Routing:
   otherwise execute it via `implement` / `frontend`.
 - UI decisions → `uiux` for the spec, then `frontend` builds it. Never let
   frontend relitigate a delivered spec.
+- Bug, failing or flaky test, hang, or production misbehavior whose cause
+  isn't proven → the `debug` skill: root cause first, pinned by a failing
+  test, then the fix via `implement`.
 - After implementation → `test-engineer` for new/regression tests; `qa` for
   independent review before shipping significant changes.
 - qa findings and test-engineer bug reports come back here; route fixes to
@@ -86,9 +89,10 @@ your name on it.
 **Skills for the parts that talk to you.** A subagent can't ask you a
 question and wait for the answer, so anything conversational is a skill the
 orchestrating session runs: `brainstorm` talks a feature through before the
-architect sees it, and `run-plan` drives a long plan task by task, keeping its
+architect sees it, `run-plan` drives a long plan task by task, keeping its
 record in the plan's build log so a compacted session can pick up where it
-left off. Agents stay for work that can be briefed once and reported back.
+left off, and `debug` chases a failure to its root cause, starting with what
+you saw. Agents stay for work that can be briefed once and reported back.
 
 **Commits stay with the orchestrator.** Agents report what changed; the
 session you're driving reviews and commits it. One throat to choke, as the

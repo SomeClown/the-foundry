@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Find the test that breaks another test when they run in the same session.
+
+The victim passes alone and fails after some other test leaves state behind.
+This runs the victim after halves of the candidate list, keeps whichever half
+still breaks it, and repeats until one candidate is left.
+
+    find-polluter VICTIM [--tests FILE] [--python PY] [--runs N] [--cmd TEMPLATE] [CANDIDATE ...]
+
+VICTIM is a pytest node id (tests/test_x.py::test_y). Candidates default to
+every test file under tests/ except the victim's own. With --tests FILE, the
+candidates are the individual tests in FILE instead. Run it twice: once to
+find the polluting file, then with --tests on that file to find the test
+inside it (or on the victim's own file, to look for an earlier test there).
+
+With pytest (the default), the victim's own result is read from a JUnit XML
+report, so a candidate that fails by itself isn't mistaken for a polluter.
+--cmd runs anything else: a command template with a {tests} placeholder, where
+a non-zero exit counts as the victim failing.
+
+Exit codes: 0 found one, 1 nothing to find (victim fails alone, or the
+candidates don't break it, or it takes two together), 2 usage error.
+"""
+
+import argparse
+import glob
+import os
+import shlex
+import subprocess
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+
+def die(message):
+    print(f"find-polluter: {message}", file=sys.stderr)
+    sys.exit(2)
+
+
+def junit_id(nodeid):
+    """Map a pytest node id to the (classname, name) pytest writes in JUnit XML."""
+    path, *rest = nodeid.split("::")
+    module = path[:-3] if path.endswith(".py") else path
+    module = module.replace("\\", "/").strip("/").replace("/", ".")
+    if not rest:
+        return None
+    *classes, name = rest
+    return ".".join([module, *classes]), name
+
+
+def victim_failed(args, candidates):
+    """Run candidates then the victim once; True if the victim failed."""
+    if args.cmd:
+        cmd = []
+        for token in shlex.split(args.cmd):
+            cmd.extend(candidates + [args.victim] if token == "{tests}" else [token])
+        return subprocess.run(cmd, capture_output=True).returncode != 0
+
+    with tempfile.TemporaryDirectory() as tmp:
+        report = os.path.join(tmp, "report.xml")
+        cmd = [
+            args.python, "-m", "pytest", "-q",
+            "-p", "no:randomly", "-p", "no:cacheprovider",
+            f"--junitxml={report}", "-o", "junit_family=xunit2",
+            *candidates, args.victim,
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        if not os.path.exists(report):
+            die(f"pytest produced no report (exit {proc.returncode}):\n{proc.stdout[-2000:]}{proc.stderr[-2000:]}")
+        want = junit_id(args.victim)
+        for case in ET.parse(report).iter("testcase"):
+            if (case.get("classname"), case.get("name")) == want:
+                return any(child.tag in ("failure", "error") for child in case)
+        die(f"the victim {args.victim} didn't run; check the node id")
+
+
+def breaks(args, candidates):
+    """True if the victim fails in any of --runs runs after these candidates."""
+    return any(victim_failed(args, candidates) for _ in range(args.runs))
+
+
+def collect_tests(args, path):
+    proc = subprocess.run(
+        [args.python, "-m", "pytest", "--collect-only", "-q", "-p", "no:randomly", path],
+        capture_output=True, text=True,
+    )
+    return [line.strip() for line in proc.stdout.splitlines() if "::" in line and not line.startswith(" ")]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("victim")
+    parser.add_argument("candidates", nargs="*")
+    parser.add_argument("--tests", metavar="FILE", help="bisect the individual tests in FILE")
+    parser.add_argument("--python", default=sys.executable, help="interpreter with pytest installed (default: this one)")
+    parser.add_argument("--runs", type=int, default=1, help="runs per check, for a victim that fails only some of the time")
+    parser.add_argument("--cmd", help="command template with a {tests} placeholder, instead of pytest")
+    args = parser.parse_args()
+    if args.runs < 1:
+        parser.error("--runs must be at least 1")
+    if args.cmd and "{tests}" not in shlex.split(args.cmd):
+        parser.error("--cmd needs a {tests} placeholder as its own word")
+
+    victim_file = args.victim.split("::")[0]
+    if args.candidates:
+        candidates = args.candidates
+    elif args.tests:
+        if args.cmd:
+            parser.error("--tests needs pytest to collect the tests; list candidates by hand with --cmd")
+        candidates = [t for t in collect_tests(args, args.tests) if t != args.victim]
+        if os.path.normpath(args.tests) == os.path.normpath(victim_file):
+            # In the victim's own file only the tests that run before it can pollute it.
+            names = collect_tests(args, args.tests)
+            if args.victim in names:
+                candidates = names[: names.index(args.victim)]
+    else:
+        candidates = sorted(
+            f for f in glob.glob("tests/**/test_*.py", recursive=True) + glob.glob("tests/**/*_test.py", recursive=True)
+            if os.path.normpath(f) != os.path.normpath(victim_file)
+        )
+    if not candidates:
+        die("no candidates to try")
+
+    print(f"victim: {args.victim}; {len(candidates)} candidates; {args.runs} run(s) per check")
+    if breaks(args, []):
+        print("the victim fails on its own: not pollution. Debug it directly.")
+        return 1
+    if not breaks(args, candidates):
+        print("the candidates together don't break the victim: not pollution from these, or it needs more runs (--runs).")
+        return 1
+
+    while len(candidates) > 1:
+        half = len(candidates) // 2
+        first, second = candidates[:half], candidates[half:]
+        if breaks(args, first):
+            candidates = first
+        elif breaks(args, second):
+            candidates = second
+        else:
+            print("neither half breaks it alone; it takes tests from both. Narrowed to:")
+            for c in candidates:
+                print(f"  {c}")
+            return 1
+        print(f"  narrowed to {len(candidates)}")
+
+    print(f"polluter: {candidates[0]}")
+    if "::" not in candidates[0]:
+        extra = "" if args.python == sys.executable else f" --python {args.python}"
+        print(f"next: find-polluter {args.victim} --tests {candidates[0]}{extra} to find the test inside it")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

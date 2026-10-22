@@ -9,7 +9,7 @@
     {
       "name": "the-foundry",
       "source": "./",
-      "description": "A portable software-development agent team for Claude Code: nine specialized subagents with enforced permissions and tiered models, plus brainstorm and run-plan skills for the orchestrating session.",
+      "description": "A portable software-development agent team for Claude Code: nine specialized subagents with enforced permissions and tiered models, plus brainstorm, run-plan, and debug skills for the orchestrating session.",
       "license": "MIT"
     }
   ]
