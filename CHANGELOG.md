@@ -4,13 +4,24 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.1] — 2026-10-23
+
+### Fixed
+- Two more directory review holds, both the scanner pairing harmless text.
+  The `find-polluter` tests handed pytest a copy of the whole environment,
+  which read as "a credential leaving the machine" next to a mention of
+  `ssh`; they now pass only what a child Python needs (PATH, HOME, the temp
+  folder, the locale). And the 1.7.0 notes named the icon's file path, which
+  held the release so a reviewer could check nothing runs an image; the path
+  is gone from the notes.
+
 ## [1.7.0] — 2026-10-23
 
 Everything here came out of the plugin directory's validation, run before the
 first submission.
 
 ### Added
-- A listing icon (`.claude-plugin/icon.png`): a steel anvil with a glowing bar
+- A listing icon: a steel anvil with a glowing bar
   on a dark rounded square.
 
 ### Changed

@@ -18,12 +18,23 @@ SCRIPT = Path(__file__).resolve().parent.parent / "skills" / "debug" / "scripts"
 SKIP_REASON = "set FOUNDRY_PYTEST_PYTHON to a Python with pytest"
 
 
+# What a child Python needs to run, and nothing else: the tests don't hand the
+# whole environment (and whatever secrets are in it) to the processes they start.
+_PASSTHROUGH = ("PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "SYSTEMROOT")
+
+
+def _child_env():
+    env = {k: os.environ[k] for k in _PASSTHROUGH if k in os.environ}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return env
+
+
 def _can_import_pytest(python):
     try:
         proc = subprocess.run(
             [python, "-c", "import pytest"],
             capture_output=True,
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            env=_child_env(),
         )
     except OSError:
         return False
@@ -69,9 +80,7 @@ class FindPolluterTest(unittest.TestCase):
         path.write_text(text)
 
     def env(self):
-        env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
-        env.pop("PYTEST_ADDOPTS", None)
-        return env
+        return _child_env()
 
     def run_script(self, *args, python=True):
         """Run find-polluter in the temp project; return the CompletedProcess."""
