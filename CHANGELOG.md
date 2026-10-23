@@ -4,6 +4,17 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.6.1] — 2026-10-23
+
+### Added
+- README section "What it runs, sends, and fetches": every shell, file, web,
+  and download behavior in one place (shell commands in the project, which
+  agents write files and where, web search and fetch, the desktop app's
+  browser, the npm download for the accessibility scan, the image build,
+  ship's outward-facing steps, the two scripts, and when the eval fixtures
+  run). The plugin directory's security scan asks for exactly this, and
+  anyone installing the plugin deserves it anyway.
+
 ## [1.6.0] — 2026-10-23
 
 ### Added

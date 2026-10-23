@@ -248,6 +248,50 @@ either is missing, so nothing breaks without them. Lighthouse needs no extra
 install; it ships inside Chrome DevTools. The WCAG, HIG, and Material
 references are just documents — no tooling required.
 
+## What it runs, sends, and fetches
+
+> "Sunlight is said to be the best of disinfectants."
+> — Louis Brandeis, who was talking about banks, but the principle travels
+
+The short version: the Foundry is Markdown and two small scripts. It bundles
+no hooks, no MCP servers, no slash commands, and no telemetry, and nothing in
+it phones home. Everything it does, it does through tools Claude Code already
+has, under whatever permissions you've given your session. Here's the long
+version, so you don't have to take my word for it:
+
+- **Shell commands in your project.** Every agent has Bash, because an agent
+  that can't run the tests can only guess. `investigate` and `architect` run
+  in plan mode, which blocks anything that changes state; `qa` and `uiux`
+  have no file-editing tools at all.
+- **Files in your project.** `implement`, `frontend`, `test-engineer`,
+  `devops`, and `docs` write files, each in its own lane (application code,
+  UI code, tests, config and infrastructure, documentation). The skills write
+  design and plan files into `docs/`, and `run-plan` keeps its working files
+  in `.git/foundry-run/`, inside the git directory where nothing gets tracked.
+- **The web.** `qa` and `uiux` can use web search and fetch pages (to check
+  a library's docs or an accessibility guideline). `frontend` and `uiux` drive
+  the Claude desktop app's built-in browser when it's there, mostly against
+  your own dev server; the plugin doesn't ship a browser of its own.
+- **Downloads.** The accessibility scan (`npx @axe-core/cli`, run by
+  `frontend` and `qa` when a dev server is up) fetches axe-core from npm.
+  The `ship` skill's pre-release image check builds your project's own
+  Dockerfile, which may pull its base image.
+- **Outward-facing steps.** Only the `ship` skill pushes, opens PRs, merges,
+  or tags (`git` and the GitHub CLI, `gh`), and only after you approve a list
+  of the exact steps. It never runs a production command: deploys are handed
+  to you as commands to paste.
+- **The scripts.** `skills/run-plan/scripts/task-brief` (bash and awk) copies
+  one task out of a plan into a file. `skills/debug/scripts/find-polluter`
+  (Python) runs your project's pytest suite in different orders to find a
+  test that leaves state behind. Neither touches the network.
+- **The tests and evals.** `tests/` runs those scripts against throwaway
+  folders. The `evals/` cases run only when you invoke `claude plugin eval`
+  yourself; their `scaffold.sh` scripts, which build small fixture repos in
+  the harness's temporary workspace, run only if you also pass `--scaffold`.
+
+None of it sends your code or data anywhere beyond what any Claude Code
+session already does with the files it reads.
+
 ## Customization
 
 Everything is plain Markdown with YAML front-matter — edit freely:
