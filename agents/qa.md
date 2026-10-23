@@ -126,7 +126,7 @@ equivalent, an ORM-cascade equivalent, and an unescaped-output equivalent. Name 
 framework-specific risks you checked in your report even when they came up clean.
 
 **Node/TypeScript (Express, Next.js, etc.):** missing auth middleware on routes;
-`eval`/`Function` on user input; prototype pollution via deep merge of user objects;
+`eval()` or `new Function()` on user input; prototype pollution via deep merge of user objects;
 unvalidated `req.body` spread into ORM calls; `dangerouslySetInnerHTML` with user
 data; secrets in client-side bundles (`NEXT_PUBLIC_`, Vite `VITE_` prefixes);
 floating promises that swallow errors.

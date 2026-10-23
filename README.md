@@ -293,7 +293,7 @@ version, so you don't have to take my word for it:
   (Python) runs your project's pytest suite in different orders to find a
   test that leaves state behind. Neither touches the network.
 - **The tests and evals.** `tests/` runs those scripts against throwaway
-  folders. The `evals/` cases run only when you invoke `claude plugin eval`
+  folders. The `evals/` cases run only when you invoke `claude plugin eval .`
   yourself; their `scaffold.sh` scripts, which build small fixture repos in
   the harness's temporary workspace, run only if you also pass `--scaffold`.
 
@@ -322,7 +322,7 @@ back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 The Foundry tests itself, too, in two layers. `tests/` checks the skills'
 scripts and holds the repo to its own README (a read-only agent that grows a
 Write tool, or a skill count that goes stale, fails the suite). `evals/` is a
-library of behavior cases for `claude plugin eval`, each one a situation that
+library of behavior cases for `claude plugin eval .`, each one a situation that
 once caught a skill doing the wrong thing; the second run of it caught the
 brainstorm skill stacking three questions into one sentence. Neither replaces
 watching a skill on real work, which is still where the strangest bugs turn

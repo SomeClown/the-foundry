@@ -11,7 +11,7 @@ touching it, never push before the ask. That's what these cases are for.
 
 Each case is a situation that once caught something real while a skill was
 being built or tested. They run with Claude Code's own eval harness,
-`claude plugin eval`, which starts a fresh headless session per run with only
+`claude plugin eval .`, which starts a fresh headless session per run with only
 this plugin loaded, builds any fixture repo the case needs, and grades the
 result.
 

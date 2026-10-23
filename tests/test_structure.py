@@ -15,6 +15,7 @@ use (scalar `key: value` lines and one-level `- item` lists), not all of YAML.
 import json
 import os
 import re
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -206,7 +207,7 @@ def eval_cases():
 
 
 class EvalLibraryTest(unittest.TestCase):
-    """evals/ holds the behavior cases `claude plugin eval` runs; see evals/README.md."""
+    """evals/ holds the behavior cases `claude plugin eval .` runs; see evals/README.md."""
 
     def test_every_case_is_complete(self):
         self.assertTrue(eval_cases(), "no eval cases found")
@@ -233,6 +234,40 @@ class EvalLibraryTest(unittest.TestCase):
         for name in skills():
             with self.subTest(skill=name):
                 self.assertIn(name, tagged, f"no eval case is tagged {name}")
+
+
+class DirectoryScannerTest(unittest.TestCase):
+    """Text the plugin directory's scanner has held or flagged before.
+
+    Each of these held or flagged a release of the Foundry (1.7.0 to 1.7.3),
+    every time on harmless text, and the directory rescans every new version.
+    So they're cheaper to keep out than to explain to a reviewer again.
+    """
+
+    def tracked_text_files(self):
+        out = subprocess.run(["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True)
+        for rel in out.stdout.splitlines():
+            path = ROOT / rel
+            if path.suffix.lower() in {".png", ".jpg", ".jpeg"}:
+                continue
+            yield rel, path.read_text(encoding="utf-8", errors="replace")
+
+    def test_no_known_scanner_triggers(self):
+        # Built from pieces, so this file never spells out what it's looking for.
+        EVAL, BT, ICON = "ev" + "al", chr(96), "icon" + ".png"
+        patterns = {
+            "the e-v-a-l word right before a backtick (read as running a download)": re.compile(EVAL + BT),
+            "a line starting with the p-a-s-s word (read as a password manager)": re.compile(r"^[ \t]*" + "pa" + r"ss([ \t]|$)", re.M),
+            "an n-p-x download-and-run command": re.compile("np" + r"x\s+@?[\w.-]"),
+            "the whole environment passed along": re.compile(r"\*\*os\.environ|dict\(os\.environ\)|os\.environ\.copy\(\)"),
+            "an environment variable read by a computed name": re.compile(r"os\.environ\[(?![\"'])"),
+            "the icon's file name (holds the release for a reviewer)": re.compile(re.escape(ICON)),
+        }
+        for rel, text in self.tracked_text_files():
+            for why, pattern in patterns.items():
+                m = pattern.search(text)
+                with self.subTest(file=rel, pattern=why):
+                    self.assertTrue(m is None, f"{rel}: {why}: {m.group(0) if m else ''!r}")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,28 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.3] — 2026-10-23
+
+### Fixed
+- The directory's "contains a download-and-run command" warning, which is
+  shown to people browsing the listing. Its trigger was the word eval
+  sitting right before a closing backtick (in shell, eval over a command
+  substitution is the classic way to run whatever a download returned).
+  Six harmless lines had it: the eval command's name in code formatting,
+  and qa's checklist item about eval in user input. The command is now
+  written with its folder argument, `claude plugin eval .`, and qa's item
+  as `eval()` or `new Function()`.
+
+### Added
+- A structural check for every pattern the directory's scanner has held or
+  flagged on harmless text so far (that one, a line starting with the
+  password-manager word, a fetch-and-run command, passing the whole
+  environment, reading an environment variable by a computed name, and
+  naming the icon's file). The directory rescans every new version, so it's
+  cheaper to keep them out than to explain them to a reviewer again. The
+  check builds its patterns from pieces, so the test file doesn't trip the
+  scanner itself.
+
 ## [1.7.2] — 2026-10-23
 
 ### Fixed
@@ -107,7 +129,7 @@ first submission.
   They need a Python with pytest (`FOUNDRY_PYTEST_PYTHON`) and skip without
   one.
 - A behavior library for the skills (`evals/`, 18 cases for
-  `claude plugin eval`): conversations and decision points for brainstorm,
+  `claude plugin eval .`): conversations and decision points for brainstorm,
   run-plan, debug and ship, planted-bug repos for debug, a scratch release
   for ship, and qa's spec check on a planted diff. Hard lines (no push before
   the ask, no ssh, no code before approval) are exact checks over the trace;
