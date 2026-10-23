@@ -267,6 +267,15 @@ If you improve an agent in a way that isn't specific to your setup, send it
 back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 [CHANGELOG](CHANGELOG.md).
 
+The Foundry tests itself, too, in two layers. `tests/` checks the skills'
+scripts and holds the repo to its own README (a read-only agent that grows a
+Write tool, or a skill count that goes stale, fails the suite). `evals/` is a
+library of behavior cases for `claude plugin eval`, each one a situation that
+once caught a skill doing the wrong thing; the second run of it caught the
+brainstorm skill stacking three questions into one sentence. Neither replaces
+watching a skill on real work, which is still where the strangest bugs turn
+up.
+
 ## Credits
 
 I'd be remiss not to mention Tony Mattke over at [Router Jockey](https://routerjockey.com), who not only is a great friend who inspired me to move to Hugo, but also has some amazing content on his blog. He deep dives into a variety of topics, all well worth a gander. One series of articles I'd highly recommend, if you're not overly comfortable with version control, begins here: [Git for Network Engineers](https://routerjockey.com/git-for-network-engineers-part-1/). 

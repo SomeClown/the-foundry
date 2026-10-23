@@ -43,7 +43,10 @@ Two things, nothing else:
    The skill, and its gate, are done.
 2. One open question that gets them describing a concrete moment: "Walk me
    through the last time you wished this existed" or "Who's the first person
-   who'll use this, and what are they trying to do?"
+   who'll use this, and what are they trying to do?" One question, not three
+   stacked in a sentence ("who's reading it, what do they get, and why now?"):
+   a stacked question makes them pick which part to answer, and the other two
+   get lost.
 
 The opening is the only place for open questions. Their own words carry intent
 that a menu would flatten, so let them describe first.
@@ -246,6 +249,12 @@ Two ways through the gate early:
 - **A throwaway spike they asked for.** Build it fast and rough, label it a
   spike, and bring what it taught you back into the conversation. Keeping the
   spike's code is a new request and comes back through the gate.
+
+**"Sounds great, build it" partway through** is ambiguous: it approves the
+part they just saw, and it might also mean "stop asking". Don't guess either
+way. Ask in one line: skip the rest (you'll state your calls on what's left,
+then write it up) or see the remaining parts first? Nothing gets built in the
+meantime.
 
 ## 10. Hand off
 

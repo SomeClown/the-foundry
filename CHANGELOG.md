@@ -4,6 +4,43 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.5.0] — 2026-10-23
+
+### Added
+- Structural checks (`tests/test_structure.py`): the repo is held to its
+  own README. Each agent's model and write access must match the team
+  table, the plan-mode agents must be the ones the README names, uiux keeps
+  its observation-only browser tools, every file a skill points at exists
+  (scripts executable), every script has tests, the agent and skill counts
+  and lists match everywhere they're written, `plugin.json`'s version is the
+  newest CHANGELOG entry, every `the-foundry:<name>` reference names
+  something real, and the eval library is complete. Each check was proven
+  by breaking a copy of the repo the way it guards against.
+- Tests for `find-polluter` (`tests/test_find_polluter.py`): tiny pytest
+  projects built per test, covering bisection, `--tests`, `--runs`, `--cmd`,
+  every exit path, and victims in classes, parametrized, `./` and absolute.
+  They need a Python with pytest (`FOUNDRY_PYTEST_PYTHON`) and skip without
+  one.
+- A behavior library for the skills (`evals/`, 18 cases for
+  `claude plugin eval`): conversations and decision points for brainstorm,
+  run-plan, debug and ship, planted-bug repos for debug, a scratch release
+  for ship, and qa's spec check on a planted diff. Hard lines (no push before
+  the ask, no ssh, no code before approval) are exact checks over the trace;
+  judgment is graded by a rubric. See `evals/README.md`.
+
+### Fixed
+- `find-polluter` said a valid victim "didn't run" when it was given as
+  `./tests/...` or an absolute path (including one through a symlinked
+  folder), counted the victim's own file as a candidate in those forms, and
+  suggested `--tests` in `--cmd` mode, where `--tests` is refused. All found
+  by the new tests.
+
+### Changed
+- `brainstorm` asks one opening question, not three stacked in one sentence,
+  and treats "sounds great, build it" partway through as approval of the part
+  just shown, asking in one line whether to skip the rest. Both found by the
+  eval library on its first runs.
+
 ## [1.4.1] — 2026-10-23
 
 ### Fixed

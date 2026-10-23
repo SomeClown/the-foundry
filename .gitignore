@@ -3,3 +3,6 @@
 
 # Python (the scripts' tests)
 __pycache__/
+
+# Eval runs (claude plugin eval)
+evals/results/

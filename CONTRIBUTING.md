@@ -28,11 +28,23 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
 1. Fork, branch, make the change.
 2. Test it: run the affected agent or skill on a real task in a real
    project. "It reads nicely" is not testing; neither of us can review a
-   prompt by staring at it. The skills' scripts have real tests: run
-   `python3 -m unittest discover -s tests -q` and
-   `claude plugin validate .` before sending anything.
-3. Update the [CHANGELOG](CHANGELOG.md) under an Unreleased heading.
-4. Open a PR describing what behavior changed and how you verified it.
+   prompt by staring at it. Then run the gate:
+   ```bash
+   FOUNDRY_PYTEST_PYTHON=/path/to/a/python/with/pytest python3 -m unittest discover -s tests -q
+   claude plugin validate .
+   ```
+   `tests/` holds the scripts' tests and the structural checks (the README's
+   promises about who can write, which model each agent runs, and how many
+   skills there are, against the actual files). The `find-polluter` tests
+   need a Python with pytest; without `FOUNDRY_PYTEST_PYTHON` they're
+   skipped, and skipped means not run, so a release needs it set.
+3. If you changed what a skill does, run its behavior cases:
+   `claude plugin eval . --tag <skill> --scaffold --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
+   A new behavior worth keeping gets a case of its own. See
+   [evals/README.md](evals/README.md) for how to read a failure and how a
+   case is built.
+4. Update the [CHANGELOG](CHANGELOG.md) under an Unreleased heading.
+5. Open a PR describing what behavior changed and how you verified it.
 
 ## Versioning
 
