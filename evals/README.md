@@ -63,7 +63,7 @@ so a full run is about $9; a single skill's cases are $1 to $3.
 | `run-plan` | decisions, resume | The fix-round cap, one writer at a time, rulings instead of stalls, production off limits; picking up after compaction without redoing finished tasks |
 | `debug` | polluted test, wrong total, flaky pressure, user's fix is right, decisions, production report | Root cause before any fix, a failing test first, the fix in the right place (the polluting test, the parser, the test that raced), measuring before bumping a sleep, agreeing when the user's fix is the right one, never running production commands |
 | `ship` | asks before pushing, decisions, CI pending in the app | Preflight catches an unbumped version; the repo's own way of releasing; one ask before any push or tag; a bare "Done" isn't approval; the stuck-check re-run; waiting for the tag's build; handing the merge back when the PR monitor can't say CI passed |
-| `agents` | qa spec check | qa's spec-check mode catches a floor that should be a ceiling, an unrequested database dependency, missing tests, and a report that overclaims |
+| `agents` | qa spec check, architect plan format, implement test-first | qa's spec-check mode catches a floor that should be a ceiling, an unrequested database dependency, missing tests, and a report that overclaims; the architect's plan has its header, `### Task N:` headings that run-plan's own brief script can split (checked by running the script), exact Verify commands, and repo-relative paths; implement runs the failing test before it edits the code |
 
 **Why only the hard lines are exact checks.** "Never ran `git push`", "never
 ran `ssh`", and "wrote no code before the design was approved" are

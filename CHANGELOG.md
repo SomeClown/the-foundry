@@ -4,6 +4,32 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.6.0] — 2026-10-23
+
+### Added
+- Behavior cases for two agents: `architect-plan-format` dispatches the
+  architect on a small design and runs run-plan's own `task-brief` script on
+  the plan it returns, so "the plan is in a format run-plan can split" is
+  checked by the script, not a judge, along with its header and Verify
+  commands; `implement-test-first` checks, from the run's trace, that the
+  failing test runs before the code is edited.
+
+### Changed
+- `docs/walkthrough.md` rewritten for the current pipeline: brainstorm,
+  investigate, architect, run-plan (with implement, test-engineer, qa, and
+  docs inside it), a debug detour, and ship. It was last touched at 1.1.0,
+  before any skill existed.
+- `architect` names every file by its path from the repo root, never an
+  absolute path. Its first eval run wrote plans pointing into one run's temp
+  folder, and plans get committed.
+- `brainstorm` commits the design on the feature branch the build will use,
+  and points at the architect's Risks section for decisions (it used to name
+  an "owner decisions" section the architect doesn't have). `run-plan` stays
+  on that branch, and its per-task spec check now gets the design section
+  too, so a requirement the plan dropped can be caught at the task instead of
+  at the final review. `ship` asks before pushing a CI fix to the PR branch.
+  All four were found while rewriting the walkthrough.
+
 ## [1.5.0] — 2026-10-23
 
 ### Added

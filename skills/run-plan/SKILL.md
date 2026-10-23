@@ -31,8 +31,9 @@ Helper script, relative to this skill's base directory:
    user that haven't been answered, ask them all in one numbered message
    (options, recommendation first) before any code is written. Nothing else
    in this skill needs to stop for the user before Task 1.
-3. **Get on a branch.** If you're on the default branch, create the one the
-   plan names (or `feat/<topic>`). Never start a plan's work on `main`.
+3. **Get on a branch.** If the design was committed on a feature branch,
+   stay on it. If you're on the default branch, create the one the plan names
+   (or `feat/<topic>`). Never start a plan's work on `main`.
 4. **Note the gate.** The plan should name it (the one command chain that
    proves the project is healthy: lint, format check, tests). If it doesn't,
    take it from the project's CLAUDE.md or CI config, and write it into the
@@ -123,7 +124,9 @@ instead (`git add <paths>`), and the build log notes that the project needs a
 
 For a task that later tasks build on, or one with exact contracts (a schema, a
 public API, a message format), dispatch `the-foundry:qa` in **spec-check
-mode** with the brief, the builder's report, and the package. A small task's
+mode** with the brief, the design section the plan implements (the brief
+can't carry a requirement the plan dropped), the builder's report, and the
+package. A small task's
 spec check can run on `model: "sonnet"`. Gaps go back to the
 builder (step 6) before the adversarial round. For other tasks, the final qa
 pass does the spec check across the branch.

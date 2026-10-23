@@ -137,7 +137,9 @@ Go ahead?
   (`gh run rerun <run-id>`), which creates a fresh check.
 - **CI fails:** don't merge, don't retry blindly. A real failure goes to the
   `debug` skill; a known flake gets named as one, with its evidence, and the
-  user decides whether to re-run.
+  user decides whether to re-run. A fix for it is new work on the PR's branch,
+  so pushing it gets its own one-line ask, even though the branch's first push
+  was approved.
 
 ## 6. Merge
 

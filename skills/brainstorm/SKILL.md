@@ -260,13 +260,16 @@ meantime.
 
 Once the design is approved:
 
-1. Commit the design section on its own, or ask first if the project's rules
-   say so. A design commit is cheap insurance against a long session losing it.
+1. Commit the design section on its own, on the feature branch the build will
+   use (create it now, `feat/<topic>`, if you're on the default branch), or ask
+   first if the project's rules say so. A design commit is cheap insurance
+   against a long session losing it.
 2. **Small change:** route through the pipeline as usual.
 3. **Project:** dispatch `the-foundry:architect` with the design section's path
    and number (plus the investigate report, if there is one). Save the plan it
-   returns to `docs/plans/YYYY-MM-DD-<topic>.md`. The architect's "owner
-   decisions" go to the user in one numbered round; then run the plan with the
+   returns to `docs/plans/YYYY-MM-DD-<topic>.md`, on the same branch. Anything
+   the architect flags as needing a human decision (in its Risks and Coupling
+   section) goes to the user in one numbered round; then run the plan with the
    `run-plan` skill.
 
 ---

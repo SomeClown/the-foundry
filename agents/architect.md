@@ -75,7 +75,9 @@ Numbered, ordered tasks, each under a heading of the form
 `### Task N: <title>` (the run-plan skill extracts each task by that heading, so
 keep it exact). For each:
 - **What to do** — specific enough to execute without design decisions
-- **Files** — every file created or modified, with what changes in each
+- **Files** — every file created or modified, with what changes in each,
+  named by its path from the repo root (`app/models.py`), never an absolute
+  path: the plan gets committed and runs on other machines and in later sessions
 - **Verify** — the exact commands to run and what they should show
   (`pytest tests/test_parser.py -q` passes; the gate exits 0), never "check it
   works"
