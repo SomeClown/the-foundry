@@ -82,11 +82,15 @@ per-call `model` override.
 agents have no Edit/Write. Browser tools are held by `frontend` (full set, for
 building) and `uiux` (observation set — no form input or scripting, and its
 instructions forbid state-changing clicks; it's a critic in the gallery, not a
-visitor doing errands). `investigate` and `architect` additionally run with
-`permissionMode: plan`, which hard-blocks mutations including through Bash.
-`qa` and `uiux` deliberately do not run in plan mode — qa needs to run builds
-and tests, uiux needs to drive a browser — but their allowlists still bar file
-editing.
+visitor doing errands). `investigate` and `architect` also carry
+`permissionMode: plan`, which hard-blocks mutations even through Bash, but only
+in a manual install: Claude Code ignores that field for agents that come from a
+plugin, as a deliberate security rule. In a plugin install, all four read-only
+agents (investigate, architect, qa, uiux) rest on having no edit tools plus
+their instructions, which so far has held. If you want the hard block, copy
+those two files into `~/.claude/agents/`, where your copy overrides the plugin's.
+`qa` and `uiux` don't carry plan mode at all (qa needs to run builds and tests,
+uiux needs to drive a browser).
 
 ## The skills
 
@@ -242,9 +246,10 @@ catches well under half of real WCAG issues, so keyboard and screen-reader
 passes still need a human — or at least an agent told to pretend to be one.
 
 **External requirements:** the axe scan is the only piece that needs anything
-installed — `npx @axe-core/cli` requires Node.js and a Chrome/Chromium install
-on the machine. The agents skip the scan (and say so in their reports) when
-either is missing, so nothing breaks without them. Lighthouse needs no extra
+installed: the axe CLI (the `@axe-core/cli` package from npm, installed
+globally by you), which needs Node.js and a Chrome/Chromium install on the
+machine. The agents never download it themselves; they skip the scan and say
+so in their reports when it's missing, so nothing breaks without it. Lighthouse needs no extra
 install; it ships inside Chrome DevTools. The WCAG, HIG, and Material
 references are just documents — no tooling required.
 
@@ -260,9 +265,11 @@ has, under whatever permissions you've given your session. Here's the long
 version, so you don't have to take my word for it:
 
 - **Shell commands in your project.** Every agent has Bash, because an agent
-  that can't run the tests can only guess. `investigate` and `architect` run
-  in plan mode, which blocks anything that changes state; `qa` and `uiux`
-  have no file-editing tools at all.
+  that can't run the tests can only guess. The four read-only agents
+  (`investigate`, `architect`, `qa`, `uiux`) have no file-editing tools at all,
+  and their instructions forbid changing anything through Bash. (Plan mode,
+  which enforces that for two of them, applies only in a manual install; see
+  the permission policy above.)
 - **Files in your project.** `implement`, `frontend`, `test-engineer`,
   `devops`, and `docs` write files, each in its own lane (application code,
   UI code, tests, config and infrastructure, documentation). The skills write
@@ -272,10 +279,11 @@ version, so you don't have to take my word for it:
   a library's docs or an accessibility guideline). `frontend` and `uiux` drive
   the Claude desktop app's built-in browser when it's there, mostly against
   your own dev server; the plugin doesn't ship a browser of its own.
-- **Downloads.** The accessibility scan (`npx @axe-core/cli`, run by
-  `frontend` and `qa` when a dev server is up) fetches axe-core from npm.
-  The `ship` skill's pre-release image check builds your project's own
-  Dockerfile, which may pull its base image.
+- **Downloads.** The plugin itself downloads nothing to run. The
+  accessibility scan uses the axe CLI only if you've installed it yourself;
+  otherwise `frontend` and `qa` skip it and say so. The `ship` skill's
+  pre-release image check builds your project's own Dockerfile, which may pull
+  its base image.
 - **Outward-facing steps.** Only the `ship` skill pushes, opens PRs, merges,
   or tags (`git` and the GitHub CLI, `gh`), and only after you approve a list
   of the exact steps. It never runs a production command: deploys are handed

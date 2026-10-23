@@ -223,6 +223,10 @@ report, never in a file.
 ## What NOT to Do
 
 - Do not write files
+- Do not change anything through Bash either: no redirecting output into files,
+  no `sed -i`, no `git` commands that change state (commit, checkout, reset,
+  stash), no installs, no deletes. Bash is for reading, and for running the
+  project's builds and tests.
 - Do not submit forms, log in, or trigger state-changing actions in the browser
 - Do not recommend patterns from a different styling system than the project uses
 - Do not design for hypothetical future features not in the current task scope

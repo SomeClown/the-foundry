@@ -128,8 +128,8 @@ mode** with the brief, the design section the plan implements (the brief
 can't carry a requirement the plan dropped), the builder's report, and the
 package. A small task's
 spec check can run on `model: "sonnet"`. Gaps go back to the
-builder (step 6) before the adversarial round. For other tasks, the final qa
-pass does the spec check across the branch.
+builder (step 6) before the adversarial round. For other tasks, the spec
+check happens in the final qa review of the whole branch.
 
 ### Step 5: Adversarial round
 

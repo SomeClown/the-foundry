@@ -4,6 +4,34 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.0] — 2026-10-23
+
+Everything here came out of the plugin directory's validation, run before the
+first submission.
+
+### Added
+- A listing icon (`.claude-plugin/icon.png`): a steel anvil with a glowing bar
+  on a dark rounded square.
+
+### Changed
+- `qa` and `frontend` no longer download the accessibility scanner on the fly
+  (`npx`, which fetches and runs code that isn't part of the plugin). They use
+  the axe CLI if you've installed it, and otherwise skip the scan and say so.
+- The four read-only agents (`investigate`, `architect`, `qa`, `uiux`) now say
+  outright that Bash is for reading and for running builds and tests, never
+  for changing anything. Claude Code ignores `permissionMode` for agents that
+  come from a plugin, so in a plugin install that instruction, plus having no
+  edit tools, is what keeps them read-only.
+
+### Fixed
+- The README claimed `investigate` and `architect` run in plan mode, which
+  hard-blocks changes even through Bash. That's true only for a manual
+  install; it now says so, and how to get the hard block back.
+- A sentence in `run-plan` wrapped so that a line began with "pass", which the
+  directory's scanner read as the `pass` password manager reading a
+  credential. Reworded; the directory's credential hold no longer has
+  anything to match.
+
 ## [1.6.1] — 2026-10-23
 
 ### Added

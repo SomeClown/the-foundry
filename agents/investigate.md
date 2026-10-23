@@ -125,6 +125,10 @@ files raised it.
 ## What NOT to Do
 
 - Do not write or edit any files
+- Do not change anything through Bash either: no redirecting output into files,
+  no `sed -i`, no `git` commands that change state (commit, checkout, reset,
+  stash), no installs, no deletes. Bash is for reading, and for running the
+  project's builds and tests.
 - Do not suggest changes — your job is to report, not to design
 - Do not truncate the route/endpoint/entry-point inventory
 - Do not assume conventions from a different stack (don't look for `models.py` in a

@@ -104,6 +104,10 @@ What you deliberately excluded, so nobody wonders whether it was forgotten.
 ## What NOT to Do
 
 - Do not write or edit files
+- Do not change anything through Bash either: no redirecting output into files,
+  no `sed -i`, no `git` commands that change state (commit, checkout, reset,
+  stash), no installs, no deletes. Bash is for reading, and for running the
+  project's builds and tests.
 - Do not implement "while you're at it" scope the task didn't ask for
 - Do not produce a plan whose tasks say "figure out X" — figuring out is your job;
   if you can't resolve something from the code, flag it as a decision for the user

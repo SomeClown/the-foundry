@@ -104,7 +104,7 @@ class AgentFilesTest(unittest.TestCase):
 
     def test_plan_mode_agents_are_the_ones_the_readme_names(self):
         text = README.read_text(encoding="utf-8")
-        m = re.search(r"((?:`[\w-]+`(?:,|\s+and)?\s+)+)additionally run with\s+`permissionMode: plan`", text)
+        m = re.search(r"((?:`[\w-]+`(?:,|\s+and)?\s+)+)also carry\s+`permissionMode: plan`", text)
         self.assertIsNotNone(m, "README no longer names the plan-mode agents")
         named = set(re.findall(r"`([\w-]+)`", m.group(1)))
         in_files = {n for n, fm in agents().items() if fm.get("permissionMode") == "plan"}
