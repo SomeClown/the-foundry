@@ -4,6 +4,17 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.4.1] — 2026-10-23
+
+### Fixed
+- `ship` told the session to bind a PR to the desktop app's monitor and "let
+  it tell you" when CI finished. That monitor wakes the session on CI
+  failures, not on success, so a session following it would wait forever
+  for a green CI. It now reads the status once, says CI is still running,
+  and merges when the user brings it back. Found on the first real use
+  (newsbot PR #66). The wait for a tag's build says the same: a tag has no
+  PR for the monitor to see.
+
 ## [1.4.0] — 2026-10-23
 
 ### Added

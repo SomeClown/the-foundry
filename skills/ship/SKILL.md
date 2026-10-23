@@ -118,8 +118,13 @@ Go ahead?
 
 ## 5. Wait for CI without babysitting it
 
-- **If the session has a PR monitor** (the Claude desktop app's PR tools that
-  notify on CI results), bind the PR to it and let it tell you. Don't poll.
+- **If the session has a PR monitor** (the Claude desktop app's PR tools),
+  bind the PR to it, read its status once, and don't poll. Know what it
+  reports: it wakes the session when CI *fails* (with Auto-fix on), not when
+  CI passes. So if CI is still running, say so, end the turn with the merge
+  as the next step, and merge when the user brings you back: read the status
+  again, and merge if it's green. Waiting for a "CI passed" notice means
+  waiting forever.
 - **Otherwise, one background watcher**, bounded, that ends on every outcome
   (green, red, stuck, timed out), never a loop of foreground checks:
   `gh pr checks <n> --watch --fail-fast` run in the background, or a bounded
@@ -165,9 +170,13 @@ git push origin vX.Y.Z
 ```
 
 **Then wait for the tag's own build** (the image publish, the release
-workflow) to finish green, the same way you waited for CI. Deploy commands
-handed over before it finishes produce a pull of an image that doesn't exist
-yet ("manifest unknown"), so the commands wait for it.
+workflow) to finish green. A tag has no PR, so a PR monitor won't see it:
+find its run (`gh run list --branch vX.Y.Z --limit 1`) and either watch it in
+one background `gh run watch <id> --exit-status`, where the session's rules
+allow that, or tell the user how long it usually takes and check it when they
+come back. Deploy commands handed over before it finishes produce a pull of
+an image that doesn't exist yet ("manifest unknown"), so the commands wait
+for it.
 
 ## 8. Hand over the deploy
 
@@ -218,6 +227,7 @@ healthy"); if they paste output, read it against what you said they'd see.
 | "They said go earlier, so this push is covered" | Only the listed steps are covered. Ask for the rest. |
 | "'Done' probably means go ahead" | Ask again in one line. |
 | "CI is slow; I'll check every minute" | Use the PR monitor, or one background watcher. |
+| "The monitor will tell me when it's green" | It tells you about failures. Hand the merge back to the user's next turn. |
 | "The check is stuck; I'll merge anyway" | Confirm the run passed, then re-run it. Never merge past a red or missing check. |
 | "The image built in CI, so I'll skip the local check" | The local check runs before the tag, every release the project asks for it. |
 | "The tag is pushed; here are the deploy commands" | Wait for the tag's build to go green first. |
