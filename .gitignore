@@ -1,2 +1,5 @@
 # macOS
 .DS_Store
+
+# Python (the scripts' tests)
+__pycache__/

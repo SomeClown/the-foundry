@@ -262,7 +262,8 @@ One message:
 - parked findings and declined qa findings, with reasons
 - questions only the user can answer, numbered, with options and a
   recommendation
-- the next step (push, PR, release) as a question. Shipping waits for their yes.
+- the next step (push, PR, release) as a question. Shipping waits for their
+  yes, and then the `ship` skill takes it from there.
 
 ## 5. When to stop and ask
 

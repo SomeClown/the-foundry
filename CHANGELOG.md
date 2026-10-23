@@ -4,6 +4,33 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.4.0] — 2026-10-23
+
+### Added
+- `ship` skill: takes finished work from a branch to production. Preflight
+  (the gate, a clean tree, the version bumped everywhere, release notes, prose
+  the change made untrue, the tag not taken), then one ask listing every
+  outward-facing step, then push, PR, CI (re-running a check GitHub leaves
+  "in progress" after its run passed), merge, a local image check, the tag,
+  and a wait for the tag's own build before the deploy commands are handed
+  over. The user runs every production command; the skill updates the status
+  docs afterwards and asks before pushing them. It learns each project's
+  habits from its runbook and history first, so a project that ships straight
+  to `main` with lightweight tags gets exactly that.
+- A test suite for the skills' scripts (`tests/`, stdlib `unittest`; run
+  `python3 -m unittest discover -s tests -q`).
+
+### Fixed
+- run-plan's `task-brief` script found no task at all in a plan whose
+  samples contained lines starting with three backticks inside a fenced
+  block. It now tracks fences the way CommonMark does (same character, a
+  closing run at least as long as the opener, nothing after it), which also
+  fixes a four-backtick fence holding ordinary three-backtick blocks.
+
+### Changed
+- The orchestrator block routes releases through `ship`, and run-plan hands
+  off to it.
+
 ## [1.3.0] — 2026-10-22
 
 ### Added

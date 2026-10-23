@@ -26,8 +26,11 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
 ## Process
 
 1. Fork, branch, make the change.
-2. Test it: run the affected agent on a real task in a real project. "It reads
-   nicely" is not testing; neither of us can review a prompt by staring at it.
+2. Test it: run the affected agent or skill on a real task in a real
+   project. "It reads nicely" is not testing; neither of us can review a
+   prompt by staring at it. The skills' scripts have real tests: run
+   `python3 -m unittest discover -s tests -q` and
+   `claude plugin validate .` before sending anything.
 3. Update the [CHANGELOG](CHANGELOG.md) under an Unreleased heading.
 4. Open a PR describing what behavior changed and how you verified it.
 

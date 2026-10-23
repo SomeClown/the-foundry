@@ -22,8 +22,8 @@ they're free.
 ## The Foundry (dev agent team)
 
 A nine-agent development team is installed (investigate, architect, uiux,
-implement, frontend, test-engineer, qa, devops, docs), plus three skills this
-session runs itself (brainstorm, run-plan, debug). This session is the
+implement, frontend, test-engineer, qa, devops, docs), plus four skills this
+session runs itself (brainstorm, run-plan, debug, ship). This session is the
 orchestrator: brief agents with self-contained context, integrate their
 reports, and own all commits and pushes.
 
@@ -46,7 +46,9 @@ Routing:
   independent review before shipping significant changes.
 - qa findings and test-engineer bug reports come back here; route fixes to
   implement/frontend. Reviewers and testers never fix application code.
-- Deploys and migrations → `devops`, following the project's documented
+- Shipping finished work (push, PR, merge, tag, deploy hand-off) → the
+  `ship` skill; the user runs every production command.
+- Runbooks, CI, and migrations → `devops`, following the project's documented
   runbook; it stops for confirmation before destructive steps.
 - After anything lands → `docs`, so project docs stay truthful for the next
   session.
@@ -91,8 +93,9 @@ question and wait for the answer, so anything conversational is a skill the
 orchestrating session runs: `brainstorm` talks a feature through before the
 architect sees it, `run-plan` drives a long plan task by task, keeping its
 record in the plan's build log so a compacted session can pick up where it
-left off, and `debug` chases a failure to its root cause, starting with what
-you saw. Agents stay for work that can be briefed once and reported back.
+left off, `debug` chases a failure to its root cause, starting with what
+you saw, and `ship` walks a release out the door with one ask for every step
+and the deploy left to you. Agents stay for work that can be briefed once and reported back.
 
 **Commits stay with the orchestrator.** Agents report what changed; the
 session you're driving reviews and commits it. One throat to choke, as the
