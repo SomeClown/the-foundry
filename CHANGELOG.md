@@ -4,6 +4,16 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.4] — 2026-10-23
+
+### Fixed
+- The directory's credential hold came back because of 1.7.3's own new
+  check: two of its patterns spelled out the environment lookups they look
+  for, and the scanner read the regex text as code reading the environment.
+  Those patterns are now built from pieces, like the others, and the check
+  ignores backslashes when matching, so it would have caught a
+  regex-escaped trigger like that one.
+
 ## [1.7.3] — 2026-10-23
 
 ### Fixed

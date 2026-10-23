@@ -255,15 +255,19 @@ class DirectoryScannerTest(unittest.TestCase):
     def test_no_known_scanner_triggers(self):
         # Built from pieces, so this file never spells out what it's looking for.
         EVAL, BT, ICON = "ev" + "al", chr(96), "icon" + ".png"
+        ENV = re.escape("os." + "env" + "iron")
         patterns = {
             "the e-v-a-l word right before a backtick (read as running a download)": re.compile(EVAL + BT),
             "a line starting with the p-a-s-s word (read as a password manager)": re.compile(r"^[ \t]*" + "pa" + r"ss([ \t]|$)", re.M),
             "an n-p-x download-and-run command": re.compile("np" + r"x\s+@?[\w.-]"),
-            "the whole environment passed along": re.compile(r"\*\*os\.environ|dict\(os\.environ\)|os\.environ\.copy\(\)"),
-            "an environment variable read by a computed name": re.compile(r"os\.environ\[(?![\"'])"),
+            "the whole environment passed along": re.compile(r"\*\*" + ENV + "|dict\\(" + ENV + "\\)|" + ENV + r"\.copy\(\)"),
+            "an environment variable read by a computed name": re.compile(ENV + r"\[(?![\"'])"),
             "the icon's file name (holds the release for a reviewer)": re.compile(re.escape(ICON)),
         }
         for rel, text in self.tracked_text_files():
+            # The scanner reads a regex-escaped trigger (a backslash before each
+            # dot or bracket) as the real thing, so match with backslashes removed.
+            text = text.replace(chr(92), "")
             for why, pattern in patterns.items():
                 m = pattern.search(text)
                 with self.subTest(file=rel, pattern=why):
