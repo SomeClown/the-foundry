@@ -4,6 +4,16 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.5] — 2026-10-23
+
+### Added
+- `PRIVACY.md`: a short, plain statement that the plugin collects and sends
+  nothing itself, and what it does inside your own session (your files, the
+  web tools two agents use, and your own remote, behind the ship skill's ask).
+- Listing links in `plugin.json` for the plugin directory: documentation
+  (the README), support (GitHub Issues), and the privacy policy. A structural
+  check makes sure the privacy link points at a file that exists.
+
 ## [1.7.4] — 2026-10-23
 
 ### Fixed

@@ -1,13 +1,21 @@
 {
   "name": "the-foundry",
   "description": "A portable software-development agent team for Claude Code: nine specialized subagents with enforced permissions and tiered models, plus brainstorm, run-plan, debug, and ship skills for the orchestrating session.",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "author": {
     "name": "Teren Bryson",
     "url": "https://github.com/SomeClown"
   },
   "homepage": "https://github.com/SomeClown/the-foundry",
   "repository": "https://github.com/SomeClown/the-foundry",
+  "documentationUrl": "https://github.com/SomeClown/the-foundry#readme",
+  "supportUrl": "https://github.com/SomeClown/the-foundry/issues",
+  "privacyPolicyUrl": "https://github.com/SomeClown/the-foundry/blob/main/PRIVACY.md",
   "license": "MIT",
-  "keywords": ["agents", "subagents", "development-team", "workflow"]
+  "keywords": [
+    "agents",
+    "subagents",
+    "development-team",
+    "workflow"
+  ]
 }

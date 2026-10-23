@@ -184,6 +184,17 @@ class DocsAgreeTest(unittest.TestCase):
         entry = next(e for e in entries if e["name"] == plugin["name"])
         self.assertEqual(entry["description"], plugin["description"])
 
+    def test_listing_links_point_at_real_files(self):
+        # The directory shows these on the listing; a renamed file would leave a dead link.
+        plugin = json.loads(PLUGIN.read_text(encoding="utf-8"))
+        for field in ("privacyPolicyUrl", "documentationUrl", "supportUrl", "homepage", "repository"):
+            with self.subTest(field=field):
+                url = plugin.get(field, "")
+                self.assertTrue(url.startswith("https://github.com/SomeClown/the-foundry"), f"{field} is {url!r}")
+                m = re.search(r"/blob/main/(.+)$", url)
+                if m:
+                    self.assertTrue((ROOT / m.group(1)).exists(), f"{field} points at {m.group(1)}, which doesn't exist")
+
     def test_version_matches_the_newest_changelog_entry(self):
         version = json.loads(PLUGIN.read_text(encoding="utf-8"))["version"]
         headings = re.findall(r"^## \[(\d+\.\d+\.\d+)\]", CHANGELOG.read_text(encoding="utf-8"), re.M)
