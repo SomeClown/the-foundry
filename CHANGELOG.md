@@ -4,6 +4,15 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.2] — 2026-10-23
+
+### Fixed
+- The directory's credential hold, third time: the `find-polluter` tests
+  looked up their pass-through variables from a list, which the scanner reads
+  as "an environment variable named at run time". Each one is now named
+  outright (PATH, HOME, the temp folder, the locale), so what's passed along
+  is visible to anyone reading the test.
+
 ## [1.7.1] — 2026-10-23
 
 ### Fixed

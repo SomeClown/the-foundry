@@ -18,13 +18,24 @@ SCRIPT = Path(__file__).resolve().parent.parent / "skills" / "debug" / "scripts"
 SKIP_REASON = "set FOUNDRY_PYTEST_PYTHON to a Python with pytest"
 
 
-# What a child Python needs to run, and nothing else: the tests don't hand the
-# whole environment (and whatever secrets are in it) to the processes they start.
-_PASSTHROUGH = ("PATH", "HOME", "TMPDIR", "TEMP", "TMP", "LANG", "LC_ALL", "SYSTEMROOT")
-
-
 def _child_env():
-    env = {k: os.environ[k] for k in _PASSTHROUGH if k in os.environ}
+    """What a child Python needs to run, and nothing else.
+
+    The tests don't hand the whole environment (and whatever secrets are in it)
+    to the processes they start. Each variable is named outright, so anyone (or
+    any scanner) reading this can see exactly what's passed along.
+    """
+    passed = {
+        "PATH": os.environ.get("PATH"),
+        "HOME": os.environ.get("HOME"),
+        "TMPDIR": os.environ.get("TMPDIR"),
+        "TEMP": os.environ.get("TEMP"),
+        "TMP": os.environ.get("TMP"),
+        "LANG": os.environ.get("LANG"),
+        "LC_ALL": os.environ.get("LC_ALL"),
+        "SYSTEMROOT": os.environ.get("SYSTEMROOT"),
+    }
+    env = {name: value for name, value in passed.items() if value is not None}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     return env
 
