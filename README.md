@@ -74,7 +74,7 @@ trade-offs, missed vulnerabilities); Sonnet everywhere execution follows a
 spec, a runbook, or established patterns. This is the same logic as staffing a
 hospital: the diagnostician gets paid more than the phlebotomist, and both of
 them would make a hash of the other's job. The orchestrating session keeps
-whatever top model you run (I've had good results with Fable 5, though your
+whatever top model you run (I've had good results with Fable 5.1, though your
 mileage may vary) and can escalate any single spawn via the Agent tool's
 per-call `model` override.
 
@@ -298,7 +298,9 @@ version, so you don't have to take my word for it:
   the harness's temporary workspace, run only if you also pass `--scaffold`.
 
 None of it sends your code or data anywhere beyond what any Claude Code
-session already does with the files it reads.
+session already does with the files it reads. The
+[privacy statement](PRIVACY.md) says the same thing in under a page, for
+anyone whose job requires it in writing.
 
 ## Customization
 

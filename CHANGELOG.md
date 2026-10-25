@@ -4,6 +4,16 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [1.7.6] — 2026-10-25
+
+### Changed
+- The README links the privacy statement from its "What it runs, sends, and
+  fetches" section, where anyone looking for it would look first, and names
+  the current Fable model.
+- CONTRIBUTING says every release gets a GitHub Release alongside its tag.
+  The tags ran to v1.7.5 while the repo page still called v1.1.0 the latest,
+  which made a busy two months look like a quiet one.
+
 ## [1.7.5] — 2026-10-23
 
 ### Added

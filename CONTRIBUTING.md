@@ -59,4 +59,7 @@ Semver-ish, applied to prompt files with a straight face:
 
 The `version` field in `.claude-plugin/plugin.json` is what triggers plugin
 updates for installed users, so it gets bumped on every release, and the
-[CHANGELOG](CHANGELOG.md) says what they're getting.
+[CHANGELOG](CHANGELOG.md) says what they're getting. Each release also gets
+a `vX.Y.Z` tag and a GitHub Release with that version's CHANGELOG entry as
+its notes, so the repo page shows what's current instead of whatever
+version last remembered to announce itself.
