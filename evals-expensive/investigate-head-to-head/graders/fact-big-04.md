@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "PDX-7712"
+pattern: "(^|[^A-Za-z0-9])PDX-7712(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

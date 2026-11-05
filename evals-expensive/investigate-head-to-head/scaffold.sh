@@ -78,10 +78,10 @@ GOTCHAS = [
 
 # One regex per reference shape that has one; the named events have none.
 CODE_SHAPES = {
-    "tracker key": r"\b[A-Z]{3}-\d{4}\b",
-    "ticket number": r"ticket \d+",
+    "tracker key": r"\b(?!(?:ISO|RFC|UTC)-)[A-Z]{3}-\d{4}\b",
+    "ticket number": r"ticket \d{4}\b",
     "change number": r"\bCHG\d+\b",
-    "issue number": r"#\d{5}",
+    "issue number": r"#\d{5}\b",
     "runbook section": r"runbook section \d+\.\d+",
     "case number": r"\b[a-z]+ case \d{7}\b",
 }

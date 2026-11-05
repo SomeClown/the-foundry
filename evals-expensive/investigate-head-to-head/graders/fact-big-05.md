@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "/v2/carriers/backhauls/lock"
+pattern: "(^|[^A-Za-z0-9])/v2/carriers/backhauls/lock(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

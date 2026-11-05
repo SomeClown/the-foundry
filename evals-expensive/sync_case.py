@@ -12,6 +12,7 @@ Standard library only. `--out DIR` writes somewhere else (the tests use it).
 
 import argparse
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -37,8 +38,20 @@ def escape(token):
     return "".join("\\" + ch if ch in REGEX_SPECIALS else ch for ch in token)
 
 
-def regex_grader(target, pattern, match):
-    return "---\ntype: regex\ntarget: %s\npattern: %s\nmatch: %s\n---\n" % (target, json.dumps(pattern), match)
+def fact_pattern(token):
+    """The found rule as a JavaScript pattern, for use with `flags: i`.
+
+    Any run of whitespace stands for a space in the token; no letter or digit
+    may come just before it, and no letter, digit or hyphen just after. No
+    lookbehind, so it runs on any engine. compare.py spells the same rule.
+    """
+    body = "\\s+".join(escape(part) for part in re.split(" +", token))
+    return "(^|[^A-Za-z0-9])" + body + "(?![A-Za-z0-9-])"
+
+
+def regex_grader(target, pattern, match, flags=""):
+    extra = "flags: %s\n" % flags if flags else ""
+    return "---\ntype: regex\ntarget: %s\npattern: %s\nmatch: %s\n%s---\n" % (target, json.dumps(pattern), match, extra)
 
 
 def load_key():
@@ -55,7 +68,7 @@ def expected():
     out = {"head-to-head-key.json": key_text}
     graders = CASE + "/graders/"
     for fact in key["facts"]:
-        out[graders + "fact-%s.md" % fact["id"]] = regex_grader("last_message", escape(fact["token"]), "contains")
+        out[graders + "fact-%s.md" % fact["id"]] = regex_grader("last_message", fact_pattern(fact["token"]), "contains", "i")
     for name, (target, pattern, match) in CONTROLS.items():
         out[graders + name + ".md"] = regex_grader(target, pattern, match)
     out[graders + "keep-report.md"] = "---\ntype: llm\nfocus: last_message\n---\n\n" + KEEP_RUBRIC + "\n"

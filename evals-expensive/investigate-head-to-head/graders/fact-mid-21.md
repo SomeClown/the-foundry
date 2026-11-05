@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "vendor case 5530281"
+pattern: "(^|[^A-Za-z0-9])vendor\\s+case\\s+5530281(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

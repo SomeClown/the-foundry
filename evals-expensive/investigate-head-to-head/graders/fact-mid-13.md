@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "ticket 4127"
+pattern: "(^|[^A-Za-z0-9])ticket\\s+4127(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

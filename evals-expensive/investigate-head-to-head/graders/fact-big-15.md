@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "the Laredo surcharge mixup"
+pattern: "(^|[^A-Za-z0-9])the\\s+Laredo\\s+surcharge\\s+mixup(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

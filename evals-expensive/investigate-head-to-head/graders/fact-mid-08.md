@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "fxctl void-odometer"
+pattern: "(^|[^A-Za-z0-9])fxctl\\s+void-odometer(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

@@ -719,6 +719,7 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 - Task 1: complete (from f8aef4b; gate GREEN, tests exit 0, 72 tests; no adversarial round)
 - Task 2: complete (from 9bcf8ec; gate RED-6 as expected, 82 tests, no skips; adversarial: 7 structural tests, no failures; two fix rounds on gaps a cold read found in the merged text)
 - Task 3: complete (from 617f19f; gate RED-6 as expected, 147 tests, no skips; adversarial: 22 tests, 2 bugs and 1 fairness problem fixed in round 1)
+- Task 4: complete (from 3811fda; gate RED-6 as expected, 284 tests, no skips; adversarial: 56 tests, 12 failures fixed in round 1, plus the rulings below)
 
 ### Decisions made during the build
 - Owner (before Task 1), quoted: "Ask above $25". If Task 5's forecast for the first full run is above $25, stop and ask before Task 7.
@@ -736,6 +737,11 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 - Ruling (Task 3): route tokens have no path parameters. Why: 7 of 12 contained `<ref>`, so a report writing `{ref}` scored a false miss.
 - Ruling (Task 3): Bash joins `allowed_tools` in both cases, with a `bash-reached` grader on the smoke case. Why: `evals/README.md` says a case's list narrows `--allow-tools`, and investigate needs Bash for `wc -l` and `./bin/git`. The prompt still tells the top session not to read the code. If wrong: the smoke test shows it for a few dollars.
 - Ruling (Task 3): `control-new-area-leads` matches 2 or more leads, including 10 to 19. Scaffolds set `commit.gpgsign=false`.
+
+- Ruling (Task 4): a fact is found case-insensitively, with any whitespace matching a space, at a token boundary, in both the graders and compare.py. Why: "Ticket 5841" at a sentence start or a wrapped token would have scored a false miss in either arm. If wrong: an unusual false hit, which the printed lists don't show, though it applies to both arms alike.
+- Ruling (Task 4): made up ignores common words after `fxctl`, excludes ISO, RFC, and UTC from tracker keys, tightens the ticket and issue shapes, and a decoy counts as live only with no marker on its line, the next wrapped line, or the nearest heading. Why: ordinary prose could have flipped the bar's third clause by itself. If wrong: a real invention slips the count; every counted item is still printed for review.
+- Ruling (Task 4): `END-OF-REPORT` may appear anywhere, not only last. Why: nothing else in a report would contain it. If wrong: a truncated report that happened to quote it, which is very unlikely.
+- Ruling (Task 4): a `ticket 58410` report fits no shape, so it's neither found nor made up. Why: follows from the tightened shape. If wrong: one invention goes uncounted.
 
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.

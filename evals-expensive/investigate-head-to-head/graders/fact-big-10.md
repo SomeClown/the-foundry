@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "fxctl unlock-embargo"
+pattern: "(^|[^A-Za-z0-9])fxctl\\s+unlock-embargo(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---

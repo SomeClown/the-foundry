@@ -633,10 +633,10 @@
   "vendor case 5530281"
  ],
  "code_shapes": {
-  "tracker key": "\\b[A-Z]{3}-\\d{4}\\b",
-  "ticket number": "ticket \\d+",
+  "tracker key": "\\b(?!(?:ISO|RFC|UTC)-)[A-Z]{3}-\\d{4}\\b",
+  "ticket number": "ticket \\d{4}\\b",
   "change number": "\\bCHG\\d+\\b",
-  "issue number": "#\\d{5}",
+  "issue number": "#\\d{5}\\b",
   "runbook section": "runbook section \\d+\\.\\d+",
   "case number": "\\b[a-z]+ case \\d{7}\\b"
  }

@@ -1,6 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "CHG0047730"
+pattern: "(^|[^A-Za-z0-9])CHG0047730(?![A-Za-z0-9-])"
 match: contains
+flags: i
 ---
