@@ -186,9 +186,9 @@ files are expected to fail, and the build log says so.
 
 How it runs, from a read of `evals/README.md` (no eval has been run yet):
 
-- A smoke test comes first, because three nested layers under `claude plugin
-  eval` haven't been tried. If they don't work there, the test moves to a scratch
-  project driven with `claude -p`.
+- A smoke test comes first, because three nested layers under
+  `claude plugin eval .` haven't been tried. If they don't work there, the test
+  moves to a scratch project driven with `claude -p`.
 - The baseline is a checkout of 1.7.6 run as its own target, since the harness
   only compares against no plugin. The comparison happens outside the harness.
 - Each planted fact gets its own check against the final report only. Checking

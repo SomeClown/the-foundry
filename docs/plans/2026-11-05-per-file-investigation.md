@@ -708,3 +708,19 @@ None. No database or migration. The nearest thing is `evals-expensive/head-to-he
 - Adding the head-to-head to the routine library, or adding routine cases for scoped mode. Part 8 asks for neither, and they cost money each run.
 - A planted file that addresses the reader directly. Part 8 doesn't ask for one, and committed text like that is the sort of thing the directory's review may object to while the plugin is under review. The rule is stated in `file-reader`'s definition, and its one-tool list limits what such text could do. If the owner wants it tested, a scratch run with untracked text is the way.
 - Any test that a real 500-file repo stops correctly. It would need a run; the definition states the rule.
+## Build log
+
+Gate: the three commands in the plan header (expect: per the Expected gate results table)
+Branch: feat/per-file-investigation, from b0c0584
+Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-per-file-investigation
+
+### Progress
+- Task 1: complete (from f8aef4b; gate GREEN, tests exit 0, 72 tests; no adversarial round)
+
+### Decisions made during the build
+- Owner (before Task 1), quoted: "Ask above $25". If Task 5's forecast for the first full run is above $25, stop and ask before Task 7.
+
+- Ruling (Task 1): no adversarial round, since no behavior changes. Plan says so. If wrong: nothing; it's one rewrapped bullet.
+
+### Parked
+- Task 1: validate warns about an untracked .DS_Store in the working copy. It's ignored by git and never ships, so it's parked for the owner rather than deleted.
