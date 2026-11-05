@@ -4,6 +4,58 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.0.0] — 2026-11-05
+
+A major version, because the team changed: `file-reader` is a tenth agent,
+and `investigate` now runs a different way (see CONTRIBUTING.md on majors).
+
+### Added
+- `file-reader`: an agent that reads one file, or one section of a big one,
+  and reports what's in it with line numbers. It holds the Read tool and
+  nothing else. `investigate` dispatches it; it isn't meant for direct use.
+- `evals-expensive/`: the head-to-head and nesting smoke cases, the fixture
+  generator, the scorer, and `compare.py`. They spend real model sessions,
+  so nothing in `tests/` starts one and only the owner runs them.
+
+### Changed
+- `investigate` now reads per file. On a new codebase it does a full sweep:
+  every eligible file gets its own `file-reader`, 10 readers at a time, with
+  about 150 files per area handed to an area lead on a big repo. A file over
+  about 1,000 lines is split into sections of about 800 with about 50 lines
+  of overlap. It stops and asks above 500 files. On a known codebase, or for
+  a narrow question or named files, it reads a scoped set instead.
+- `investigate`'s report always ends with Coverage: a mode line, then files
+  listed, read, skipped (by reason), re-dispatched, failed, and every file
+  left unread. Nothing is silently skipped.
+- The read-only exception, stated plainly: `investigate` still has no edit
+  tools, but it can now spawn agents, and only its instructions keep it to
+  `file-reader` and its own area leads, because Claude Code ignores
+  `Agent(type)` restrictions in a subagent definition.
+- The full-sweep rule: one full sweep at a time, with nothing else that
+  spawns readers running alongside it.
+- `file-reader` runs on Haiku, with `investigate` and its area leads on
+  Sonnet, on the owner's call after the Haiku check. Everything on Haiku was
+  cheaper still, but one run lost its whole report and every run was slower.
+
+### Measured
+One 191-file test repo with 48 planted facts, 3 runs per arm, against
+1.7.6 as the baseline (found, missed, and made up are out of 48 and per run):
+- 1.7.6: found 35, 35, and 48; missed 13, 13, and 0; made up 0 in every run;
+  about $0.47 a run.
+- 2.0.0 with every agent on Sonnet: found 48 in every run, missed 0, made up
+  0, about $5.57 a run.
+- 2.0.0 as shipped, readers on Haiku: found 48 in every run, missed 0, made
+  up 0, about $2.62 a run and about the same time as all-Sonnet.
+
+The raw head-to-head verdict was BAR MISSED, from scorer false positives on
+decoys the reports marked dead. The owner chose to fix the scorer, and the
+rescored verdict is BAR MET.
+
+Plan mode: spawning works under it, both in a manual install (agents copied
+to `.claude/agents/`) and with a local copy of `investigate` shadowing the
+plugin's. In a manual install the first batch can fail once on the plugin's
+agent name, and `investigate` retries with the bare name.
+
 ## [1.7.6] — 2026-10-25
 
 ### Changed

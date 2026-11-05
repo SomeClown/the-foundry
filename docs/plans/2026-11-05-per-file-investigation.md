@@ -795,6 +795,7 @@ Owner (Task 8 stop), quoted: "Fix the scorer first". The owner chose to fix the 
 - Ruling (Task 10): no adversarial round, per the plan; the gate and the grep are the test. The builder kept the "copy those two files" advice and added that a copy of `investigate` still dispatches the plugin's `the-foundry:file-reader`, which is variant 2's result. If wrong: a README sentence is off, and the qa pass reads it.
 - Task 11: complete (from 7d6648b; gate GREEN: 381 tests OK, no skips, tests exit 0, both validates exit 0; both greps as the brief expects; no adversarial round, as the plan says). `agents/investigate.md` changed in the one cost sentence only: about 1.4 cents a file, readers on Haiku, dated.
 - Ruling (Task 11): the per-file cost is $2.62 over the repo's 191 tracked files, rounded to 1.4 cents. Why: the Coverage line counts 191 tracked files, and a per-file figure is what the 500-file stop needs. If wrong: the estimate is off by about 6% (180 files were read in full), well inside run-to-run spread.
+- Task 12: complete (from d6933b4; gate GREEN: 381 tests OK, tests exit 0, both validates exit 0; version check prints 2.0.0; no adversarial round, as the plan says). The CHANGELOG states the raw BAR MISSED, the owner's scorer fix, the rescored BAR MET, and the Haiku switch with its reason.
 
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.
