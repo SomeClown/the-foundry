@@ -123,14 +123,28 @@ class AgentFilesTest(unittest.TestCase):
         self.assertEqual(reader["tools"], ["Read"])
         self.assertEqual(reader["model"], "haiku")
 
+    def test_file_reader_front_matter_keys_are_exactly_the_four(self):
+        # No hooks, mcpServers, permissionMode, or skills may creep in.
+        self.assertEqual(set(agents()["file-reader"]), {"name", "description", "tools", "model"})
+
     def test_investigate_is_the_only_read_only_agent_that_can_spawn(self):
         # "Task" is the Agent tool's other name; the session init lists it that way.
         spawners = {
             name
             for name, fm in agents().items()
-            if {"Agent", "Task"} & set(fm["tools"]) and not WRITE_TOOLS & set(fm["tools"])
+            if any(re.match(r"(Agent|Task)\b", t) for t in fm["tools"])
+            and not WRITE_TOOLS & set(fm["tools"])
         }
         self.assertEqual(spawners, {"investigate"})
+
+    def test_spawner_detection_catches_scoped_spawning_entries(self):
+        # The detector above must see Agent(file-reader) and Task(...) as spawners.
+        for entry in ("Agent", "Task", "Agent(file-reader)", "Task(file-reader, x)"):
+            with self.subTest(entry=entry):
+                self.assertTrue(re.match(r"(Agent|Task)\b", entry))
+        for entry in ("Read", "Taskmaster", "Grep"):
+            with self.subTest(entry=entry):
+                self.assertFalse(re.match(r"(Agent|Task)\b", entry))
 
     def test_team_is_ten(self):
         self.assertEqual(len(agents()), 10)
@@ -178,13 +192,31 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
         for (_, prev_end), (start, end) in (((a1, b1), (a2, b2)), ((a2, b2), (a3, b3))):
             self.assertEqual(prev_end - start + 1, 50, "overlap is not 50 lines")
             self.assertEqual(end - start + 1, 800, "section is not 800 lines")
-        # "and so on, ending at the last line": step 750, width 800, clipped.
-        for total in (1001, 1550, 1551, 1640, 2300, 2400):
+        # "and so on, ending at the last line": the step and width come from the
+        # definition's own numbers, so editing them there changes this check.
+        step, width = a2 - a1, b1 - a1 + 1
+        self.assertEqual(self.sections_cover(step, width, range(1001, 2500)), [])
+
+    @staticmethod
+    def sections_cover(step, width, totals):
+        """Totals for which sections of `width` starting every `step` lines leave a gap."""
+        bad = []
+        for total in totals:
             covered, start = set(), 1
             while start <= total:
-                covered.update(range(start, min(start + 799, total) + 1))
-                start += 750
-            self.assertEqual(covered, set(range(1, total + 1)), f"gap in a {total}-line file")
+                covered.update(range(start, min(start + width - 1, total) + 1))
+                start += step
+            if covered != set(range(1, total + 1)):
+                bad.append(total)
+        return bad
+
+    def test_section_coverage_check_can_fail(self):
+        # Proof the check above has teeth: a step wider than the width leaves gaps.
+        self.assertNotEqual(self.sections_cover(850, 800, range(1001, 2500)), [])
+        # And the definition's real numbers are what feed it.
+        m = re.search(r"lines (\d+)-(\d+), (\d+)-(\d+)", self.flat("investigate"))
+        a1, b1, a2, _ = map(int, (m.group(1), m.group(2), m.group(3), m.group(4)))
+        self.assertEqual(self.sections_cover(a2 - a1, b1 - a1 + 1, range(1001, 2500)), [])
 
     def test_area_lead_check_comes_before_orientation(self):
         text = self.text("investigate")

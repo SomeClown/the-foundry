@@ -797,6 +797,66 @@ Owner (Task 8 stop), quoted: "Fix the scorer first". The owner chose to fix the 
 - Ruling (Task 11): the per-file cost is $2.62 over the repo's 191 tracked files, rounded to 1.4 cents. Why: the Coverage line counts 191 tracked files, and a per-file figure is what the 500-file stop needs. If wrong: the estimate is off by about 6% (180 files were read in full), well inside run-to-run spread.
 - Task 12: complete (from d6933b4; gate GREEN: 381 tests OK, tests exit 0, both validates exit 0; version check prints 2.0.0; no adversarial round, as the plan says). The CHANGELOG states the raw BAR MISSED, the owner's scorer fix, the rescored BAR MET, and the Haiku switch with its reason.
 
+### From the qa pass
+Three qa reviewers ran in one message, each with its own lens: read-only boundaries (0 Critical, 0 High, 3 Medium, 8 Low), definitions against the design (0/1/4/11), and docs against this build log (0/2/3/9). Every number the docs quote matched this log, and the docs reviewer reproduced each one with `compare.py`. qa can't write files, so the orchestrator holds the reports. Triage:
+- Fix batch 1 (`agents/investigate.md`, brief `fix-batch-1-brief.md`):
+  - area leads return a per-file checklist, and the top reconciles by path (the High);
+  - a failed or cut-off lead gets one restart;
+  - the concurrency retry continues in batches of 5;
+  - wait for background agents;
+  - readers and leads are dispatched with only a type and a brief;
+  - the `Reader agent:` value is limited to the two reader names, and paths go in backticks;
+  - leads skip the split paragraph;
+  - untracked files: listed, not read, on a full sweep, and read when a scoped read names them;
+  - the first-line flags stay first;
+  - re-dispatch a short `Lines read:` or a missing section only;
+  - coupling is checked by grep;
+  - the entry point is in orientation;
+  - a stop reply carries no Coverage section;
+  - the mode rule covers a known codebase asking for the whole thing, and a focus doesn't make a read scoped.
+- Fix batch 2 (docs):
+  - CHANGELOG names the second scorer fix and the readers-on-Haiku raw BAR MISSED (docs High);
+  - the walkthrough's Stage 2 brief is a full sweep (docs High, definitions Medium);
+  - `investigate` dispatches run one at a time unless each brief says the codebase is known or asks one narrow question;
+  - the README and CHANGELOG hard-block advice covers `investigate`'s own calls only, in default or plan mode;
+  - the depth bound is the default's;
+  - the session types the sweep was tested in;
+  - evals/README's `--max-cost-usd` contradiction, absolute `WORK`, and the `--summary` exit codes;
+  - the scripts lists in README and PRIVACY;
+  - area leads in PRIVACY and debug;
+  - the cost figures labeled as means with the judge included;
+  - the CHANGELOG wording and Coverage claims;
+  - the manual-install shadowing and overwrite notes;
+  - the "one exception" wording;
+  - the CONTRIBUTING pointer.
+- Tests (test-engineer, folded into batch 1's adversarial round):
+  - `file-reader`'s front-matter keys exactly `{name, description, tools, model}`;
+  - the spawner test matches `Agent(...)`;
+  - the coverage-loop test that can't fail;
+  - pins for line-number labels, "once", and the dispatch-name order.
+- Declined:
+  - Leads dispatched under the bare name in a shadow copy. Why: the agent can't reliably tell it's a copy, and the docs fix states the limit. If wrong: a user who wants the hard block on leads has to copy `investigate` with the plugin uninstalled.
+  - `compare.py`'s "legacy" dead word and string-prefix route exemption. Why: rescored without them, nothing changed in any stored report, and both arms are scored alike. If wrong: a future run's made-up count could read low.
+  - A more specific reader name than `file-reader`. Why: a rename is the owner's call, and the README note covers the collision.
+  - Checking whether `uiux`'s `Skill` tool can fork a subagent. Why: no fork skill ships, and the README wording is softened instead.
+- For the docs task's "As built":
+  - the Haiku switch reversing 5B;
+  - the design constraint "can lower the limit" corrected to "can raise or lower";
+  - the Part 7 amendment (lead checklists and the top-level reconciliation);
+  - line-number accuracy on Haiku never measured (two Haiku runs report an off-by-one reader that a lead corrected by grep);
+  - the reader's gotcha template mirroring the test prompt's fact shapes (Task 3, never logged).
+- Ruling (qa pass): batch 1 changes measured behavior after the head-to-head. Why: the High is a silent-gap hole the stored runs show, and the design's anti-goals rule out a silent gap. If wrong: 2.0.0 ships a definition the head-to-head didn't measure. A re-run of the readers arm (about $8 for 3 runs) goes to the owner as a question in the final report.
+- Fix batch 1: adversarial round done. 9 test methods (7 new, 2 changed), 47 pins as subtests in the new `tests/test_investigate_batch1.py`, 389 tests OK, no bugs. Seven ambiguities in the edited definition, ruled and sent back as fix round 1:
+  1. the "summary line" is the summary after `Mode:`;
+  2. a lead that can't spawn still returns a checklist, and isn't restarted;
+  3. batches of 5 apply to readers, leads stay one at a time;
+  4. no first-line flag after a second refusal, with the unstarted files listed by path in Coverage;
+  5. "gotcha" said once;
+  6. sections named;
+  7. untracked files don't count toward the 500-file stop.
+  If wrong: each is a sentence in the definition the qa pass can revisit.
+- Fix batch 1: complete (from c777e9b; gate GREEN, 389 tests OK, tests exit 0, both validates exit 0; adversarial: 9 test methods with 58 pins in `tests/test_investigate_batch1.py`, 0 bugs, 7 ambiguities fixed in round 1). Ruling 1's wording changed a pinned phrase, so the builder applied it with the pin failing and test-engineer then updated the pin. `agents/investigate.md` went from 299 to 342 lines.
+
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.
 - Task 1: validate warns about an untracked .DS_Store in the working copy. It's ignored by git and never ships, so it's parked for the owner rather than deleted.
