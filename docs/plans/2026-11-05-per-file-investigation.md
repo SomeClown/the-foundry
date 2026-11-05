@@ -722,6 +722,16 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 - Task 4: complete (from 3811fda; gate RED-6 as expected, 284 tests, no skips; adversarial: 56 tests, 12 failures fixed in round 1, plus the rulings below)
 - Task 5: complete, outcome A (two runs: $0.43 and $0.40, 82 and 74 seconds, 8 agents each, so about $0.05 per agent; all graders pass, reader names clean on the second). Task 6 skipped.
 - Task 7: first run done, one run and not a verdict: $5.61 plus $0.07 for judges, 750 seconds, 48 of 48 found, 3 made up (all decoys), 2 area leads, all controls pass. Stopped for the owner's go-ahead on Task 8. Forecast was $10 to $20 for about 190 readers plus leads, under the owner's $25; definitions f7e3e3853dc76def0890679355f884fec606b870 3fd94fe0109e4e717e41be30b2ce6ceef2075d52 
+- Task 8: runs done, stopped for the owner (owner's yes quoted below; hashes match the first run; baseline built from v1.7.6, version 1.7.6, 9 agents; `--max-cost-usd 25` per command; baseline exit 0, new-rest exit 0, compare exit 1)
+
+Head-to-head verdict: BAR MISSED (raw, compare exit 1). Waiting on the owner's ruling on the decoy false positives.
+- New, per run: found 48/48/48, missed 0/0/0, made up 3/3/3 (all decoys), $5.69/$5.41/$5.62, 750/720/822 s. Mean: found 48.00, missed 0.00, made up 3.00, $5.57, 764 s.
+- Baseline 1.7.6, per run: found 35/35/48, missed 13/13/0, made up 0/0/0, $0.51/$0.42/$0.48, 117/98/111 s. Mean: found 39.33, missed 8.67, made up 0.00, $0.47, 109 s.
+- Clause 1 (found at least 90% of 48): PASS. Clause 2 (missed at most half the baseline's): PASS, 0.00 against 8.67. Clause 3 (made up no more than the baseline): FAIL, 3.00 against 0.00.
+- Misses by placement: new 0 of 24 big-file-middle and 0 of 24 repo-middle per run; baseline 4.00 and 4.67 per run.
+- Baseline fact-level misses, the same 13 in runs 1 and 2, none in run 3: fact-big-08, -12, -15, -19, -23, -24 and fact-mid-14, -16, -17, -18, -19, -21, -24. All are gotchas; the baseline found every route and command in every run. The new arm missed nothing.
+- Total spend on the head-to-head: new $16.71, baseline $1.41, $18.12 in all, including judges.
+- The made-up lists, read by eye: all 9 counted items are decoys each report marks as dead. Six (`/v2/warehouse/pallets/legacy-purge`, `/v2/fleet/frames/legacy-thaw`, `/v2/fleet/gpses/legacy-confirm`, counted in two runs) are sub-bullets under a parent bullet quoting "removed in 4.0". Three (`/v2/customs/declarations/legacy-reassign`, `/v2/routing/detours/legacy-reopen`, `/v2/warehouse/aisles/legacy-flag`, one run) sit under the bold line `**Commented out, not live**`, which `decoy_listed_live` doesn't treat as a heading. No other made-up item was counted in either arm. Ruled out, clause 3 is 0.00 against 0.00, a PASS, and the verdict would be BAR MET. The plan says a ruling can't turn a miss into a pass without the owner, so it's theirs.
 
 ### Decisions made during the build
 - Owner (before Task 1), quoted: "Ask above $25". If Task 5's forecast for the first full run is above $25, stop and ask before Task 7.
@@ -747,7 +757,13 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 
 - Ruling (Task 5): the first smoke run ($0.43, 82 seconds) passed every grader, outcome A, but the lead tried the bare `file-reader` name first and recovered on retry. investigate now tries the plugin name first, passes the working name to leads, and treats an unknown name as not a failure to spawn. Why: a lead that read that error as can't-spawn would waste a paid run. If wrong: one failed call in a manual install. Smoke rerun below.
 
+- Owner (Task 7 stop), quoted: "Yes, $25 ceiling". Task 8 adds `--max-cost-usd 25` to each of its two eval commands.
+- Owner (Task 7 stop), quoted: "Add to the TODO list for this project to evaluate how costs, accuracy, and time would change if we dropped the agent model down a level or two (to Haiku from Sonnet, for instance). We'll want a verdict on this before we take it to version 2.0.0 as planned." Recorded under "Before 2.0.0" below.
+
 - Ruling (Task 7): the head-to-head's timeout is 3600 seconds, not 5400. Why: the harness refuses anything higher, and refused the first launch at $0. If wrong: a run that needs longer leaves no report, which goes to the owner rather than being rerun.
+
+### Before 2.0.0 (owner's TODO)
+- **A cheaper model for the sweep: needs a verdict before 2.0.0.** Measure how cost, accuracy (found, missed, made up), and time change with the agents a level or two down, starting with `file-reader` on Haiku instead of Sonnet, and possibly the area leads and `investigate` too. Use the same head-to-head case and `compare.py --summary` against the Sonnet runs from Task 8. Placed after Task 9 and before Task 10, not just before Task 12: Tasks 10 to 12 write the reader's model and the measured costs into the README, docs, and CHANGELOG, and a switch would change them. It spends real money, so before running it the orchestrator brings the owner the arms, the number of runs, and a cost forecast from Task 8's figures. Switching the reader off Sonnet reverses owner decision 5B in the design, so it's the owner's call.
 
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.
