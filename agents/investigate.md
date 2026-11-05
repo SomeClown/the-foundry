@@ -102,8 +102,10 @@ anyway, and say in the body that `Agent` is missing.
 
 ## Run the Readers
 
-Dispatch by the name your `Agent` tool lists: `file-reader` if it's there, otherwise
-`the-foundry:file-reader`. Each reader's brief is:
+Try the plugin name first: `the-foundry:file-reader`. If that name is refused as
+unknown, use the bare name, `file-reader`, which is what a manual install gives.
+Use whichever name worked for the rest of the run. An area lead tries the name in
+its brief's `Reader agent:` line first. Each reader's brief is:
 
 ```
 Read <path> [lines A to B, for a section].
@@ -118,8 +120,10 @@ Send 10 at a time, in one message, and wait for all of them before sending the n
 
 **Above that,** split the repo into areas of at most about 150 files, normally by
 top-level folder, dividing large folders and merging small ones. Run one area at a
-time, never two together. Each is led by another copy of you (`investigate` if your
-`Agent` tool lists it, otherwise `the-foundry:investigate`), with this brief:
+time, never two together. Each is led by another copy of you. Try the plugin name
+first, `the-foundry:investigate`; if it's refused as unknown, use the bare name,
+`investigate`. Use whichever worked for the rest of the run, and pass the reader
+name that worked to each lead on a new line of its brief:
 
 ```
 AREA LEAD
@@ -127,6 +131,7 @@ Area: <name>
 Project: <a sentence or two>
 Focus: <the task's focus, or "none">
 Environment: <anything your brief said about the environment, such as a git wrapper>
+Reader agent: <name>
 Files:
 <one path per line>
 ```
@@ -169,6 +174,9 @@ you carry its flag to the first line of your report. If several leads carry a fl
 make it one first line: `NOT A PER-FILE READ: <which areas, and why>`. The mode
 line stays `Mode: full sweep, <N> area leads`; the first-line flag names which
 areas fell back.
+
+An unknown-name error isn't a failure to spawn. Try the other name first, and only
+fall back if `Agent` isn't available at all or both names are refused.
 
 If a spawn is refused because too many agents are running, wait for the ones you
 started to finish, then try once more with a batch of 5. List anything still not

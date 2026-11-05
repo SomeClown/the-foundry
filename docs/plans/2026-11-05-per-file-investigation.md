@@ -743,6 +743,8 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 - Ruling (Task 4): `END-OF-REPORT` may appear anywhere, not only last. Why: nothing else in a report would contain it. If wrong: a truncated report that happened to quote it, which is very unlikely.
 - Ruling (Task 4): a `ticket 58410` report fits no shape, so it's neither found nor made up. Why: follows from the tightened shape. If wrong: one invention goes uncounted.
 
+- Ruling (Task 5): the first smoke run ($0.43, 82 seconds) passed every grader, outcome A, but the lead tried the bare `file-reader` name first and recovered on retry. investigate now tries the plugin name first, passes the working name to leads, and treats an unknown name as not a failure to spawn. Why: a lead that read that error as can't-spawn would waste a paid run. If wrong: one failed call in a manual install. Smoke rerun below.
+
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.
 - Task 1: validate warns about an untracked .DS_Store in the working copy. It's ignored by git and never ships, so it's parked for the owner rather than deleted.
