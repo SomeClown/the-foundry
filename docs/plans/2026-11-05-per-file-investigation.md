@@ -716,11 +716,19 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 
 ### Progress
 - Task 1: complete (from f8aef4b; gate GREEN, tests exit 0, 72 tests; no adversarial round)
+- Task 2: complete (from 9bcf8ec; gate RED-6 as expected, 82 tests, no skips; adversarial: 7 structural tests, no failures; two fix rounds on gaps a cold read found in the merged text)
 
 ### Decisions made during the build
 - Owner (before Task 1), quoted: "Ask above $25". If Task 5's forecast for the first full run is above $25, stop and ask before Task 7.
 
 - Ruling (Task 1): no adversarial round, since no behavior changes. Plan says so. If wrong: nothing; it's one rewrapped bullet.
+
+- Ruling (Task 2): on a new codebase, full sweep unless the brief asks one narrow question or names files; on a known one, scoped unless the brief asks for the whole thing. The design's two modes left briefs like "before designing a feature" uncovered. Why: the owner said "always" for a new codebase and gave one exception. If wrong: more sweeps than wanted; a brief can always say scoped.
+- Ruling (Task 2): in scoped mode the 500-file stop, the 150-file split, the gap check, and Coverage count the scoped set, not the repo. Why: otherwise a three-file read on a 600-file repo stops. If wrong: nothing paid; it's one paragraph.
+- Ruling (Task 2): STOPPED BEFORE READING beats NOT A PER-FILE READ on the first line. Why: stopping is the safer of the two. If wrong: nothing paid.
+- Ruling (Task 2): a fourth mode value, `Mode: single agent, not a per-file read`, and leads' Coverage has no mode line. Why: the three in the plan couldn't be filled truthfully on a fallback.
+
+- Ruling (Task 2): a lead that fell back keeps the mode line and the first-line flag names its area; a single-agent read gives unread files as a count per folder, not by path. Why: the file left both undefined. If wrong: a longer or shorter Coverage section.
 
 ### Parked
 - Task 1: validate warns about an untracked .DS_Store in the working copy. It's ignored by git and never ships, so it's parked for the owner rather than deleted.
