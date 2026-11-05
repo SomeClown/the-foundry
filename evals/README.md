@@ -86,6 +86,68 @@ model actually did and what the judge saw, and decide which of three it is:
    `--judge-model sonnet`, and tighten the rubric's wording if it keeps
    happening.
 
+## The expensive cases: `evals-expensive/`
+
+`evals-expensive/` holds the paid head-to-head for per-file investigation: a
+generated test repo of 191 files with planted facts (48 of them), and a
+comparison of today's `investigate` against 1.7.6's single-agent one. It sits
+outside `evals/` so a routine run, which loads this folder, never starts it
+by accident: one full sweep starts about 190 readers, and it runs only with
+`--eval-dir evals-expensive`. `nesting-smoke` is the cheap check beside it,
+that an agent can start an agent that starts an agent.
+
+The exact commands (`WORK` is a scratch folder; run them one after the other).
+The first run of the new version:
+
+```bash
+git rev-parse HEAD:agents/investigate.md HEAD:agents/file-reader.md
+claude plugin eval . --eval-dir evals-expensive --case investigate-head-to-head --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 1 --no-publish --output-dir "$WORK/results/new-first"
+python3 evals-expensive/compare.py --key evals-expensive/head-to-head-key.json --summary "$WORK/results/new-first/aggregate-result.json"
+```
+
+Then the baseline, built from the v1.7.6 tag, and the rest of the new arm:
+
+```bash
+BASE="${TMPDIR:-/tmp}/foundry-baseline-1.7.6"; rm -rf "$BASE"; mkdir -p "$BASE"
+git archive v1.7.6 | tar -x -C "$BASE"
+cp -R evals-expensive "$BASE/"
+grep '"version"' "$BASE/.claude-plugin/plugin.json"; ls "$BASE/agents" | wc -l
+
+(cd "$BASE" && claude plugin eval . --eval-dir evals-expensive --case investigate-head-to-head --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 3 --no-publish --output-dir "$WORK/results/baseline")
+
+claude plugin eval . --eval-dir evals-expensive --case investigate-head-to-head --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 2 --no-publish --output-dir "$WORK/results/new-rest"
+
+python3 evals-expensive/compare.py --key evals-expensive/head-to-head-key.json --new "$WORK/results/new-first/aggregate-result.json" "$WORK/results/new-rest/aggregate-result.json" --baseline "$WORK/results/baseline/aggregate-result.json"; echo "compare exit=$?"
+```
+
+The baseline should print `"version": "1.7.6"` and `9` agents.
+`--max-cost-usd` can't limit a run (the harness checks it only before a run
+starts); the case's `timeout_seconds: 3600` is what bounds one.
+
+**What it cost.** Measured on 2026-11-05, with the readers on Haiku (the
+shipped setup), a run took about $2.62 and 796 seconds on the 191-file test
+repo, against about $0.47 and 109 seconds for 1.7.6. The same sweep with every
+reader on Sonnet, which is what led to the switch, cost $5.57 a run.
+
+**How `compare.py` scores.** The harness's `aggregate-result.json` holds each
+run's report, which `compare.py` reads and checks against
+`head-to-head-key.json`. It counts, per run: facts found (of 48), facts missed,
+and items made up (a route, `fxctl` command or ticket reference that isn't
+real, or a decoy listed as live). A decoy the report marks dead, on its own
+line, the next line, a parent bullet, a colon lead-in, a bold run-in label
+ending in a full stop, or the nearest heading or bold label, isn't counted as
+made up. The bar is on the means across each arm's runs: found at least 90% of
+the 48, missed at most half the baseline's, and made up no more than the
+baseline's. Exit 0 prints `BAR MET`, exit 1 prints `BAR MISSED`, and exit 2
+prints `CAN'T SCORE` with the reason (a missing report, too few runs, an
+unreadable key); a crash while scoring is also exit 2, never 1. `--summary`
+scores one result on its own and exits 0.
+
+**Why the `llm` grader.** The `keep-report` grader exists to store the
+report, as its `evidence`, so `compare.py` has something to score. Its
+verdict only checks that the reply looks like a report. The fact graders
+(`fact-*`) apply the same found rule as `compare.py`.
+
 ## How a case is built
 
 ```

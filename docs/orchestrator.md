@@ -4,7 +4,7 @@
 > structure is a copy of the organization's communication structure."
 > — Melvin Conway, describing your codebase from 1967
 
-The nine agents are only half of The Foundry. The other half is the
+The ten agents are only half of The Foundry. The other half is the
 orchestrating session — the Claude Code session you're actually typing into —
 which briefs agents, integrates their results, routes findings, and owns every
 commit. The agent files can't teach your session that job. Your `CLAUDE.md`
@@ -21,15 +21,18 @@ they're free.
 ```markdown
 ## The Foundry (dev agent team)
 
-A nine-agent development team is installed (investigate, architect, uiux,
-implement, frontend, test-engineer, qa, devops, docs), plus four skills this
-session runs itself (brainstorm, run-plan, debug, ship). This session is the
-orchestrator: brief agents with self-contained context, integrate their
-reports, and own all commits and pushes.
+A ten-agent development team is installed (investigate, file-reader, architect,
+uiux, implement, frontend, test-engineer, qa, devops, docs), plus four skills this
+session runs itself (brainstorm, run-plan, debug, ship). `file-reader` is
+dispatched only by `investigate`. This session is the orchestrator: brief agents
+with self-contained context, integrate their reports, and own all commits and
+pushes.
 
 Routing:
 - Unfamiliar codebase or post-context-gap → `investigate` first; pass its
-  report to later agents instead of re-deriving it.
+  report to later agents instead of re-deriving it. If it replies
+  `STOPPED BEFORE READING`, ask the user; a yes goes back in a new brief that
+  says so.
 - New feature or project with open choices → the `brainstorm` skill first; it
   writes the approved design to `docs/design.md`. Nothing gets built before
   the user approves it.
@@ -57,8 +60,9 @@ Working rules:
 - Evidence before claims: no "done", "fixed", or "passing" without command
   output from this session that shows it, exit code included.
 - Dispatch independent work (read-only reviews, separate investigations) in
-  parallel, in one message. Never run two file-writing agents on the same
-  branch at once.
+  parallel, in one message, except full sweeps: run those one at a time, with
+  nothing else that spawns readers alongside. Never run two file-writing
+  agents on the same branch at once.
 - Outside review comments (PR reviewers, bots) get checked against the code
   before you agree with them; when they're wrong, push back with evidence.
 
@@ -77,6 +81,11 @@ common failure mode is a lazy briefing — "fix the thing we discussed" means
 nothing to a fresh agent. Pass file paths, the relevant report, and the
 decision context. The walkthrough in this repo shows what real briefings look
 like.
+
+**Say whether the codebase is known.** A brief to `investigate` should state
+whether the session already knows the codebase. A new one gets a full sweep,
+one reader per file; a narrow question gets a scoped read of only the files
+that matter.
 
 **Don't re-run investigate out of habit.** Its report is reusable within a
 session. Re-run it after a context gap, a big landed change, or when you catch

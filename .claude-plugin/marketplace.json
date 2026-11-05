@@ -4,12 +4,12 @@
     "name": "Teren Bryson",
     "url": "https://github.com/SomeClown"
   },
-  "description": "Home of The Foundry, a portable nine-agent software-development team, with skills, for Claude Code.",
+  "description": "Home of The Foundry, a portable ten-agent software-development team, with skills, for Claude Code.",
   "plugins": [
     {
       "name": "the-foundry",
       "source": "./",
-      "description": "A portable software-development agent team for Claude Code: nine specialized subagents with enforced permissions and tiered models, plus brainstorm, run-plan, debug, and ship skills for the orchestrating session.",
+      "description": "A portable software-development agent team for Claude Code: ten specialized subagents with enforced permissions and tiered models, plus brainstorm, run-plan, debug, and ship skills for the orchestrating session.",
       "license": "MIT"
     }
   ]

@@ -196,7 +196,9 @@ commits only: pushing waits for the user.
 
 - **One writer at a time.** implement, frontend, test-engineer, and docs all
   write files; never run two of them at once on the same branch. Read-only
-  agents (qa, investigate, architect) can run in parallel with each other.
+  agents (qa, investigate, architect) can run in parallel with each other,
+  except full sweeps of `investigate`: run those one at a time, with nothing
+  else that spawns readers alongside.
 - **Batch small same-shape work.** Five tasks that each add one config key, or
   one rename across eight files, go to one builder as one dispatch, with one
   adversarial round and one gate.

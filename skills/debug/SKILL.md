@@ -112,7 +112,9 @@ Use whichever of these fits; most bugs fall to one or two.
 - **Legwork.** For a long trace through unfamiliar code or history, dispatch
   `the-foundry:investigate` with the symptom, the evidence so far, and the one
   question to answer ("where does `guild_id` become None before
-  `record_post`?"). It's read-only and reports back.
+  `record_post`?"). A one-question brief gets a scoped read of only the
+  relevant files. It changes nothing: it starts read-only readers and reports
+  back.
 
 ## 4. One hypothesis at a time
 

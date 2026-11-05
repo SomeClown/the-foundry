@@ -10,7 +10,8 @@ permissions you've set:
 
 - **Your files:** its agents read the project you open, and five of them write
   files there, each in its own lane (application code, UI code, tests, config,
-  docs). Nothing is copied anywhere else by the plugin.
+  docs). `investigate` starts read-only reader agents inside your session, and
+  they go nowhere new. Nothing is copied anywhere else by the plugin.
 - **The web:** two agents (`qa` and `uiux`) can use Claude Code's own web search
   and page fetching, and two (`frontend` and `uiux`) can drive the Claude
   desktop app's built-in browser, mostly against your own dev server.
