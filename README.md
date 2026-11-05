@@ -6,19 +6,18 @@
 A portable software-development agent team for [Claude Code](https://claude.com/claude-code):
 raw requests go in, shipped features come out.
 
-The Foundry is nine specialized subagents plus your orchestrating Claude Code
-session as the tenth member, and four skills that session runs itself. Each
+The Foundry is ten specialized subagents plus your orchestrating Claude Code session as the lead, and four skills that session runs itself. Each
 agent is a single Markdown file with a strict tool allowlist, an assigned model
 tier, and opinionated working instructions.
-Install it, and every project you open gets an investigation specialist, an
-architect, a designer, two implementers, a test engineer, an adversarial
+Install it, and every project you open gets an investigation specialist (with
+a small file reader it sends out to read one file apiece), an architect, a designer, two implementers, a test engineer, an adversarial
 reviewer, a devops hand, and a docs keeper: the session you're typing into acts
 as the lead that briefs them, integrates their results, and owns every commit.
 In other words, it's your project manager. I've thought about building a
 dedicated PM agent, but I'm not sure I need one: the orchestrating session does
 the job well, with minimal token consumption.
 
-To be fair, you do not need nine agents to write software. I wrote software for decades with zero agents and an amount of coffee that my doctor politely describes as "concerning." What you get from nine agents is the same thing you get from nine specialists anywhere: nobody has to be mediocre at everything, and the reviewer isn't grading their own homework. You also need strict boundaries and guardrails, the same as managing any team, to keep the agents in their own lanes. I seem to have achieved that here, but I am still testing, so take your own safety precautions and make sure you feel comfortable with what the team is doing.
+To be fair, you do not need ten agents to write software. I wrote software for decades with zero agents and an amount of coffee that my doctor politely describes as "concerning." What you get from ten agents is the same thing you get from ten specialists anywhere: nobody has to be mediocre at everything, and the reviewer isn't grading their own homework. You also need strict boundaries and guardrails, the same as managing any team, to keep the agents in their own lanes. I seem to have achieved that here, but I am still testing, so take your own safety precautions and make sure you feel comfortable with what the team is doing.
 
 ## Background
 
@@ -42,7 +41,11 @@ Design principles that came out of that experience:
 - **Read-only means enforced read-only.** Advisory agents don't have edit
   tools at all: the boundary is the tool allowlist, not a polite instruction.
   Asking an eager LLM to please not edit files is like asking a Labrador to
-  please not acknowledge the mailman. Take away the tools instead.
+  please not acknowledge the mailman. Take away the tools instead. One
+  exception, stated plainly: `investigate` has no edit tools, but it can spawn
+  agents, and only its instructions keep it to `file-reader` and its own area
+  leads, because Claude Code ignores `Agent(type)` restrictions in a subagent
+  definition.
 - **The reviewer must be able to run things.** A QA agent that can't build or
   test the project can only find bugs by squinting. Foundry's `qa` runs the
   suite; that's how it catches what reading misses.
@@ -59,7 +62,8 @@ Design principles that came out of that experience:
 
 | Agent | Role | Writes? | Model |
 |---|---|---|---|
-| `investigate` | Codebase onboarding — reads a project cold; reports structure, data model, coupling, gotchas | No | sonnet |
+| `investigate` | Codebase onboarding — reads a project cold, giving each file its own reader; reports structure, data model, coupling, gotchas | No | sonnet |
+| `file-reader` | Reads one file or section for `investigate` and reports it with line numbers; holds only `Read` | No | haiku |
 | `architect` | Turns a feature request (+ investigate report) into an ordered implementation plan with file-level scope | No | opus |
 | `uiux` | Design advisor — aesthetic/creative direction, visual critique in a browser, dataviz, greenfield design systems | No | opus |
 | `implement` | General implementer — backend, business logic, APIs, data models | Yes (app code) | sonnet |
@@ -71,7 +75,8 @@ Design principles that came out of that experience:
 
 **Model policy:** Opus goes where mistakes are subtle and costly (design
 trade-offs, missed vulnerabilities); Sonnet everywhere execution follows a
-spec, a runbook, or established patterns. This is the same logic as staffing a
+spec, a runbook, or established patterns, and `file-reader` runs on Haiku, since
+reading one file is the smallest job on the team. This is the same logic as staffing a
 hospital: the diagnostician gets paid more than the phlebotomist, and both of
 them would make a hash of the other's job. The orchestrating session keeps
 whatever top model you run (I've had good results with Fable 5.1, though your
@@ -79,18 +84,34 @@ mileage may vary) and can escalate any single spawn via the Agent tool's
 per-call `model` override.
 
 **Permission policy:** Tool allowlists are the enforced boundary — read-only
-agents have no Edit/Write. Browser tools are held by `frontend` (full set, for
+agents have no Edit/Write. The one exception is that `investigate` can spawn
+agents, and only its instructions keep it to `file-reader` and its own area
+leads, because Claude Code ignores `Agent(type)` restrictions in a subagent
+definition. Browser tools are held by `frontend` (full set, for
 building) and `uiux` (observation set — no form input or scripting, and its
 instructions forbid state-changing clicks; it's a critic in the gallery, not a
 visitor doing errands). `investigate` and `architect` also carry
 `permissionMode: plan`, which hard-blocks mutations even through Bash, but only
 in a manual install: Claude Code ignores that field for agents that come from a
-plugin, as a deliberate security rule. In a plugin install, all four read-only
-agents (investigate, architect, qa, uiux) rest on having no edit tools plus
-their instructions, which so far has held. If you want the hard block, copy
-those two files into `~/.claude/agents/`, where your copy overrides the plugin's.
-`qa` and `uiux` don't carry plan mode at all (qa needs to run builds and tests,
-uiux needs to drive a browser).
+plugin, as a deliberate security rule. In a plugin install, all five read-only
+agents (investigate, file-reader, architect, qa, uiux) rest on having no edit
+tools plus their instructions, which so far has held; `file-reader`'s boundary
+is its tool list alone, since it holds `Read` and nothing else. If you want the
+hard block, copy those two files into `~/.claude/agents/`, where your copy
+overrides the plugin's. A copy of `investigate` alongside the plugin still
+dispatches the plugin's `the-foundry:file-reader`, which worked on the first try
+when tested. `qa`, `uiux` and `file-reader` don't carry plan mode at all (qa
+needs to run builds and tests, uiux needs to drive a browser, and file-reader
+has only `Read`).
+
+Plan mode doesn't block `investigate` from spawning readers, in a manual install
+or a copy (tested 2026-11-05). In a manual install, where every agent is copied
+into `~/.claude/agents/`, the first batch under the `the-foundry:file-reader`
+name fails with "Agent type not found" and the rest run under the bare
+`file-reader` name; it costs a turn, not a reader. `investigate` also ignores
+the notice plan mode adds, and may mention it on the first line of its report.
+Should plan mode ever block spawning, a manual install or a copy falls back to
+single-agent reading and says so at the top of its report.
 
 ## The skills
 
@@ -135,7 +156,8 @@ brainstorm → investigate → architect → run-plan: [ implement / frontend (u
 
 Division-of-labor rules the agents enforce on themselves:
 
-- Read-only agents (investigate, architect, uiux, qa) never write files.
+- Read-only agents (investigate, file-reader, architect, uiux, qa) never write files.
+- One full sweep at a time: nothing else that spawns readers runs alongside it.
 - test-engineer touches only tests; docs only documentation; devops only
   config/infra. Application-code fixes always route back through
   implement/frontend.
@@ -170,7 +192,7 @@ claude plugin marketplace add SomeClown/the-foundry
 claude plugin install the-foundry@the-foundry
 ```
 
-That's it. The nine agents and four skills are now available in every
+That's it. The ten agents and four skills are now available in every
 project (the skills as `/the-foundry:brainstorm`, `/the-foundry:run-plan`,
 `/the-foundry:debug` and `/the-foundry:ship`, though your session will
 usually reach for them on its own), they update
@@ -203,7 +225,7 @@ feature: install the plugin, then shadow any agent you want to customize.
 
 ### Optional: run them as an agent team
 
-Claude Code's experimental agent-teams feature lets the nine run as
+Claude Code's experimental agent-teams feature lets the team run as
 coordinating teammates (shared task list, per-agent inboxes) rather than
 one-shot subagents. Enable it in `~/.claude/settings.json`:
 
@@ -264,12 +286,22 @@ it phones home. Everything it does, it does through tools Claude Code already
 has, under whatever permissions you've given your session. Here's the long
 version, so you don't have to take my word for it:
 
-- **Shell commands in your project.** Every agent has Bash, because an agent
-  that can't run the tests can only guess. The four read-only agents
-  (`investigate`, `architect`, `qa`, `uiux`) have no file-editing tools at all,
-  and their instructions forbid changing anything through Bash. (Plan mode,
+- **Shell commands in your project.** Every agent but `file-reader` has Bash,
+  because an agent that can't run the tests can only guess. The read-only
+  agents (`investigate`, `architect`, `qa`, `uiux`) have no file-editing tools
+  at all, and their instructions forbid changing anything through Bash;
+  `file-reader` has only `Read`. (Plan mode,
   which enforces that for two of them, applies only in a manual install; see
   the permission policy above.)
+- **Agents starting agents.** `investigate` starts `file-reader` agents, one per
+  file (or per section of a file over about 1,000 lines), 10 at a time, and for
+  a large repo it starts area leads of about 150 files each that start readers
+  of their own. It stops above 500 files and asks instead. That costs more than
+  one agent reading everything: on one test repo of 191 files, one full sweep
+  with the readers on Haiku cost about $2.62 and took 796 seconds, against about
+  $0.47 and 109 seconds for 1.7.6's single-agent read (those are one test repo's
+  figures, dated 2026-11-05). Nothing leaves the session any differently: the
+  readers use the same `Read` tool on the same files.
 - **Files in your project.** `implement`, `frontend`, `test-engineer`,
   `devops`, and `docs` write files, each in its own lane (application code,
   UI code, tests, config and infrastructure, documentation). The skills write
@@ -296,6 +328,8 @@ version, so you don't have to take my word for it:
   folders. The `evals/` cases run only when you invoke `claude plugin eval .`
   yourself; their `scaffold.sh` scripts, which build small fixture repos in
   the harness's temporary workspace, run only if you also pass `--scaffold`.
+  `evals-expensive/` runs only with `--eval-dir evals-expensive`, and it isn't
+  part of a routine run.
 
 None of it sends your code or data anywhere beyond what any Claude Code
 session already does with the files it reads. The
