@@ -303,7 +303,7 @@ context:
 runs: 1
 tags: [head-to-head]
 max_turns: 12
-timeout_seconds: 5400
+timeout_seconds: 3600
 allowed_tools: [Agent, Read, Glob, Grep, Bash]
 ---
 
@@ -495,7 +495,7 @@ In Tasks 7 and 8, every eval command becomes the equivalent `run-cli.sh` call, o
 
 ### Task 7: One run of the new version, then its cost goes to the owner (SPENDS REAL MONEY: the orchestrator runs it, not a subagent; STOP POINT)
 
-**What to do.** This is one full sweep of about 190 readers on Sonnet. `--max-cost-usd` can't limit it, because the harness only checks that ceiling before a run starts; what bounds this run is `timeout_seconds: 5400`. First log the forecast from Task 5 and apply the owner's answer to the first question under Risks. Then record the definitions it runs against, and run it in the background (`WORK` as set in Task 5; set it again in each shell call):
+**What to do.** This is one full sweep of about 190 readers on Sonnet. `--max-cost-usd` can't limit it, because the harness only checks that ceiling before a run starts; what bounds this run is `timeout_seconds: 3600`. First log the forecast from Task 5 and apply the owner's answer to the first question under Risks. Then record the definitions it runs against, and run it in the background (`WORK` as set in Task 5; set it again in each shell call):
 
 ```
 git rev-parse HEAD:agents/investigate.md HEAD:agents/file-reader.md
@@ -669,7 +669,7 @@ None. No database or migration. The nearest thing is `evals-expensive/head-to-he
 
 **Needs a human decision:**
 
-1. **Before Task 1: a limit on the first full run.** The harness can't stop a run in flight, so the only bound is the 5400-second timeout. Recommended: no extra limit, but if Task 5's forecast is above a figure the owner names now, stop and ask before Task 7. If the owner doesn't name one, send the forecast and run.
+1. **Before Task 1: a limit on the first full run.** The harness can't stop a run in flight, so the only bound is the 3600-second timeout. Recommended: no extra limit, but if Task 5's forecast is above a figure the owner names now, stop and ask before Task 7. If the owner doesn't name one, send the forecast and run.
 2. **At Task 7: go ahead with Task 8, and with what ceiling.** Required by the design.
 3. **At Task 8, on a miss or unscoreable result: what happens next.** Required by the design. Bar-met results carry on without a stop, and the numbers appear in the final report.
 4. **At `ship`: the changes outside the repo,** which no agent should make. These are the "nine agents" and the parallel-investigation line in `~/.claude/CLAUDE.md` (its Dev agent team section), the wording in `~/Claude/notes/foundry-directory-submission.md` (lines 44 to 51, and also the answers near lines 88 and 99), and the live listing in the portal if it says nine. The orchestrator lists them for the owner in its final report.
@@ -746,6 +746,8 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 - Ruling (Task 4): a `ticket 58410` report fits no shape, so it's neither found nor made up. Why: follows from the tightened shape. If wrong: one invention goes uncounted.
 
 - Ruling (Task 5): the first smoke run ($0.43, 82 seconds) passed every grader, outcome A, but the lead tried the bare `file-reader` name first and recovered on retry. investigate now tries the plugin name first, passes the working name to leads, and treats an unknown name as not a failure to spawn. Why: a lead that read that error as can't-spawn would waste a paid run. If wrong: one failed call in a manual install. Smoke rerun below.
+
+- Ruling (Task 7): the head-to-head's timeout is 3600 seconds, not 5400. Why: the harness refuses anything higher, and refused the first launch at $0. If wrong: a run that needs longer leaves no report, which goes to the owner rather than being rerun.
 
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.

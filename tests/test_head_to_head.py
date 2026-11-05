@@ -133,6 +133,14 @@ class CasesAreCompleteTest(unittest.TestCase):
                 self.assertRegex(prompt, r"(?m)^tags: \[[a-z-]+\]$")
                 self.assertTrue(list((case / "graders").glob("*.md")), "no graders")
 
+    def test_timeouts_are_inside_the_harness_limit(self):
+        # The harness refuses to load a case over 3600 seconds ("execution.timeout_seconds: Number must be less than or equal to 3600").
+        for case in (H2H, SMOKE):
+            with self.subTest(case=case.name):
+                head = (case / "prompt.md").read_text(encoding="utf-8").split("---")[1]
+                seconds = int(re.search(r"^timeout_seconds: (\d+)$", head, re.M).group(1))
+                self.assertLessEqual(seconds, 3600)
+
     def test_nesting_smoke_has_its_eight_graders(self):
         names = sorted(p.stem for p in (SMOKE / "graders").glob("*.md"))
         self.assertEqual(names, sorted(["reader-token", "reader-format", "no-fallback", "lead-dispatched", "reader-dispatched",

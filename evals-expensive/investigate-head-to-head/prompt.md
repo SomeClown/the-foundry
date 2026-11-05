@@ -2,7 +2,7 @@
 runs: 1
 tags: [head-to-head]
 max_turns: 12
-timeout_seconds: 5400
+timeout_seconds: 3600
 allowed_tools: [Agent, Read, Glob, Grep, Bash]
 ---
 
