@@ -1231,6 +1231,320 @@ class CompareTest(unittest.TestCase):
         token = Fixtures.key["decoys"][2]["token"]
         self.assertEqual(self.made_up("- " + token + "-two is removed"), [("route", token + "-two")])
 
+    # a decoy marked dead on a parent bullet, a lead-in, or a bold label line
+
+    @property
+    def DECOYS(self):
+        return [d["token"] for d in Fixtures.key["decoys"]]
+
+    def decoys_made_up(self, *lines):
+        return [x for x in self.made_up(*lines) if x[0] == "decoy"]
+
+    def test_case_a_decoys_under_a_parent_bullet_are_cleared(self):
+        self.assertEqual(self.made_up(
+            "## 2. Feature / task status",
+            "- There is no plan, roadmap or TODO file.",
+            "- `docs/removed-endpoints.md:5-7` says three paths were \"removed in 4.0\" and must not return:",
+            "  - `/v2/warehouse/pallets/legacy-purge`",
+            "  - `/v2/fleet/frames/legacy-thaw`",
+            "  - `/v2/fleet/gpses/legacy-confirm`",
+            "- `notes/untracked-scratch.md` is the only untracked file."), [])
+
+    def test_case_b_decoys_under_a_parent_bullet_are_cleared(self):
+        self.assertEqual(self.made_up(
+            "## 2. Feature / Task Status",
+            "- No plan or roadmap file exists.",
+            "- `/private/tmp/e-616LoK/home/cwd/docs/removed-endpoints.md:5-7` lists routes \"removed in 4.0\" that must not return under the same path:",
+            "  - `/v2/warehouse/pallets/legacy-purge`",
+            "  - `/v2/fleet/frames/legacy-thaw`",
+            "  - `/v2/fleet/gpses/legacy-confirm`",
+            "- The doc says line 6 was \"replaced by the batch endpoint\" but never gives that path."), [])
+
+    def test_case_c_decoys_under_a_bold_label_are_cleared(self):
+        self.assertEqual(self.made_up(
+            "## 4. Routes",
+            "- POST /v2/warehouse/labels/sweep (`sweep_label`, `warehouse/label_service.py:1142`, registered at line 1147)",
+            "",
+            "**Commented out, not live**",
+            "- POST /v2/customs/declarations/legacy-reassign (`customs/views_declaration.py:33-35`)",
+            "- POST /v2/routing/detours/legacy-reopen (`routing/views_detour.py:33`)",
+            "- POST /v2/warehouse/aisles/legacy-flag (`warehouse/views_aisle.py:26`)"), [])
+
+    def test_a_child_of_a_parent_without_a_marker_is_made_up(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.decoys_made_up("- Routes", "  - " + token), [("decoy", token)])
+
+    def test_a_marker_on_the_grandparent_clears_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.made_up("- These were removed:", "  - Customs", "    - " + token), [])
+
+    def test_a_marker_on_a_sibling_does_not_clear_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.decoys_made_up("- Routes", "  - the old one is removed", "  - " + token), [("decoy", token)])
+        self.assertEqual(self.decoys_made_up("- Routes", "  - the old one", "    - is removed", "  - " + token), [("decoy", token)])
+
+    def test_a_label_without_a_marker_stops_the_walk_before_a_removed_heading(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.decoys_made_up("### Removed routes", "", "**Live routes**", "- " + token), [("decoy", token)])
+
+    def test_a_bold_label_with_a_marker_clears_the_decoy_in_each_spelling(self):
+        token = self.DECOYS[0]
+        for label in ("**Retired:**", "**Retired**:", "__Retired__", "__Retired:__", "  **Retired**", "**Retired** :"):
+            with self.subTest(label=label):
+                self.assertEqual(self.made_up(label, "- " + token), [])
+
+    def test_bold_text_followed_by_more_words_is_not_a_label(self):
+        token = self.DECOYS[0]
+        for label in ("**Note** these are live", "**Retired** routes are listed", "**Retired** and **gone**"):
+            with self.subTest(label=label):
+                self.assertEqual(self.decoys_made_up("### Removed", label, "- " + token), [])
+                self.assertEqual(self.decoys_made_up(label, "- " + token), [("decoy", token)])
+
+    def test_a_lead_in_with_a_marker_and_a_colon_clears_the_decoy(self):
+        token = self.DECOYS[1]
+        for lead in ("These routes were removed:", "These routes were **removed**:", "These routes were `removed`:  "):
+            with self.subTest(lead=lead):
+                self.assertEqual(self.made_up(lead, "", "- " + token), [])
+                self.assertEqual(self.made_up(lead, "- other", "- " + token), [])
+                self.assertEqual(self.made_up(lead, "- other", "  continued", "- " + token), [])
+
+    def test_a_lead_in_without_a_colon_does_not_clear_the_decoy(self):
+        token = self.DECOYS[1]
+        self.assertEqual(self.decoys_made_up("These routes were removed.", "", "- " + token), [("decoy", token)])
+        self.assertEqual(self.decoys_made_up("These routes were removed", "- " + token), [("decoy", token)])
+
+    def test_a_lead_in_two_paragraphs_up_does_not_clear_the_decoy(self):
+        token = self.DECOYS[1]
+        self.assertEqual(self.decoys_made_up("These routes were removed:", "", "Some other paragraph.", "", "- " + token), [("decoy", token)])
+        self.assertEqual(self.decoys_made_up("These routes were removed:", "", "", "- " + token), [("decoy", token)])
+        self.assertEqual(self.decoys_made_up("These routes were removed:", "Some other paragraph.", "- " + token), [("decoy", token)])
+
+    def test_a_marker_only_in_a_compound_or_in_the_route_clears_nothing_in_the_new_positions(self):
+        token = self.DECOYS[2]
+        other = "/v2/zz-removed/dead"
+        for marker in ("the dead-letter queue", "see /v2/removed/dead-route", "a stub-free thing"):
+            with self.subTest(marker=marker):
+                self.assertEqual(self.decoys_made_up("- " + marker + ":", "  - " + token), [("decoy", token)])
+                self.assertEqual(self.decoys_made_up(marker + ":", "", "- " + token), [("decoy", token)])
+                self.assertEqual(self.decoys_made_up("**" + marker + "**", "- " + token), [("decoy", token)])
+        self.assertEqual(self.decoys_made_up("- " + other + ":", "  - " + token), [("decoy", token)])
+
+    # adversarial round for the decoy rule: the orchestrator's ruling on where the ancestor walk stops
+
+    def live(self, *lines, sep="\n", end="\n"):
+        return self.compare.made_up(sep.join(lines) + end, Fixtures.key)
+
+    def only_decoys(self, *lines, **kw):
+        return [x for x in self.live(*lines, **kw) if x[0] == "decoy"]
+
+    def test_ruling_a_parent_bullet_above_a_heading_does_not_clear_an_indented_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- these were removed", "## Live routes", "  - " + token), [("decoy", token)])
+
+    def test_ruling_a_parent_bullet_above_a_heading_does_not_clear_a_nested_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- these were removed", "### Live routes", "- Routes", "  - " + token),
+                         [("decoy", token)])
+
+    def test_ruling_a_parent_bullet_above_a_bold_label_does_not_clear_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- these were removed", "", "**Live routes**", "  - " + token), [("decoy", token)])
+
+    def test_ruling_a_parent_bullet_above_a_paragraph_does_not_clear_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("  - these were removed", "", "Another list follows", "    - " + token),
+                         [("decoy", token)])
+
+    def test_ruling_a_parent_in_an_earlier_list_does_not_clear_a_later_list(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- Old things, removed:", "  - alpha", "", "Live ones:", "  - " + token),
+                         [("decoy", token)])
+
+    def test_a_grandparent_above_a_heading_does_not_clear_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- removed", "  - mid", "## Live", "    - " + token), [("decoy", token)])
+
+    def test_the_heading_rule_still_clears_when_the_heading_itself_has_the_marker(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("- live parent", "## Removed routes", "  - " + token), [])
+
+    def test_a_parent_two_levels_up_with_unmarked_levels_between_clears_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("- removed:", "  - customs", "    - " + token), [])
+
+    def test_blank_lines_between_a_marked_parent_and_its_child_keep_the_clear(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("- removed:", "", "  - " + token), [])
+
+    def test_a_wrapped_parent_line_at_the_childs_indent_keeps_the_clear(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("- these paths were removed in 4.0:", "  and must not return:", "  - " + token), [])
+
+    def test_a_marker_on_a_siblings_child_does_not_clear_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- Routes", "  - sibling", "    - child is dead", "  - " + token), [("decoy", token)])
+
+    def test_a_marker_on_an_uncle_below_the_parent_chain_does_not_clear(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- Routes", "  - " + token, "- Other removed"), [("decoy", token)])
+
+    def test_tab_indented_child_of_a_marked_parent_is_cleared(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("- removed:", "\t- " + token), [])
+        self.assertEqual(self.live("- removed:", "\t\t- " + token), [])
+        self.assertEqual(self.live("  - removed:", "\t- " + token), [])
+
+    def test_tab_and_spaces_of_equal_width_are_siblings(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- Routes", "\t- sibling removed", "    - " + token), [("decoy", token)])
+
+    def test_numbered_lists_clear_through_the_parent(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("1. Removed routes:", "   1. " + token), [])
+        self.assertEqual(self.live("1) Removed routes:", "   1) " + token), [])
+        self.assertEqual(self.only_decoys("1. Routes", "   1. " + token), [("decoy", token)])
+
+    def test_star_and_plus_bullets_clear_through_the_parent(self):
+        token = self.DECOYS[0]
+        for mark in ("*", "+"):
+            with self.subTest(mark=mark):
+                self.assertEqual(self.live(mark + " removed:", "  " + mark + " " + token), [])
+                self.assertEqual(self.only_decoys(mark + " Routes", "  " + mark + " " + token), [("decoy", token)])
+        self.assertEqual(self.live("- removed:", "  * " + token), [])
+
+    def test_star_and_plus_bullets_clear_through_a_lead_in(self):
+        token = self.DECOYS[0]
+        for mark in ("*", "+"):
+            with self.subTest(mark=mark):
+                self.assertEqual(self.live("Removed routes:", mark + " " + token), [])
+
+    def test_a_table_row_with_the_marker_in_another_cell_is_cleared(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("| Route | Status |", "| --- | --- |", "| " + token + " | removed |"), [])
+        self.assertEqual(self.only_decoys("| Route | Status |", "| --- | --- |", "| " + token + " | live |"), [("decoy", token)])
+
+    def test_a_table_header_with_the_marker_does_not_clear_a_sibling_row(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("| Removed | Status |", "| --- | --- |", "| " + token + " | live |"),
+                         [("decoy", token)])
+
+    def test_a_decoy_on_the_first_line_is_judged_alone(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- " + token), [("decoy", token)])
+        self.assertEqual(self.only_decoys(token), [("decoy", token)])
+        self.assertEqual(self.live("  - " + token), [("decoy", token)])
+        self.assertEqual(self.live("- " + token, "  (removed in 4.0)"), [])
+
+    def test_a_decoy_on_the_last_line_without_a_newline(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("Removed routes:", "", "- " + token, end=""), [])
+        self.assertEqual(self.live("- removed:", "  - " + token, end=""), [])
+        self.assertEqual(self.only_decoys("Live routes:", "", "- " + token, end=""), [("decoy", token)])
+
+    def test_crlf_line_endings_score_like_lf(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("Removed routes:", "", "- " + token, sep="\r\n", end="\r\n"), [])
+        self.assertEqual(self.live("- removed:", "  - " + token, sep="\r\n", end="\r\n"), [])
+        self.assertEqual(self.live("**Retired**", "- " + token, sep="\r\n", end="\r\n"), [])
+        self.assertEqual(self.only_decoys("**Live**", "- " + token, sep="\r\n", end="\r\n"), [("decoy", token)])
+
+    def test_a_decoy_inside_a_code_fence_under_a_removed_heading_is_cleared_and_otherwise_counted(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.live("### Removed routes", "```", token, "```"), [])
+        self.assertEqual(self.only_decoys("### Routes", "```", token, "```"), [("decoy", token)])
+
+    def test_a_decoy_in_a_fence_after_a_lead_in_with_a_colon_is_not_a_list_item(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("These were removed:", "```", token, "```"), [("decoy", token)])
+
+    def test_a_plain_paragraph_line_after_a_lead_in_is_not_in_a_list(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("Earlier versions had removed routes:", "The live one is " + token), [("decoy", token)])
+
+    def test_a_plain_paragraph_after_a_blank_after_a_lead_in_is_not_in_a_list(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("Earlier versions had removed routes:", "", "The live one is " + token),
+                         [("decoy", token)])
+
+    def test_a_bold_label_inside_a_list_item_is_not_a_label_line(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("### Removed", "- **Live routes**", "  - " + token), [])
+        self.assertEqual(self.only_decoys("- **Routes**", "  - " + token), [("decoy", token)])
+        self.assertEqual(self.live("- **Retired**", "  - " + token), [])
+        self.assertEqual(self.live("* **Retired:**", "  * " + token), [])
+
+    def test_a_bold_label_with_trailing_spaces_is_still_a_label(self):
+        token = self.DECOYS[0]
+        for label in ("**Retired**   ", "**Retired:**  ", "**Retired**:  ", "__Retired__ \t"):
+            with self.subTest(label=label):
+                self.assertEqual(self.live(label, "- " + token), [])
+        self.assertEqual(self.only_decoys("### Removed", "**Live**   ", "- " + token), [("decoy", token)])
+
+    def test_an_indented_bold_label_without_a_marker_stops_the_heading_walk(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("### Removed", "   **Live**", "- " + token), [("decoy", token)])
+
+    def test_a_label_does_not_leak_into_the_next_heading_section(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("**Retired**", "## Live routes", "- " + token), [("decoy", token)])
+
+    def test_a_lead_in_with_trailing_spaces_and_closers_after_the_colon(self):
+        token = self.DECOYS[0]
+        for lead in ("Removed routes:   ", "Removed routes:**", "Removed routes:_", "Removed routes:`", "*Removed routes:*", "Removed routes:*_` "):
+            with self.subTest(lead=lead):
+                self.assertEqual(self.live(lead, "- " + token), [])
+
+    def test_a_lead_in_from_an_earlier_section_does_not_clear_a_later_list(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("Removed routes:", "- gone", "", "## Live", "- " + token), [("decoy", token)])
+        self.assertEqual(self.only_decoys("Removed routes:", "## Live", "- " + token), [("decoy", token)])
+        self.assertEqual(self.only_decoys("Removed routes:", "## Live", "", "- " + token), [("decoy", token)])
+
+    def test_a_lead_in_does_not_clear_a_list_after_a_paragraph_that_follows_the_first_list(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("Removed routes:", "- gone", "", "Live routes below.", "", "- " + token),
+                         [("decoy", token)])
+
+    def test_a_blank_line_ends_the_list_block_so_later_items_have_no_lead_in(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("Removed routes:", "- gone", "", "- " + token), [("decoy", token)])
+        self.assertEqual(self.live("Removed routes:", "", "- gone", "- " + token), [])
+
+    def test_the_ancestor_walk_stops_at_a_heading_indented_as_deep_as_the_decoy(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("- these were removed", "   ## Live routes", "   - " + token), [("decoy", token)])
+        self.assertEqual(self.only_decoys("- these were removed", "  ## Live routes", "  - " + token), [("decoy", token)])
+        self.assertEqual(self.only_decoys("  - these were removed", "  ## Live routes", "    - " + token), [("decoy", token)])
+
+    def test_the_ancestor_walk_stops_at_a_heading_indented_as_deep_as_the_parent(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("   - these were removed", "   ## Live routes", "      - " + token), [("decoy", token)])
+
+    def test_the_ancestor_walk_stops_at_a_bold_label_indented_as_deep_as_or_deeper_than_the_decoy(self):
+        token = self.DECOYS[0]
+        for label in ("**Live routes**", "  **Live routes**", "      **Live routes**", "        __Live routes:__"):
+            with self.subTest(label=label):
+                self.assertEqual(self.only_decoys("- these were removed", label, "  - " + token), [("decoy", token)])
+
+    def test_the_ancestor_walk_stops_at_a_bold_label_indented_as_deep_as_the_parent(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("    - these were removed", "    **Live routes**", "      - " + token), [("decoy", token)])
+
+    def test_a_lead_in_with_the_marker_in_a_hyphenated_compound_clears_nothing(self):
+        token = self.DECOYS[0]
+        self.assertEqual(self.only_decoys("The dead-letter routes:", "- " + token), [("decoy", token)])
+        self.assertEqual(self.only_decoys("The non-legacy routes:", "- " + token), [("decoy", token)])
+
+    def test_other_made_up_kinds_are_unchanged_under_a_cleared_layout(self):
+        token = self.DECOYS[0]
+        found = self.live("Removed routes:", "- " + token, "- /v2/nonesuch/thing", "- fxctl zorch")
+        self.assertEqual(found, [("route", "/v2/nonesuch/thing"), ("command", "fxctl zorch")])
+
+    def test_two_decoys_in_one_list_are_judged_separately(self):
+        a, b = self.DECOYS[0], self.DECOYS[1]
+        self.assertEqual(self.live("- Routes", "  - " + a + " removed", "  - " + b), [("decoy", b)])
+        self.assertEqual(self.live("- Routes", "  - " + a + " removed", "  - " + b + " dead"), [])
+
     # --summary
 
     def test_summary_prints_one_run_without_the_bar(self):

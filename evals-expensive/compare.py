@@ -29,8 +29,9 @@ no real route (or strict prefix of one), an fxctl word that is no real command
 and not plain prose (IGNORED_WORDS), a reference of one of the key's
 code_shapes that is no real code, and a decoy route listed live. A decoy is
 listed live when none of DEAD_WORDS is on its own line, on the next line (when
-that is no new list item or heading), or on the nearest heading above. A
-decoy is judged by that rule alone, not also as an unknown route.
+that is no new list item or heading), on an ancestor list item, on the
+lead-in line of its list (when that ends with a colon), or on the nearest heading
+or bold label line above. A decoy is judged by that rule alone, not also as an unknown route.
 
 Standard library only.
 """
@@ -53,6 +54,8 @@ DEAD_WORDS = re.compile(
     r"retired|obsolete|unused|legacy|stale|stub)(?![\w-])", re.I)
 LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)]|\|)\s")
 HEADING = re.compile(r"^\s{0,3}#{1,6}\s")
+# A line that is only bold text, with an optional colon inside or after it.
+LABEL = re.compile(r"^\s*(\*\*|__)(?:(?!\1).)+\1\s*:?\s*$")
 IGNORED_WORDS = set((
     "command commands subcommand subcommands cli tool binary entry entrypoint group app program is and or the has was in on").split())
 CASE = "investigate-head-to-head"
@@ -80,15 +83,58 @@ def has_dead_word(line):
     return DEAD_WORDS.search(line_without_routes(line)) is not None
 
 
+def indent_of(line):
+    return len(line.expandtabs(4)) - len(line.expandtabs(4).lstrip())
+
+
+def is_label(line):
+    """A line that is only bold text (and maybe a colon): it heads the lines under it like a heading."""
+    return LABEL.match(line) is not None
+
+
+def lead_in_line(lines, i):
+    """The line that introduces the list block holding lines[i], when it ends with a colon, else None."""
+    start = i
+    for j in range(i - 1, -1, -1):
+        line = lines[j]
+        if not line.strip() or HEADING.match(line) or not (LIST_ITEM.match(line) or indent_of(line) > 0):
+            break
+        start = j
+    j = start - 1
+    if j >= 0 and not lines[j].strip():
+        j -= 1
+    if j < 0 or not lines[j].strip() or LIST_ITEM.match(lines[j]) or HEADING.match(lines[j]):
+        return None
+    return lines[j] if lines[j].rstrip(" *_`").endswith(":") else None
+
+
 def decoy_listed_live(lines, i):
     """Whether the decoy on lines[i] is stated as live: no dead word near it."""
     if has_dead_word(lines[i]):
         return False
     if i + 1 < len(lines) and not LIST_ITEM.match(lines[i + 1]) and not HEADING.match(lines[i + 1]) and has_dead_word(lines[i + 1]):
         return False
+    if LIST_ITEM.match(lines[i]):
+        depth = indent_of(lines[i])
+        for j in range(i - 1, -1, -1):
+            line = lines[j]
+            if HEADING.match(line) or is_label(line):
+                break
+            if LIST_ITEM.match(line):
+                if indent_of(line) < depth:
+                    if has_dead_word(line):
+                        return False
+                    depth = indent_of(line)
+            elif line.strip() and indent_of(line) < depth:
+                break
+    if LIST_ITEM.match(lines[i]) or indent_of(lines[i]) > 0:
+        lead_in = lead_in_line(lines, i)
+        if lead_in is not None and has_dead_word(lead_in):
+            return False
     for j in range(i - 1, -1, -1):
-        if HEADING.match(lines[j]):
-            return not has_dead_word(lines[j])
+        if HEADING.match(lines[j]) or is_label(lines[j]):
+            # Underscores are word characters, so the __ of a label is blanked before the marker is looked for.
+            return not has_dead_word(lines[j].replace("__", " ") if is_label(lines[j]) else lines[j])
     return True
 
 
