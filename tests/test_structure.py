@@ -341,6 +341,22 @@ class EvalLibraryTest(unittest.TestCase):
                 self.assertIn(name, tagged, f"no eval case is tagged {name}")
 
 
+class RepoSizeLimitTest(unittest.TestCase):
+    """The plugin directory takes the whole repo, including evals-expensive/, so it has to stay inside the directory's limits."""
+
+    def tracked(self):
+        out = subprocess.run(["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True)
+        return out.stdout.splitlines()
+
+    def test_no_tracked_file_is_over_256_kib(self):
+        for rel in self.tracked():
+            with self.subTest(file=rel):
+                self.assertLessEqual((ROOT / rel).stat().st_size, 256 * 1024)
+
+    def test_at_most_512_tracked_files(self):
+        self.assertLessEqual(len(self.tracked()), 512)
+
+
 class DirectoryScannerTest(unittest.TestCase):
     """Text the plugin directory's scanner has held or flagged before.
 

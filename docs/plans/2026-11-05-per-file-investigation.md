@@ -304,12 +304,12 @@ runs: 1
 tags: [head-to-head]
 max_turns: 12
 timeout_seconds: 5400
-allowed_tools: [Agent, Read, Glob, Grep]
+allowed_tools: [Agent, Read, Glob, Grep, Bash]
 ---
 
 Dispatch the the-foundry:investigate agent on the repo in the current directory with the brief below, and wait for it. Then reply with its report, complete and word for word, adding only a last line that says END-OF-REPORT. Don't read the code yourself, and don't shorten or summarize the report.
 
-Brief for the agent: "This is a new codebase to me, and I need to understand the whole thing. In this sandbox the plain `git` command is blocked: use `./bin/git` wherever you'd type `git`, and tell any agent you brief to do the same. In the route inventory, give every route its full path on its own line, never grouped under a prefix. Give every CLI subcommand as `fxctl <name>`. When a gotcha's source cites an incident code, quote the code next to the gotcha."
+Brief for the agent: "This is a new codebase to me, and I need to understand the whole thing. In this sandbox the plain `git` command is blocked: use `./bin/git` wherever you'd type `git`, and tell any agent you brief to do the same. In the route inventory, give every route its full path on its own line, never grouped under a prefix. Give every CLI subcommand as `fxctl <name>`. When a gotcha's source cites a ticket, incident, change number, or named event, quote that reference word for word next to the gotcha."
 ````
 
 `scaffold.sh` is self-contained, executable, and generates everything from a Python heredoc, because whether a scaffold can see sibling files isn't documented and every existing one assumes it can't. It finds a real git the way `evals/architect-plan-format/scaffold.sh` does, writes `bin/git`, and commits the fixture, with `bin/` listed in `.git/info/exclude` so it stays out of the file list. It uses `random.Random(20261105)`, so output is deterministic. Called as `scaffold.sh --emit-key PATH`, it writes the answer key to PATH and builds nothing. The key must never land in the workspace.
@@ -329,7 +329,7 @@ The fixture is a fictional Python freight service with a CLI called `fxctl`:
 **Planted facts: 48, one grader each.**
 - 24 in the middle of big files: 12 routes or commands and 12 gotchas, on a line between 35% and 65% of the way through the file. At least one sits in the overlap band of a split (lines 751-800 of the 1,640-line file).
 - 24 in the middle of the repo: 12 routes or commands and 12 gotchas, in normal files ranked between 35% and 65% of the sorted `git ls-files` output.
-- A route's token is its full path (`/v2/...`). A command's token is `fxctl <name>`. A gotcha is a natural comment citing a unique code, such as `# Keep the 90-day hold: settlement files arrive late (INC-4127); shortening it double-charges.`, and its token is that code.
+- A route's token is its full path (`/v2/...`). A command's token is `fxctl <name>`. A gotcha is a natural comment citing a unique reference, such as `# Keep the 90-day hold: settlement files arrive late (see PDX-771); shortening it double-charges.`, and its token is that reference. The 24 references use at least six shapes (a tracker key, `ticket 4127`, a change number, `#88213`, a runbook section, a named event such as `the Tacoma cutover`), with at most four tokens per shape, so no single search finds them all, and the comments share no marker word. Route tokens have no path parameters, so a report's choice of `<ref>`, `{ref}`, or `:ref` can't cause a false miss.
 - Each token appears exactly once in the fixture.
 
 **Decoys: 6.** Three commented-out routes, and three routes a doc says were removed. These are what a report could wrongly list as live.
@@ -343,7 +343,7 @@ The fixture is a fictional Python freight service with a CLI called `fxctl`:
 - `fact-<id>.md`: `type: regex`, `target: last_message`, the token as `pattern` (regex-escaped), `match: contains`.
 - `control-report-complete.md`: regex on `last_message` for `END-OF-REPORT`.
 - `control-new-roster.md`: regex on `trace` for `the-foundry:file-reader`. It proves which arm ran, since the session's init lists its agents.
-- `control-new-area-leads.md`: regex on `last_message` for `full sweep, [2-9][0-9]* area leads`.
+- `control-new-area-leads.md`: regex on `last_message` for `full sweep, ([2-9]|[1-9][0-9]+) area leads`.
 - `control-new-no-fallback.md`: regex on `last_message` for `NOT A PER-FILE READ`, `match: not_contains`.
 - `control-new-untracked.md`: regex on `last_message` for `notes/untracked-scratch`.
 - `keep-report.md`: `type: llm`, `focus: last_message`, with the rubric "PASS only if the message is a codebase report with section headings. FAIL if it's a refusal or a short summary." Its job is to make the harness store the report as `evidence`.
@@ -360,6 +360,7 @@ Its graders:
 - `no-fallback`: regex on `last_message` for `NOT A PER-FILE READ`, `match: not_contains`.
 - `lead-dispatched`: `tool_used`, `tool: Agent`, `input_match: AREA LEAD`.
 - `reader-dispatched`: `tool_used`, `tool: Agent`, `input_match: file-reader`.
+- `bash-reached`: `tool_used`, `tool: Bash`, `input_match: bin/git`. It proves the nested agents kept Bash.
 - `report-kept`: `llm` on `last_message`, with the same rubric as `keep-report.md`.
 - `trace-kept`: `llm`, `focus: trace`, with the rubric "PASS only if the trace shows a file-reader being dispatched." It stores the trace, so readers can be counted.
 
@@ -401,7 +402,7 @@ For each run:
 - **Made up:** the sum of these, with each item printed so a person can check it:
   - route-shaped strings (`/v2/[a-z0-9_/-]*[a-z0-9]`) that aren't in `routes` and aren't a strict prefix of one
   - `fxctl <word>` not in `commands`
-  - `INC-\d{4}` not in `codes`
+  - a reference-shaped string (from the key's `code_shapes`) not in `codes`. Named events have no shape, so they can't be counted as made up
   - a decoy on a report line that lacks all of the words commented, removed, disabled, dead, deprecated, inactive, retired
 
 The bar, on the means across each arm's runs:
@@ -717,6 +718,7 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 ### Progress
 - Task 1: complete (from f8aef4b; gate GREEN, tests exit 0, 72 tests; no adversarial round)
 - Task 2: complete (from 9bcf8ec; gate RED-6 as expected, 82 tests, no skips; adversarial: 7 structural tests, no failures; two fix rounds on gaps a cold read found in the merged text)
+- Task 3: complete (from 617f19f; gate RED-6 as expected, 147 tests, no skips; adversarial: 22 tests, 2 bugs and 1 fairness problem fixed in round 1)
 
 ### Decisions made during the build
 - Owner (before Task 1), quoted: "Ask above $25". If Task 5's forecast for the first full run is above $25, stop and ask before Task 7.
@@ -730,5 +732,11 @@ Work dir: /Users/someclown/dev/claude/the-foundry/.git/foundry-run/2026-11-05-pe
 
 - Ruling (Task 2): a lead that fell back keeps the mode line and the first-line flag names its area; a single-agent read gives unread files as a count per folder, not by path. Why: the file left both undefined. If wrong: a longer or shorter Coverage section.
 
+- Ruling (Task 3): the 24 gotcha tokens change from one `INC-` shape to at least six shapes, with no shared marker word. Why: the adversarial round found that `grep -r INC-` alone found all 24, half the bar, so the test would have measured one search rather than reading. Real gotchas don't share a prefix. Routes and commands stay greppable, as real ones are, which is the plan's fair-comparison rule. If wrong: the test is a bit harder on the baseline than the original fixture. Flagged to the owner.
+- Ruling (Task 3): route tokens have no path parameters. Why: 7 of 12 contained `<ref>`, so a report writing `{ref}` scored a false miss.
+- Ruling (Task 3): Bash joins `allowed_tools` in both cases, with a `bash-reached` grader on the smoke case. Why: `evals/README.md` says a case's list narrows `--allow-tools`, and investigate needs Bash for `wc -l` and `./bin/git`. The prompt still tells the top session not to read the code. If wrong: the smoke test shows it for a few dollars.
+- Ruling (Task 3): `control-new-area-leads` matches 2 or more leads, including 10 to 19. Scaffolds set `commit.gpgsign=false`.
+
 ### Parked
+- Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.
 - Task 1: validate warns about an untracked .DS_Store in the working copy. It's ignored by git and never ships, so it's parked for the owner rather than deleted.

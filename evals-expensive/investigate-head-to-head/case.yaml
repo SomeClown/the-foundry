@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: investigate-head-to-head
+context:
+  scaffold_script: scaffold.sh

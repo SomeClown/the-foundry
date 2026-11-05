@@ -42,7 +42,7 @@ Inventory:
 - <route | command | model | function> <full path or name> (line N)
 Refers to: <project files it imports or names, or "none">
 Gotchas:
-- <the sharp edge, quoting any ticket or incident code the file cites> (line N)
+- <the sharp edge, quoting any ticket, incident, change number, or named event the file cites> (line N)
 Couldn't read: <what and why, or "nothing">
 ```
 
