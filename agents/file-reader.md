@@ -3,7 +3,7 @@ name: file-reader
 description: Reads one file, or one section of a big file, for the investigate agent and reports what's in it, with line numbers. Dispatched by investigate during a per-file read, one reader per file; not meant for direct use. Read-only: holds the Read tool and nothing else.
 tools:
   - Read
-model: sonnet
+model: haiku
 ---
 
 # File Reader

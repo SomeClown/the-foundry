@@ -95,7 +95,7 @@ file counts as read only when every one of its sections has reported.
 say the user approved reading that many, read no more file contents (counting
 lines with `wc -l` is fine, since the reader count needs it). Reply with a first
 line of `STOPPED BEFORE READING: <N> files`, then the area breakdown and a rough
-cost: the number of readers, each a short Sonnet session. You can't ask the user
+cost: the number of readers, each a short Haiku session. You can't ask the user
 yourself, so the orchestrator will, and a go-ahead reaches you as a new brief.
 This stop wins over every other first line: above 500 files with no `Agent`, stop
 anyway, and say in the body that `Agent` is missing.

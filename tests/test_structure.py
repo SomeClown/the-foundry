@@ -121,7 +121,7 @@ class AgentFilesTest(unittest.TestCase):
     def test_file_reader_holds_exactly_read(self):
         reader = agents()["file-reader"]
         self.assertEqual(reader["tools"], ["Read"])
-        self.assertEqual(reader["model"], "sonnet")
+        self.assertEqual(reader["model"], "haiku")
 
     def test_investigate_is_the_only_read_only_agent_that_can_spawn(self):
         # "Task" is the Agent tool's other name; the session init lists it that way.

@@ -34,7 +34,7 @@
 
 ### 1. Goal and Approach
 
-When this is done, `investigate` gives each file its own read-only `file-reader` on Sonnet, compiles what they report with a gap check and re-reads, uses area leads above about 150 files, stops above 500, and adds a Coverage section. A head-to-head against 1.7.6 will have shown it clears the owner's bar, or the build will have stopped with the numbers in the owner's hands. The test lives in a new top-level `evals-expensive/` directory, reached only through `--eval-dir`, so routine runs of `claude plugin eval .` never touch it. Area-lead behavior is a section of `agents/investigate.md`, switched on by a first brief line of `AREA LEAD`, rather than a separate file, because the design makes the lead a second copy of `investigate`. Scoring happens in one small script, `evals-expensive/compare.py`, working from the final report's text, so the verdict is arithmetic and not a judge's opinion. The key trade-off is ordering: the definitions and the test come first and the docs stay wrong in the meantime, which leaves the gate red in a precisely known way for most of the build. In exchange, nothing gets written up about a gain that hasn't been shown.
+When this is done, `investigate` gives each file its own read-only `file-reader` (on Sonnet as designed, on Haiku after the owner's call in the build log), compiles what they report with a gap check and re-reads, uses area leads above about 150 files, stops above 500, and adds a Coverage section. A head-to-head against 1.7.6 will have shown it clears the owner's bar, or the build will have stopped with the numbers in the owner's hands. The test lives in a new top-level `evals-expensive/` directory, reached only through `--eval-dir`, so routine runs of `claude plugin eval .` never touch it. Area-lead behavior is a section of `agents/investigate.md`, switched on by a first brief line of `AREA LEAD`, rather than a separate file, because the design makes the lead a second copy of `investigate`. Scoring happens in one small script, `evals-expensive/compare.py`, working from the final report's text, so the verdict is arithmetic and not a judge's opinion. The key trade-off is ordering: the definitions and the test come first and the docs stay wrong in the meantime, which leaves the gate red in a precisely known way for most of the build. In exchange, nothing gets written up about a gain that hasn't been shown.
 
 **What the old eval results settled.** Read from `evals/results/` (Claude Code 2.1.303; 2.1.318 is installed now, so Task 5 re-checks it):
 
@@ -585,7 +585,7 @@ Check each with `grep -c 'file-reader' <file>`, then look at the dispatches and 
 
 ### Task 10: README
 
-**Precondition.** As in Task 9. Numbers and plan-mode results come from the build log.
+**Precondition.** As in Task 9. **Reader model (owner, after the Haiku check):** `file-reader` runs on `haiku`; `investigate` and the area leads stay on `sonnet`. Measured figures for the shipped setup are the Haiku check's readers-on-Haiku runs in the build log ("Before 2.0.0"); Task 8's all-Sonnet runs are the comparison. Numbers and plan-mode results come from the build log.
 
 **What to do.** Edit `README.md`, keeping its voice.
 
@@ -596,7 +596,7 @@ Lines the tests pin, which must each stay on one line:
 
 Other edits:
 - **Team table:** add this row after `investigate`, and update `investigate`'s role to say it gives each file its own reader:
-  ``| `file-reader` | Reads one file or section for `investigate` and reports it with line numbers; holds only `Read` | No | sonnet |``
+  ``| `file-reader` | Reads one file or section for `investigate` and reports it with line numbers; holds only `Read` | No | haiku |``
 - **Roster sentence and the "nine agents" paragraph:** ten agents, including a file reader. Leave the Fred Brooks quote alone. The agent-teams line "lets the nine run" becomes "lets the team run".
 - **"Read-only means enforced read-only":** state the exception plainly: `investigate` has no edit tools, but it can spawn agents, and only its instructions keep it to `file-reader` and its own area leads, because Claude Code ignores `Agent(type)` restrictions in a subagent definition.
 - **Permission policy:**
@@ -619,7 +619,7 @@ Other edits:
 
 ### Task 11: The rest of the repo's docs (makes the whole gate pass)
 
-**Precondition.** As in Task 9.
+**Precondition.** As in Task 9. **Reader model (owner, after the Haiku check):** `file-reader` runs on `haiku`; `investigate` and the area leads stay on `sonnet`. Measured figures for the shipped setup are the Haiku check's readers-on-Haiku runs in the build log ("Before 2.0.0"); Task 8's all-Sonnet runs are the comparison.
 
 **What to do.**
 - **`.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`:** "nine specialized subagents" becomes "ten specialized subagents" in both plugin descriptions, which must stay identical, and "nine-agent" becomes "ten-agent". Leave the version alone until Task 12.
@@ -647,7 +647,7 @@ Other edits:
 
 ### Task 12: CHANGELOG and the version
 
-**Precondition.** As in Task 9.
+**Precondition.** As in Task 9. **Reader model (owner, after the Haiku check):** `file-reader` runs on `haiku`; `investigate` and the area leads stay on `sonnet`. Measured figures for the shipped setup are the Haiku check's readers-on-Haiku runs in the build log ("Before 2.0.0"); Task 8's all-Sonnet runs are the comparison.
 
 **What to do.** In one change, since `test_version_matches_the_newest_changelog_entry` ties them together:
 - Set `"version": "2.0.0"` in `.claude-plugin/plugin.json`. `marketplace.json` has no version field.
@@ -788,6 +788,9 @@ Owner (Task 8 stop), quoted: "Fix the scorer first". The owner chose to fix the 
 - Ruling (scorer fix 2): rule (b) applies only when the opening bold run's text ends with `.`, `!` or `?` inside the closing delimiter. Why: as first briefed, it cleared two subtests of the existing `test_bold_text_followed_by_more_words_is_not_a_label` (`**Retired** routes are listed`, `**Retired** and **gone**`), and existing tests stay unchanged. If wrong: a report that writes `**Retired routes**` with no full stop above a list of dead decoys still scores them made up, and someone has to read it by eye.
 - Ruling (scorer fix 2, adversarial): `test_a_run_in_label_indented_one_to_three_spaces_clears` misread the brief, so it isn't a bug. The brief says the lead-in is found exactly as before, and the existing walk counts an indented line right above a list as part of the list, for colon lead-ins too. The test was rewritten to pin "counted". If wrong: an indented run-in label still leaves its decoys counted, a shape no stored report uses.
 - Scorer fix 2: complete (from 454f55c; gate RED-6, 381 tests, both validates exit 0; adversarial: 31 tests, 0 bugs, 1 misread test rewritten; no fix rounds). Rescored every stored report, no new runs, log `haiku-rescore.log`. Sonnet (Task 8): BAR MET, compare exit 0, unchanged. Readers on Haiku: found 48/48/48, missed 0, made up 0/0/0, BAR MET, compare exit 0. Everything on Haiku: unchanged, BAR MISSED, compare exit 1. The baseline still makes up 0 in every run. Readers on Haiku now meets the owner's bar and is the cheaper arm that does, so the switch goes ahead.
+- Haiku switch: complete (from 51cd70b; gate RED-6, 381 tests, both validates exit 0; no adversarial round). `agents/file-reader.md` now says `model: haiku`, `investigate`'s cost sentence says "each a short Haiku session", and `test_file_reader_holds_exactly_read` expects `haiku`. `investigate` and the area leads stay on `sonnet`. Tasks 10 to 12 now carry a "Reader model" note in their preconditions, and the Task 10 README row says `haiku`.
+- Ruling (Haiku switch): no adversarial round. Why: it changes one frontmatter value and one phrase, and a structural test pins the value. If wrong: nothing is lost that the qa pass won't catch.
+- Ruling (Haiku switch): no new paid run of the switched branch. Why: the readers arm ran from a copy of this branch with exactly this `model:` line, and nothing else differs. If wrong: a difference shows up only in the owner's first real use.
 
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.
