@@ -56,6 +56,8 @@ LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)]|\|)\s")
 HEADING = re.compile(r"^\s{0,3}#{1,6}\s")
 # A line that is only bold text, with an optional colon inside or after it.
 LABEL = re.compile(r"^\s*(\*\*|__)(?:(?!\1).)+\1\s*:?\s*$")
+# A line that opens with a bold run closed on the same line and ending in . ! or ? (a run-in label).
+RUN_IN = re.compile(r"^\s*(\*\*|__)((?:(?!\1).)*[.!?])\1")
 IGNORED_WORDS = set((
     "command commands subcommand subcommands cli tool binary entry entrypoint group app program is and or the has was in on").split())
 CASE = "investigate-head-to-head"
@@ -93,7 +95,7 @@ def is_label(line):
 
 
 def lead_in_line(lines, i):
-    """The line that introduces the list block holding lines[i], when it ends with a colon, else None."""
+    """The line that introduces the list block holding lines[i], when it ends with a colon or opens with a bold marker label, else None."""
     start = i
     for j in range(i - 1, -1, -1):
         line = lines[j]
@@ -105,7 +107,10 @@ def lead_in_line(lines, i):
         j -= 1
     if j < 0 or not lines[j].strip() or LIST_ITEM.match(lines[j]) or HEADING.match(lines[j]):
         return None
-    return lines[j] if lines[j].rstrip(" *_`").endswith(":") else None
+    if lines[j].rstrip(" *_`").endswith(":"):
+        return lines[j]
+    run_in = None if is_label(lines[j]) else RUN_IN.match(lines[j])
+    return run_in.group(2) if run_in else None
 
 
 def decoy_listed_live(lines, i):

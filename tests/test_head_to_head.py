@@ -2271,5 +2271,232 @@ class CompareRulingsTest(unittest.TestCase):
         self.cant_score(out, "fact-big-99")
 
 
+class CompareRunInLabelTest(unittest.TestCase):
+    """Scorer fix 2: a lead-in paragraph that opens with a bold run-in label clears the list under it."""
+
+    @classmethod
+    def setUpClass(cls):
+        CompareTest.setUpClass.__func__(cls)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def decoys(self, *lines):
+        out = self.compare.made_up("\n".join(lines) + "\n", Fixtures.key)
+        return [x for x in out if x[0] == "decoy"]
+
+    def token(self):
+        return Fixtures.key["decoys"][0]["token"]
+
+    def test_the_real_case_is_cleared(self):
+        self.assertEqual(self.compare.made_up("\n".join((
+            "## 7. Gotchas",
+            "- `dispatch/views_shift.py:31`: \"# The card network allows 45 days for chargebacks (portal case 3382650).\"",
+            "- `dispatch/standby_service.py:21`: \"# Look back 120 days; maker notices trickle in for months. We found out during the Reno freeze.\"",
+            "",
+            "**Retired routes.** The comment \"# Retired with the carrier portal rewrite; kept so the old path isn't reused.\" sits above a commented-out route in three files. It names an event but gives no ticket.",
+            "- `customs/views_declaration.py:32`: `/v2/customs/declarations/legacy-reassign`",
+            "- `routing/views_detour.py:32`: `/v2/routing/detours/legacy-reopen`",
+            "- `warehouse/views_aisle.py:25`: `/v2/warehouse/aisles/legacy-flag`",
+            "",
+            "**Other sharp edges:**",
+            "- The cited workarounds are not applied anywhere the leads looked.",
+            "")), Fixtures.key), [])
+
+    def test_a_bold_run_in_label_with_the_marker_clears_across_one_blank_line_not_two(self):
+        t = self.token()
+        self.assertEqual(self.decoys("**Retired routes.** Kept for reference.", "- " + t), [])
+        self.assertEqual(self.decoys("**Retired routes.** Kept for reference.", "", "- " + t), [])
+        self.assertEqual(self.decoys("**Retired routes.** Kept for reference.", "", "", "- " + t), [("decoy", t)])
+
+    def test_underscore_bold_counts(self):
+        t = self.token()
+        self.assertEqual(self.decoys("__Retired routes.__ Kept for reference.", "- " + t), [])
+
+    def test_a_bold_run_ending_in_an_exclamation_or_question_mark_clears(self):
+        t = self.token()
+        for label in ("**Retired routes!** Kept.", "**Retired routes?** Kept.", "**Retired routes!**", "__Retired routes?__ Kept."):
+            with self.subTest(label=label):
+                self.assertEqual(self.decoys(label, "- " + t), [])
+
+    def test_a_bold_run_not_ending_in_sentence_punctuation_does_not_clear(self):
+        t = self.token()
+        for label in ("**Retired routes** kept here.", "**Retired routes**. Kept here.", "**Retired routes,** kept here."):
+            with self.subTest(label=label):
+                self.assertEqual(self.decoys(label, "- " + t), [("decoy", t)])
+
+    def test_the_marker_outside_the_bold_does_not_clear(self):
+        t = self.token()
+        self.assertEqual(self.decoys("**Routes.** These were retired.", "- " + t), [("decoy", t)])
+
+    def test_a_bold_run_that_does_not_open_the_line_does_not_clear(self):
+        t = self.token()
+        self.assertEqual(self.decoys("See the **retired** routes below.", "- " + t), [("decoy", t)])
+
+    def test_an_unclosed_bold_does_not_clear(self):
+        t = self.token()
+        self.assertEqual(self.decoys("**Retired routes. Kept for reference.", "- " + t), [("decoy", t)])
+
+    def test_a_hyphenated_or_route_marker_in_the_bold_does_not_clear(self):
+        t = self.token()
+        self.assertEqual(self.decoys("**Dead-letter routes.** Kept here.", "- " + t), [("decoy", t)])
+        self.assertEqual(self.decoys("**See /v2/legacy/old.** Kept here.", "- " + t), [("decoy", t)])
+
+    def test_the_marker_two_paragraphs_above_does_not_clear(self):
+        t = self.token()
+        self.assertEqual(self.decoys("**Retired routes.** Kept for reference.", "", "Another paragraph.", "", "- " + t), [("decoy", t)])
+
+    def test_a_plain_paragraph_decoy_is_not_cleared_by_it(self):
+        t = self.token()
+        self.assertEqual(self.decoys("**Retired routes.** Kept for reference.", "", t), [("decoy", t)])
+
+
+class CompareRunInLabelAdversarialTest(unittest.TestCase):
+    """Adversarial round on scorer fix 2: where the opening bold run is found and where the lead-in sits."""
+
+    @classmethod
+    def setUpClass(cls):
+        CompareTest.setUpClass.__func__(cls)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def decoys(self, *lines):
+        out = self.compare.made_up("\n".join(lines) + "\n", Fixtures.key)
+        return [x for x in out if x[0] == "decoy"]
+
+    def token(self):
+        return Fixtures.key["decoys"][0]["token"]
+
+    def cleared(self, *lines):
+        self.assertEqual(self.decoys(*lines), [])
+
+    def counted(self, *lines):
+        self.assertEqual(self.decoys(*lines), [("decoy", self.token())])
+
+    # where the opening bold run is found
+
+    def test_a_lead_in_indented_one_to_three_spaces_is_part_of_the_list_block_and_does_not_clear(self):
+        t = self.token()
+        for pad in (" ", "  ", "   "):
+            with self.subTest(pad=len(pad), kind="run-in"):
+                self.counted(pad + "**Retired routes.** Kept for reference.", "- " + t)
+            with self.subTest(pad=len(pad), kind="colon"):
+                self.counted(pad + "These routes were removed:", "- " + t)
+
+    def test_bold_italic_opening_run_clears(self):
+        self.cleared("***Retired routes.*** Kept.", "- " + self.token())
+
+    def test_a_route_inside_the_bold_does_not_hide_the_marker_beside_it(self):
+        self.cleared("**Retired /v2/a/b.** Kept.", "- " + self.token())
+
+    def test_a_code_span_inside_the_bold_does_not_hide_the_marker_beside_it(self):
+        self.cleared("**`Retired` routes.** Kept.", "- " + self.token())
+
+    def test_the_marker_in_an_uppercase_bold_run_clears(self):
+        self.cleared("**RETIRED ROUTES.** Kept.", "- " + self.token())
+
+    def test_a_crlf_line_ending_does_not_break_the_run_in_label(self):
+        self.cleared("**Retired routes.** Kept.\r", "- " + self.token())
+
+    def test_empty_bold_does_not_clear(self):
+        self.counted("****. Kept.", "- " + self.token())
+
+    def test_mismatched_delimiters_do_not_clear(self):
+        t = self.token()
+        self.counted("**Retired routes.__ Kept.", "- " + t)
+        self.counted("__Retired routes.** Kept.", "- " + t)
+
+    def test_nested_bold_that_closes_early_does_not_clear(self):
+        self.counted("**Retired **routes.** Kept.", "- " + self.token())
+
+    def test_only_the_opening_bold_run_is_checked(self):
+        self.counted("**Routes.** **Retired.** Kept.", "- " + self.token())
+
+    def test_a_quoted_run_in_label_does_not_clear(self):
+        self.counted("> **Retired routes.** Kept.", "- " + self.token())
+
+    def test_a_bold_run_with_a_colon_inside_and_more_words_does_not_clear(self):
+        self.counted("**Retired:** kept here.", "- " + self.token())
+
+    def test_a_trailing_colon_with_the_marker_only_outside_the_bold_clears_by_the_colon_rule(self):
+        self.cleared("**Routes.** The retired ones:", "- " + self.token())
+
+    def test_a_trailing_colon_with_no_marker_anywhere_does_not_clear(self):
+        self.counted("**Routes.** The live ones:", "- " + self.token())
+
+    def test_a_trailing_colon_with_the_marker_in_the_bold_clears(self):
+        self.cleared("**Retired routes.** Kept here:", "- " + self.token())
+
+    def test_a_fullwidth_full_stop_is_not_sentence_punctuation(self):
+        self.counted("**Retired routes\u3002** Kept.", "- " + self.token())
+
+    def test_a_dead_letter_compound_beside_a_real_marker_clears(self):
+        self.cleared("**Dead-letter and retired routes.** Kept.", "- " + self.token())
+
+    # where the lead-in sits
+
+    def test_a_list_block_with_continuation_lines_keeps_its_lead_in(self):
+        t = self.token()
+        self.cleared("**Retired routes.** Kept.", "- a", "  more about a", "- " + t)
+        self.cleared("**Retired routes.** Kept.", "", "- a", "  more about a", "- " + t)
+
+    def test_a_decoy_on_an_indented_continuation_line_is_cleared_by_it(self):
+        t = self.token()
+        self.cleared("**Retired routes.** Kept.", "- a", "  " + t)
+
+    def test_a_second_list_block_after_a_blank_line_has_no_lead_in(self):
+        self.counted("**Retired routes.** Kept.", "- a", "", "- " + self.token())
+
+    def test_a_paragraph_continuation_line_between_lead_in_and_list_blocks_it(self):
+        self.counted("**Retired routes.** Kept.", "Continued here.", "- " + self.token())
+
+    def test_a_heading_between_lead_in_and_list_blocks_it(self):
+        self.counted("**Retired routes.** Kept.", "## Notes", "- " + self.token())
+
+    def test_a_marker_less_whole_line_label_between_lead_in_and_list_blocks_it(self):
+        t = self.token()
+        self.counted("**Retired routes.** Kept.", "**Live routes**", "- " + t)
+        self.counted("**Retired routes.** Kept.", "", "**Other:**", "- " + t)
+
+    def test_other_list_marker_styles_are_cleared(self):
+        t = self.token()
+        for item in ("* " + t, "+ " + t, "1. " + t, "2) " + t, "| " + t + " |"):
+            with self.subTest(item=item):
+                self.cleared("**Retired routes.** Kept.", item)
+
+    # interactions with rules 1 to 5
+
+    def test_a_child_bullet_is_cleared_by_the_run_in_lead_in_above_its_block(self):
+        self.cleared("**Retired routes.** Kept.", "- parent", "  - " + self.token())
+
+    def test_a_run_in_lead_in_with_the_marker_wins_below_a_marker_less_label(self):
+        self.cleared("**Live routes**", "**Retired routes.** Kept.", "- " + self.token())
+
+    def test_a_marker_less_run_in_lead_in_under_a_removed_heading_still_follows_the_heading(self):
+        self.cleared("### Removed", "**Live routes.** Fine.", "- " + self.token())
+
+    def test_a_marker_less_run_in_lead_in_under_a_marker_less_label_under_a_removed_heading_stays_counted(self):
+        self.counted("### Removed", "**Live routes**", "**Live routes.** Fine.", "- " + self.token())
+
+    def test_a_marker_label_above_a_marker_less_run_in_lead_in_clears(self):
+        self.cleared("**Retired**", "**Live routes.** Fine.", "- " + self.token())
+
+    def test_a_whole_line_bold_with_a_full_stop_is_a_label_not_a_lead_in(self):
+        t = self.token()
+        self.cleared("**Retired routes.**", "- " + t)
+        self.counted("**Live routes.**", "- " + t)
+        self.counted("### Removed", "**Live routes.**", "- " + t)
+
+    def test_a_long_line_with_no_closing_delimiter_is_scored_quickly(self):
+        import time
+        t = self.token()
+        start = time.monotonic()
+        self.counted("**" + "a. " * 20000 + "x", "- " + t)
+        self.assertLess(time.monotonic() - start, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
