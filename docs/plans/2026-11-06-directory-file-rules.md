@@ -620,6 +620,8 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
   - run-plan tag × 2: exit 0, $1.03, 193 s. run-plan-decisions 0.93 (`item-d` failed run 2), run-plan-resume 1.00.
   - v2.0.1 baseline, widened debug-polluted-test × 2: $0.96, 124 s, 0.63. `ran-the-check` passed run 1 (PASS FAIL PASS), failed run 2; `victim-untouched` failed both (Edit called 1x).
   - Total spent: $6.04 of the $11 cap. The result files hold no judge reasons, and the runs kept no traces (no `--keep-temp`).
+  - Re-run with traces (owner's OK): debug-polluted-test × 2 with `--keep-temp`, $0.87, 118 s, 1.00 in both (`ran-the-check` votes FAIL PASS PASS and PASS PASS PASS). Total now $6.91.
+  - What the traces show: both runs ran the victim alone (passed) and `tests.test_a_currency tests.test_c_report` as a process of its own (failed) before the root-cause write-up. Run 1 paired each of the 7 other files with the victim in one Bash loop instead of halving, then said "Exactly one module poisons it: `test_a_currency`" before its labeled pin run. Run 2 halved in groups of three. Neither ran the check as two standalone, labeled commands. So the split votes come from the grader's form, not a missing check: "in one command right after test_a_currency with no other test file in that command" reads one way for a loop of separate processes, and "before naming" reads one way for an interim conclusion.
 
 ### Decisions made during the build
 
