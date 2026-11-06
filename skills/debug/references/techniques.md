@@ -49,7 +49,9 @@ victim failed, so nothing gets run twice.
    way of running a list of tests in a given order in one process.
 4. **Keep the half that breaks it.** If the victim fails after the first
    half, keep that half. If not, run the second half the same way, and keep
-   it if the victim fails. Repeat until one file is left.
+   it if the victim fails. Repeat until one file is left. What's left is a
+   suspect, not the polluter: until step 6 holds, call it the suspect, in
+   your notes and to the user.
    - Neither half breaks it: it takes tests from both halves together, or
      it's load, not state (see Races). Stop halving and report the list
      you've narrowed to.
@@ -60,8 +62,9 @@ victim failed, so nothing gets run twice.
    candidates (`pytest --collect-only -q <file>`, or its `Class.test_name`
    ids for unittest). If the polluter is in the victim's own file, the
    candidates are only the tests that run before the victim.
-6. **The check (required).** Before you name a polluter, run these two and
-   show both commands and their results:
+6. **The check (required).** Before you name a polluter, run these two
+   as commands of their own, not inside a loop or alongside other runs,
+   and show both commands and their results:
    - the victim alone: it passes;
    - the polluter, then the victim, in one run with nothing else: the
      victim fails.

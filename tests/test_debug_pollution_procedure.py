@@ -158,6 +158,12 @@ class OrderTest(unittest.TestCase):
         self.assertIn("Before you name a polluter", body)
 
 
+def flat_sub(text, phrase, new="", count=1):
+    """Replace a phrase however the file wraps it: whitespace in it matches any run of whitespace."""
+    pattern = r"\s+".join(re.escape(word) for word in phrase.split())
+    return re.subn(pattern, lambda _m: new, text, count=count)[0]
+
+
 def pin_suite_result(skills_dir):
     """Run the pin tests from test_structure against a copy of skills/."""
     with mock.patch.object(test_structure, "SKILLS", skills_dir):
@@ -196,7 +202,7 @@ class PinMutationTest(unittest.TestCase):
     def test_deleting_each_required_phrase_is_caught(self):
         for phrase in test_structure.DebugPollutionProcedureTest.PHRASES:
             with self.subTest(phrase=phrase):
-                self.assertCaught(self.tech, lambda t: t.replace(phrase, "", 1))
+                self.assertCaught(self.tech, lambda t: flat_sub(t, phrase))
 
     def test_rewording_each_required_phrase_is_caught(self):
         rewordings = {
@@ -207,7 +213,7 @@ class PinMutationTest(unittest.TestCase):
         }
         for phrase, new in rewordings.items():
             with self.subTest(phrase=phrase):
-                self.assertCaught(self.tech, lambda t: t.replace(phrase, new, 1))
+                self.assertCaught(self.tech, lambda t: flat_sub(t, phrase, new))
 
     def test_removing_step_6_entirely_is_caught(self):
         def drop(t):
@@ -227,12 +233,53 @@ class PinMutationTest(unittest.TestCase):
         self.assertCaught(self.tech, move)
 
     def test_flipping_before_to_after_naming_is_caught(self):
-        self.assertCaught(self.tech, lambda t: t.replace("Before you name a polluter", "After you name a polluter", 1))
+        self.assertCaught(self.tech, lambda t: flat_sub(t, "Before you name a polluter", "After you name a polluter"))
 
     def test_deleting_the_unittest_command_is_caught(self):
         def drop(t):
             return "\n".join(l for l in t.splitlines() if "python3 -m unittest -v" not in l) + "\n"
         self.assertCaught(self.tech, drop)
+
+    def test_deleting_the_suspect_sentence_is_caught(self):
+        self.assertCaught(self.tech, lambda t: flat_sub(t, "call it the suspect"))
+
+    def test_deleting_the_own_commands_phrase_is_caught(self):
+        self.assertCaught(self.tech, lambda t: flat_sub(
+            t, "as commands of their own, not inside a loop or alongside other runs"))
+
+    def test_allowing_a_loop_is_caught(self):
+        self.assertCaught(self.tech, lambda t: flat_sub(t, "not inside a loop", "inside a loop"))
+
+    def test_moving_the_suspect_sentence_to_step_6_is_caught(self):
+        def move(t):
+            t = flat_sub(t, "until step 6 holds, call it the suspect, in your notes and to the user.", "")
+            return flat_sub(t, "and show both commands and their results:",
+                            "and show both commands and their results (call it the suspect):")
+        self.assertCaught(self.tech, move)
+
+    def test_moving_the_suspect_sentence_after_step_7_is_caught(self):
+        def move(t):
+            t = flat_sub(t, "until step 6 holds, call it the suspect, in your notes and to the user.", "")
+            return t.replace("If no single file breaks it, but the whole set does",
+                             "Until step 6 holds, call it the suspect.\nIf no single file breaks it, but the whole set does", 1)
+        self.assertCaught(self.tech, move)
+
+    def test_moving_the_suspect_sentence_into_step_5_is_caught(self):
+        def move(t):
+            t = flat_sub(t, "until step 6 holds, call it the suspect, in your notes and to the user.", "")
+            return flat_sub(t, "5. **Then inside that file,**", "5. **Then inside that file,** call it the suspect,")
+        self.assertCaught(self.tech, move)
+
+    def test_dropping_before_you_name_a_polluter_is_caught(self):
+        self.assertCaught(self.tech, lambda t: flat_sub(t, "Before you name a polluter,", ""))
+
+    def test_rewrapping_a_pinned_phrase_stays_green(self):
+        # Whitespace-only edits must not trip the pins.
+        original = self.tech.read_text(encoding="utf-8")
+        self.tech.write_text(flat_sub(original, "not inside a loop or alongside other runs",
+                                      "not inside a\n   loop or alongside\n   other runs", count=1), encoding="utf-8")
+        result = pin_suite_result(self.skills)
+        self.assertEqual((result.failures, result.errors), ([], []))
 
     def test_deleting_the_victim_grep_is_caught(self):
         self.assertCaught(self.tech, lambda t: t.replace(" | grep -E '^test_y '", "", 1))

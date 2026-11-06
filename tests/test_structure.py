@@ -293,6 +293,8 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         "the polluter, then the victim, in one run with nothing else",
         "not the run's exit code",
         "Before you name a polluter",
+        "call it the suspect",
+        "as commands of their own, not inside a loop or alongside other runs",
         "python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y",
         "2>&1 | grep -E '^test_y '",
         "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y'",
@@ -316,6 +318,12 @@ class DebugPollutionProcedureTest(unittest.TestCase):
     def test_check_comes_before_reading_the_polluter(self):
         body = self.pollution()
         self.assertLess(body.index("**The check (required).**"), body.index("**Read what the polluter changes"))
+
+    def test_suspect_sentence_sits_in_step_4(self):
+        body = self.pollution()
+        at = body.index("call it the suspect")
+        self.assertLess(body.index("4. **Keep the half that breaks it.**"), at)
+        self.assertLess(at, body.index("5. **Then inside that file,**"))
 
     def test_skill_points_at_the_check(self):
         self.assertIn(self.SKILL_PHRASE, self.skill())

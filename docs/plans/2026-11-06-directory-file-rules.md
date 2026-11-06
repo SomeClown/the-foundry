@@ -640,6 +640,14 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 - Ruling (Task 4): no adversarial round on the fixture, as the plan says. Why: it's an eval fixture, checked by the free run in Verify and by `tests/test_debug_pollution_procedure.py` against it (21 tests OK). If wrong: a fixture flaw shows up as a Task 5 grader miss instead.
 
+### From Task 5 (fix batch 1)
+
+- Owner (2026-11-06): "Both, then re-run": the procedure makes the check visible, and the grader judges it by substance.
+- Procedure (the Task 3 builder): step 4 says what halving leaves is a suspect until step 6 holds; step 6 runs its two checks as commands of their own. Pins added, including the suspect sentence's place in step 4.
+- Grader and tests (test-engineer): `ran-the-check` now passes a loop that starts each run as its own process, and doesn't count "suspect" as naming. Mutation tests match on flattened whitespace, so a rewrap doesn't break them.
+- Gate: exit 0, Ran 473, all four exits 0.
+- Ruling: one mutation stays green: a loosening suffix after a pinned phrase ("or alongside other runs, if you like"). The pins are substring checks, and catching every rewording would mean pinning whole sentences. If wrong: a weakened step 6 that only a reviewer would catch.
+
 ### Parked
 
 - Task 2 (spec check): README's "The scripts." bullet still names `skills/run-plan/scripts/task-brief` until Task 6 replaces it, as planned. Task 6's builder is told to confirm it.
