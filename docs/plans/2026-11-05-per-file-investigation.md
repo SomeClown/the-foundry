@@ -856,6 +856,8 @@ Three qa reviewers ran in one message, each with its own lens: read-only boundar
   7. untracked files don't count toward the 500-file stop.
   If wrong: each is a sentence in the definition the qa pass can revisit.
 - Fix batch 1: complete (from c777e9b; gate GREEN, 389 tests OK, tests exit 0, both validates exit 0; adversarial: 9 test methods with 58 pins in `tests/test_investigate_batch1.py`, 0 bugs, 7 ambiguities fixed in round 1). Ruling 1's wording changed a pinned phrase, so the builder applied it with the pin failing and test-engineer then updated the pin. `agents/investigate.md` went from 299 to 342 lines.
+- Fix batch 2: complete (from ecc9ff9; gate GREEN, 389 tests OK, tests exit 0, both validates exit 0; the stale-count grep prints nothing outside the design and plans). All 15 items are in, plus an item the brief missed: the CHANGELOG says the head-to-head measured the definition before fix batch 1, and lists the lead checklists under Changed.
+- Ruling (fix batch 2): no adversarial round. Why: it's docs only, the gate's pinned lines hold, and the orchestrator checked the High items against the diff. If wrong: a docs slip ships, and the final report lists the items for the owner to read.
 
 ### Parked
 - Task 3: the agent under test could read `evals-expensive/` by absolute path, because the new arm loads the plugin from the repo root. Nothing points at it, so it's parked; qa looks at any run where a fact is found without a reader citing it.

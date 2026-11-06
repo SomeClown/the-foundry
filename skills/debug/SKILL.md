@@ -113,8 +113,9 @@ Use whichever of these fits; most bugs fall to one or two.
   `the-foundry:investigate` with the symptom, the evidence so far, and the one
   question to answer ("where does `guild_id` become None before
   `record_post`?"). A one-question brief gets a scoped read of only the
-  relevant files. It changes nothing: it starts read-only readers and reports
-  back.
+  relevant files. It changes nothing: it starts read-only readers (and, on a
+  large repo, copies of itself as area leads, which hold Bash like it does) and
+  reports back.
 
 ## 4. One hypothesis at a time
 

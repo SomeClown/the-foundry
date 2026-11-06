@@ -59,10 +59,11 @@ Routing:
 Working rules:
 - Evidence before claims: no "done", "fixed", or "passing" without command
   output from this session that shows it, exit code included.
-- Dispatch independent work (read-only reviews, separate investigations) in
-  parallel, in one message, except full sweeps: run those one at a time, with
-  nothing else that spawns readers alongside. Never run two file-writing
-  agents on the same branch at once.
+- Dispatch independent work (read-only reviews) in
+  parallel, in one message, except `investigate`: even a scoped read starts
+  readers 10 at a time, so run `investigate` dispatches one at a time, with
+  nothing else that starts agents alongside. Other read-only agents still run
+  in parallel. Never run two file-writing agents on the same branch at once.
 - Outside review comments (PR reviewers, bots) get checked against the code
   before you agree with them; when they're wrong, push back with evidence.
 
@@ -84,8 +85,9 @@ like.
 
 **Say whether the codebase is known.** A brief to `investigate` should state
 whether the session already knows the codebase. A new one gets a full sweep,
-one reader per file; a narrow question gets a scoped read of only the files
-that matter.
+one reader per file, unless the brief asks one narrow question or names the
+files; a known one gets a scoped read of only the files that matter, unless
+the brief asks for the whole thing.
 
 **Don't re-run investigate out of habit.** Its report is reusable within a
 session. Re-run it after a context gap, a big landed change, or when you catch

@@ -33,6 +33,9 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    FOUNDRY_PYTEST_PYTHON=/path/to/a/python/with/pytest python3 -m unittest discover -s tests -q
    claude plugin validate .
    ```
+   A change to `investigate` or `file-reader` also gets the nesting smoke
+   case, and the head-to-head in `evals-expensive/` with the owner's OK,
+   since it costs real money.
    `tests/` holds the scripts' tests and the structural checks (the README's
    promises about who can write, which model each agent runs, and how many
    skills there are, against the actual files). The `find-polluter` tests

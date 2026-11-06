@@ -62,7 +62,7 @@ Design principles that came out of that experience:
 
 | Agent | Role | Writes? | Model |
 |---|---|---|---|
-| `investigate` | Codebase onboarding — reads a project cold, giving each file its own reader; reports structure, data model, coupling, gotchas | No | sonnet |
+| `investigate` | Codebase onboarding — reads a project cold, giving each file its own reader; reports structure, data model, coupling, gotchas (only its instructions keep it to `file-reader` and its own leads) | No | sonnet |
 | `file-reader` | Reads one file or section for `investigate` and reports it with line numbers; holds only `Read` | No | haiku |
 | `architect` | Turns a feature request (+ investigate report) into an ordered implementation plan with file-level scope | No | opus |
 | `uiux` | Design advisor — aesthetic/creative direction, visual critique in a browser, dataviz, greenfield design systems | No | opus |
@@ -84,8 +84,8 @@ mileage may vary) and can escalate any single spawn via the Agent tool's
 per-call `model` override.
 
 **Permission policy:** Tool allowlists are the enforced boundary — read-only
-agents have no Edit/Write. The one exception is that `investigate` can spawn
-agents, and only its instructions keep it to `file-reader` and its own area
+agents have no Edit/Write. The one exception I know of is that `investigate` holds
+`Agent` and can spawn agents, and only its instructions keep it to `file-reader` and its own area
 leads, because Claude Code ignores `Agent(type)` restrictions in a subagent
 definition. Browser tools are held by `frontend` (full set, for
 building) and `uiux` (observation set — no form input or scripting, and its
@@ -100,16 +100,24 @@ is its tool list alone, since it holds `Read` and nothing else. If you want the
 hard block, copy those two files into `~/.claude/agents/`, where your copy
 overrides the plugin's. A copy of `investigate` alongside the plugin still
 dispatches the plugin's `the-foundry:file-reader`, which worked on the first try
-when tested. `qa`, `uiux` and `file-reader` don't carry plan mode at all (qa
+when tested. That copy gets plan mode for its own tool calls only. Its area
+leads (above about 150 files) are dispatched under the plugin's name first, so
+with the plugin installed they're the plugin's copy, which ignores
+`permissionMode`. Nothing it starts inherits its plan mode, since a subagent
+with no `permissionMode` takes the main session's mode, and plan mode applies
+only when your session itself is in default or plan mode. `qa`, `uiux` and `file-reader` don't carry plan mode at all (qa
 needs to run builds and tests, uiux needs to drive a browser, and file-reader
 has only `Read`).
 
 Plan mode doesn't block `investigate` from spawning readers, in a manual install
-or a copy (tested 2026-11-05). In a manual install, where every agent is copied
+or a copy (tested 2026-11-05, once per variant, on a 6-file repo with the agents
+in a scratch project's `.claude/agents/` and `--setting-sources project`, so no
+area leads). In a manual install, where every agent is copied
 into `~/.claude/agents/`, the first batch under the `the-foundry:file-reader`
-name fails with "Agent type not found" and the rest run under the bare
-`file-reader` name; it costs a turn, not a reader. `investigate` also ignores
-the notice plan mode adds, and may mention it on the first line of its report.
+name fails with an "Agent type ... not found" error and the rest run under the
+bare `file-reader` name; it costs a turn, not a reader. `investigate` also
+ignores the notice plan mode adds, and may mention it in its report, after any
+first-line flag.
 Should plan mode ever block spawning, a manual install or a copy falls back to
 single-agent reading and says so at the top of its report.
 
@@ -221,7 +229,11 @@ Or put either into a single project's `.claude/` directory to scope them to that
 repo. New Claude Code sessions pick them up automatically — agent definitions
 load at session start, so restart any running session. Note that user-level
 `.claude/agents/` definitions override same-named plugin agents, which is a
-feature: install the plugin, then shadow any agent you want to customize.
+feature: install the plugin, then shadow any agent you want to customize. In a
+manual install the bare name `file-reader` resolves to a project's own
+`.claude/agents/file-reader.md` first, if a trusted project has one, and
+`cp the-foundry/agents/*.md ~/.claude/agents/` overwrites an existing user agent
+of the same name.
 
 ### Optional: run them as an agent team
 
@@ -280,7 +292,7 @@ references are just documents — no tooling required.
 > "Sunlight is said to be the best of disinfectants."
 > — Louis Brandeis, who was talking about banks, but the principle travels
 
-The short version: the Foundry is Markdown and two small scripts. It bundles
+The short version: the Foundry is Markdown and a few small scripts. It bundles
 no hooks, no MCP servers, no slash commands, and no telemetry, and nothing in
 it phones home. Everything it does, it does through tools Claude Code already
 has, under whatever permissions you've given your session. Here's the long
@@ -296,12 +308,21 @@ version, so you don't have to take my word for it:
 - **Agents starting agents.** `investigate` starts `file-reader` agents, one per
   file (or per section of a file over about 1,000 lines), 10 at a time, and for
   a large repo it starts area leads of about 150 files each that start readers
-  of their own. It stops above 500 files and asks instead. That costs more than
+  of their own. Only its instructions keep it to `file-reader` and its own
+  leads, and the one-level bound on leads holds at Claude Code's default nesting
+  depth; a raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, `claude --agent`, or
+  running `investigate` as an agent-team teammate leaves only the instructions.
+  It stops above 500 files and asks instead. That costs more than
   one agent reading everything: on one test repo of 191 files, one full sweep
-  with the readers on Haiku cost about $2.62 and took 796 seconds, against about
-  $0.47 and 109 seconds for 1.7.6's single-agent read (those are one test repo's
-  figures, dated 2026-11-05). Nothing leaves the session any differently: the
-  readers use the same `Read` tool on the same files.
+  with the readers on Haiku cost about $2.62 and about 800 seconds a run (the
+  mean of three eval runs, judge cost included), against about $0.47 and 109
+  seconds for 1.7.6's single-agent read (the mean of three eval runs, labeled
+  the same way; those are one test repo's figures, dated 2026-11-05). The sweep
+  was tested in `claude -p` and eval runs only: in an SDK run with fork mode
+  off, nested agents start in the background, and the definition waits for
+  them. Nothing leaves the session any differently: the readers use the same
+  `Read` tool on files in your project, and a full sweep opens every tracked
+  file.
 - **Files in your project.** `implement`, `frontend`, `test-engineer`,
   `devops`, and `docs` write files, each in its own lane (application code,
   UI code, tests, config and infrastructure, documentation). The skills write
@@ -323,7 +344,11 @@ version, so you don't have to take my word for it:
 - **The scripts.** `skills/run-plan/scripts/task-brief` (bash and awk) copies
   one task out of a plan into a file. `skills/debug/scripts/find-polluter`
   (Python) runs your project's pytest suite in different orders to find a
-  test that leaves state behind. Neither touches the network.
+  test that leaves state behind. `evals-expensive/compare.py` and
+  `evals-expensive/sync_case.py` (Python) are run by hand, read result JSON
+  and the case files, and stay local. The `evals-expensive/` scaffold writes a
+  `bin/git` wrapper into its scratch fixture. None of them touches the
+  network.
 - **The tests and evals.** `tests/` runs those scripts against throwaway
   folders. The `evals/` cases run only when you invoke `claude plugin eval .`
   yourself; their `scaffold.sh` scripts, which build small fixture repos in

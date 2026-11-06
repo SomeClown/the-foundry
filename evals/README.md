@@ -1,4 +1,4 @@
-# Behavior tests for the skills (and one agent)
+# Behavior tests for the skills (and some agents)
 
 > "Trust, but verify."
 > — Russian proverb, borrowed by a US president, overused by everyone since
@@ -40,7 +40,10 @@ claude plugin eval . --tag ship --scaffold --allow-tools Bash Write Edit \
   judge still gets one wrong now and then; a real regression usually breaks
   several, or trips one of the exact checks below. The default, 1.0, fails a
   case on any miss.
-- `--max-cost-usd 10` caps the spend. `-j 4` runs four at once.
+- `--max-cost-usd 10` is a ceiling checked before a run starts. It doesn't
+  stop a run in flight, and a run that breaches it skips the paid graders
+  (`keep-report` among them, in the expensive cases below). `-j 4` runs four
+  at once.
 - `--judge-model sonnet` matters. With the default judge (haiku), the first
   trial failed correct answers on long, multi-part replies, sometimes by a
   unanimous vote. With sonnet the same answers pass, for about 10 to 20 cents
@@ -96,7 +99,7 @@ by accident: one full sweep starts about 190 readers, and it runs only with
 `--eval-dir evals-expensive`. `nesting-smoke` is the cheap check beside it,
 that an agent can start an agent that starts an agent.
 
-The exact commands (`WORK` is a scratch folder; run them one after the other).
+The exact commands (`WORK` is a scratch folder, as an absolute path, since the baseline command runs inside a `cd`; run them one after the other).
 The first run of the new version:
 
 ```bash
@@ -121,8 +124,11 @@ python3 evals-expensive/compare.py --key evals-expensive/head-to-head-key.json -
 ```
 
 The baseline should print `"version": "1.7.6"` and `9` agents.
-`--max-cost-usd` can't limit a run (the harness checks it only before a run
-starts); the case's `timeout_seconds: 3600` is what bounds one.
+The measured runs added `--max-cost-usd 25` to each of the three `claude
+plugin eval .` commands. That ceiling is checked only before a run starts, so
+it can't stop one in flight, and a run that breaches it skips the paid graders,
+`keep-report` among them, so `compare.py` can't score it. The case's
+`timeout_seconds: 3600` is what bounds a run.
 
 **What it cost.** Measured on 2026-11-05, with the readers on Haiku (the
 shipped setup), a run took about $2.62 and 796 seconds on the 191-file test
@@ -135,13 +141,14 @@ run's report, which `compare.py` reads and checks against
 and items made up (a route, `fxctl` command or ticket reference that isn't
 real, or a decoy listed as live). A decoy the report marks dead, on its own
 line, the next line, a parent bullet, a colon lead-in, a bold run-in label
-ending in a full stop, or the nearest heading or bold label, isn't counted as
+ending in `.`, `!` or `?`, or the nearest heading or bold label, isn't counted as
 made up. The bar is on the means across each arm's runs: found at least 90% of
 the 48, missed at most half the baseline's, and made up no more than the
 baseline's. Exit 0 prints `BAR MET`, exit 1 prints `BAR MISSED`, and exit 2
 prints `CAN'T SCORE` with the reason (a missing report, too few runs, an
 unreadable key); a crash while scoring is also exit 2, never 1. `--summary`
-scores one result on its own and exits 0.
+scores one result on its own and exits 0 when the run is scoreable, otherwise
+2 with `CAN'T SCORE`.
 
 **Why the `llm` grader.** The `keep-report` grader exists to store the
 report, as its `evidence`, so `compare.py` has something to score. Its

@@ -106,9 +106,10 @@ sources of truth and a Saturday gone.
 > the migration mechanism. A feature is coming (docs/design.md §14) that adds
 > per-season blackout dates which the schedule generator must respect.
 
-This brief names a focus, so `investigate` does a scoped read, one reader per
-relevant file, rather than a full sweep. What comes back includes a
-Coverage section saying which mode ran and which files were read.
+This brief is a codebase the session doesn't know, with a focus, and it names
+no files, so `investigate` gives it a full sweep: one reader per tracked file,
+with the focus sharpening what the readers look for. What comes back includes
+a Coverage section saying which mode ran and which files were read.
 
 **What comes back** (condensed): Flask + SQLAlchemy + SQLite, a custom
 `flask db-migrate` command rather than Alembic, and the part that pays for the
