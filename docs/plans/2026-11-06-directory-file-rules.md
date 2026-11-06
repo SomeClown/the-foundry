@@ -613,7 +613,13 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 - Task 2: complete (from 90ebe00; gate exit 0, Ran 475, all four exits 0; spec check: no gaps; adversarial: 47 tests, 2 bugs fixed in round 1; byte-identical to the old script on 19 of 19 tasks, bash and zsh)
 - Task 3: complete (from 4430bea; gate exit 0, Ran 464, all four exits 0; adversarial: 21 tests, the procedure's commands checked against the real fixture under unittest and pytest, 4 weak pins fixed in round 1)
 - Task 4: complete (from d8e5739; gate exit 0, Ran 464, all four exits 0; fixture check: 8 tests, only the victim fails, alone exit 0, pair exit 1; no adversarial round, per the plan)
-- Task 5: stopped for the owner's OK on the eval runs (plan rule 3)
+- Task 5: owner OK'd the runs (2026-11-06). Bar missed; stopped for the owner. Results:
+  - First try of the three branch commands refused to start (`not a trusted plugin directory`; the plan's commands lacked `--trust-plugin`), $0. Re-run with the flag.
+  - debug tag × 2: exit 1, $3.03, 501 s. debug-polluted-test 0.75 (`ran-the-check` FAIL in both runs, votes FAIL FAIL FAIL and FAIL PASS FAIL; `fixed-the-polluter`, `right-cause`, `victim-untouched` passed in both). debug-production-report 0.83 (`asks-and-hands-over` failed run 2). The other four cases 1.00.
+  - architect-plan-format × 2: exit 0, $1.02, 184 s, 1.00 in both runs (both brief graders passed).
+  - run-plan tag × 2: exit 0, $1.03, 193 s. run-plan-decisions 0.93 (`item-d` failed run 2), run-plan-resume 1.00.
+  - v2.0.1 baseline, widened debug-polluted-test × 2: $0.96, 124 s, 0.63. `ran-the-check` passed run 1 (PASS FAIL PASS), failed run 2; `victim-untouched` failed both (Edit called 1x).
+  - Total spent: $6.04 of the $11 cap. The result files hold no judge reasons, and the runs kept no traces (no `--keep-temp`).
 
 ### Decisions made during the build
 
