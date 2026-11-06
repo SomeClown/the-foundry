@@ -1,7 +1,7 @@
 """Structural checks: the repo agrees with itself.
 
 The README makes promises about the team (who can write, which model each
-agent runs, which agents are locked into plan mode, how many agents and
+agent runs, which front-matter keys the agents use, how many agents and
 skills there are), and the agent and skill files either keep them or they
 don't. Nothing used to check. These tests read the files and fail on drift,
 which so far has meant "three skills" lingering in three places after a fourth
@@ -46,16 +46,30 @@ def front_matter(path):
     for line in lines[1:]:
         if line.strip() == "---":
             return data
-        item = re.match(r"^\s+-\s+(.*)$", line)
-        if item and key:
-            if not isinstance(data[key], list):
-                data[key] = []
-            data[key].append(item.group(1).strip())
+        if not line.strip() or line.lstrip().startswith("#"):
             continue
-        pair = re.match(r"^([A-Za-z][\w-]*):\s*(.*)$", line)
-        if pair:
-            key, value = pair.group(1), pair.group(2).strip()
-            data[key] = value.strip('"') if value else []
+        if line[0] in " \t":
+            item = re.match(r"^\s+-\s+(.*)$", line)
+            if item and key:
+                if not isinstance(data[key], list):
+                    data[key] = []
+                data[key].append(item.group(1).strip())
+            continue
+        # A top-level line must be a key this parser recognizes (bare or quoted,
+        # optional space before the colon). Anything else fails loudly, so no
+        # key form can slip past the keys guard unseen.
+        pair = re.match(r"""^(?:([\w-]+)|"([\w-]+)"|'([\w-]+)')[ \t]*:(?:[ \t]+(.*))?$""", line)
+        if not pair:
+            raise AssertionError(f"{path.relative_to(ROOT)}: front-matter line the parser doesn't recognize: {line!r}")
+        key = next(g for g in pair.groups()[:3] if g)
+        value = (pair.group(4) or "").strip()
+        if re.fullmatch(r'"(?:[^"\\]|\\.)*"', value):
+            value = re.sub(r'\\(["\\])', r"\1", value[1:-1])
+        elif len(value) >= 2 and value[0] == value[-1] == '"':
+            raise AssertionError(f"{path.relative_to(ROOT)}: unterminated quoted value: {line!r}")
+        elif re.fullmatch(r"'(?:[^']|'')*'", value):
+            value = value[1:-1].replace("''", "'")
+        data[key] = value if value else []
     raise AssertionError(f"{path.relative_to(ROOT)}: front matter never closes")
 
 
@@ -103,13 +117,19 @@ class AgentFilesTest(unittest.TestCase):
                 else:
                     self.assertTrue(writes, "README says it writes, but it has no Edit or Write tool")
 
-    def test_plan_mode_agents_are_the_ones_the_readme_names(self):
-        text = README.read_text(encoding="utf-8")
-        m = re.search(r"((?:`[\w-]+`(?:,|\s+and)?\s+)+)also carry\s+`permissionMode: plan`", text)
-        self.assertIsNotNone(m, "README no longer names the plan-mode agents")
-        named = set(re.findall(r"`([\w-]+)`", m.group(1)))
-        in_files = {n for n, fm in agents().items() if fm.get("permissionMode") == "plan"}
-        self.assertEqual(named, in_files)
+    def test_front_matter_keys_are_the_ones_the_directory_takes(self):
+        for name, fm in agents().items():
+            with self.subTest(agent=name):
+                extra = set(fm) - {"name", "description", "tools", "model"}
+                self.assertFalse(extra, f"agent {name} has front-matter keys the directory doesn't take: {sorted(extra)}")
+        for name, fm in skills().items():
+            with self.subTest(skill=name):
+                extra = set(fm) - {"name", "description"}
+                self.assertFalse(extra, f"skill {name} has front-matter keys the directory doesn't take: {sorted(extra)}")
+
+    def test_readme_says_no_agent_carries_permission_mode(self):
+        text = " ".join(README.read_text(encoding="utf-8").split())
+        self.assertIn("No agent carries `permissionMode`", text)
 
     def test_uiux_browser_tools_are_observation_only(self):
         # README: uiux holds the observation set, "no form input or scripting".

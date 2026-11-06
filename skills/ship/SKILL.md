@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Take finished, tested work from a branch to merged, released, and deployed: the gate, push, PR, CI (including a check stuck after its run passed), merge, a local build check, the version tag, the tag's own build, deploy commands for the user to run, and the status docs afterwards. Use when work is done and the user says "ship it", "push and merge", "release it", "tag it", or "deploy", or when run-plan finishes and asks what's next. Reads the project's runbook and history for its specifics; asks before every push, merge, tag, and deploy, and never runs production commands itself.
+description: "Take finished, tested work from a branch to merged, released, and deployed: the gate, push, PR, CI (including a check stuck after its run passed), merge, a local build check, the version tag, the tag's own build, deploy commands for the user to run, and the status docs afterwards. Use when work is done and the user says \"ship it\", \"push and merge\", \"release it\", \"tag it\", or \"deploy\", or when run-plan finishes and asks what's next. Reads the project's runbook and history for its specifics; asks before every push, merge, tag, and deploy, and never runs production commands itself."
 ---
 
 # Ship

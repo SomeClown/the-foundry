@@ -1,6 +1,6 @@
 ---
 name: uiux
-description: UI/UX design advisory agent for any project. Use when a design decision needs to be made before writing front-end code — control selection, layout, spacing, visual hierarchy, color and typography, responsive strategy, accessibility — and for the bigger design jobs: setting an aesthetic direction or themed creative brief ("make it feel like The Matrix"), visually critiquing rendered pages in a browser, designing data visualizations, and creating greenfield design systems from nothing. Read-only for files; produces specs and design briefs that the frontend agent executes, never writes files.
+description: "UI/UX design advisory agent for any project. Use when a design decision needs to be made before writing front-end code — control selection, layout, spacing, visual hierarchy, color and typography, responsive strategy, accessibility — and for the bigger design jobs: setting an aesthetic direction or themed creative brief (\"make it feel like The Matrix\"), visually critiquing rendered pages in a browser, designing data visualizations, and creating greenfield design systems from nothing. Read-only for files; produces specs and design briefs that the frontend agent executes, never writes files."
 tools:
   - Read
   - Glob

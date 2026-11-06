@@ -609,7 +609,12 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 ### Progress
 
+- Task 1: complete (from 67080af; gate exit 0, Ran 425, all four exits 0; adversarial: 35 tests, 7 parser bugs fixed in round 1)
+
 ### Decisions made during the build
+
+- Ruling (Task 1): all 7 failing adversarial tests in `tests/test_front_matter_rules.py` are real bugs in the test parser, not misreads. Two are bypasses of the keys guard (`permissionMode : plan`, a quoted key), both valid YAML; the other five (an underscore-led key, a single-quoted value, an unterminated quote) are YAML behavior the parser gets wrong. If wrong: a stricter parser than the files need, at no cost to the shipped plugin.
+- Ruling (Task 1): the README sentence saying `qa`, `uiux`, and `file-reader` don't carry plan mode goes with the replaced paragraph. Why: no agent carries it now, and the new text says so. If wrong: one sentence to restore.
 
 - Ruling (Task 1): fold in the probe's "Frontmatter value may be misread" note (5 findings: `agents/architect.md`, `agents/file-reader.md`, `agents/investigate.md`, `agents/uiux.md`, `skills/ship/SKILL.md`) by double-quoting each `description` value. Why: Task 1 already edits agent front matter, and the fix is mechanical. If wrong: a front-matter parser in the tests that doesn't strip quotes, caught by the gate.
 

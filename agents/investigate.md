@@ -1,6 +1,6 @@
 ---
 name: investigate
-description: Codebase onboarding agent for any project. Use at the start of a session that needs to understand the current state of a codebase before making changes — especially after a context gap, when picking up an unfamiliar repo cold, or before designing a feature that touches several files. Gives each file its own file-reader agent and compiles what they report. Read-only for files: produces a structured summary and flags coupling risks; never writes files, though it does start agents.
+description: "Codebase onboarding agent for any project. Use at the start of a session that needs to understand the current state of a codebase before making changes — especially after a context gap, when picking up an unfamiliar repo cold, or before designing a feature that touches several files. Gives each file its own file-reader agent and compiles what they report. Read-only for files: produces a structured summary and flags coupling risks; never writes files, though it does start agents."
 tools:
   - Read
   - Glob
@@ -8,7 +8,6 @@ tools:
   - Bash
   - Agent
 model: sonnet
-permissionMode: plan
 ---
 
 # Investigation Agent

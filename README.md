@@ -90,27 +90,9 @@ leads, because Claude Code ignores `Agent(type)` restrictions in a subagent
 definition. Browser tools are held by `frontend` (full set, for
 building) and `uiux` (observation set — no form input or scripting, and its
 instructions forbid state-changing clicks; it's a critic in the gallery, not a
-visitor doing errands). `investigate` and `architect` also carry
-`permissionMode: plan`, which hard-blocks mutations even through Bash, but only
-in a manual install: Claude Code ignores that field for agents that come from a
-plugin, as a deliberate security rule. In a plugin install, all five read-only
-agents (investigate, file-reader, architect, qa, uiux) rest on having no edit
-tools plus their instructions, which so far has held; `file-reader`'s boundary
-is its tool list alone, since it holds `Read` and nothing else. If you want the
-hard block, copy those two files into `~/.claude/agents/`, where your copy
-overrides the plugin's. A copy of `investigate` alongside the plugin still
-dispatches the plugin's `the-foundry:file-reader`, which worked on the first try
-when tested. That copy gets plan mode for its own tool calls only. Its area
-leads (above about 150 files) are dispatched under the plugin's name first, so
-with the plugin installed they're the plugin's copy, which ignores
-`permissionMode`. Nothing it starts inherits its plan mode, since a subagent
-with no `permissionMode` takes the main session's mode, and plan mode applies
-only when your session itself is in default or plan mode. `qa`, `uiux` and `file-reader` don't carry plan mode at all (qa
-needs to run builds and tests, uiux needs to drive a browser, and file-reader
-has only `Read`).
+visitor doing errands). No agent carries `permissionMode`. Claude Code ignores it for agents that come from a plugin, as a deliberate security rule, and the plugin directory doesn't take the key in a plugin's agent files. So all five read-only agents (investigate, file-reader, architect, qa, uiux) rest on having no edit tools plus their instructions, which so far has held; `file-reader`'s boundary is its tool list alone, since it holds `Read` and nothing else. If you want the hard block plan mode gives (it blocks mutations even through Bash), copy `agents/investigate.md` and `agents/architect.md` into `~/.claude/agents/` and add `permissionMode: plan` to each copy's front matter; your copy overrides the plugin's. That copy gets plan mode for its own tool calls only, and only when your session itself is in default or plan mode: nothing it starts inherits it, since a subagent with no `permissionMode` takes the main session's mode. A copy of `investigate` still dispatches the plugin's `the-foundry:file-reader`, which worked on the first try when tested, and its area leads (above about 150 files) are the plugin's copy, without plan mode.
 
-Plan mode doesn't block `investigate` from spawning readers, in a manual install
-or a copy (tested 2026-11-05, once per variant, on a 6-file repo with the agents
+Plan mode, added to your own copies, doesn't block `investigate` from spawning readers (tested 2026-11-05, once per variant, on a 6-file repo with the agents
 in a scratch project's `.claude/agents/` and `--setting-sources project`, so no
 area leads). In a manual install, where every agent is copied
 into `~/.claude/agents/`, the first batch under the `the-foundry:file-reader`
@@ -302,9 +284,7 @@ version, so you don't have to take my word for it:
   because an agent that can't run the tests can only guess. The read-only
   agents (`investigate`, `architect`, `qa`, `uiux`) have no file-editing tools
   at all, and their instructions forbid changing anything through Bash;
-  `file-reader` has only `Read`. (Plan mode,
-  which enforces that for two of them, applies only in a manual install; see
-  the permission policy above.)
+  `file-reader` has only `Read`. (Plan mode can enforce that for `investigate` and `architect` if you add it to your own copies; see the permission policy above.)
 - **Agents starting agents.** `investigate` starts `file-reader` agents, one per
   file (or per section of a file over about 1,000 lines), 10 at a time, and for
   a large repo it starts area leads of about 150 files each that start readers

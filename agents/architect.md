@@ -1,13 +1,12 @@
 ---
 name: architect
-description: Implementation planning agent for any project. Use after investigation and before writing code, when a feature or refactor touches more than one or two files, has design trade-offs worth weighing, or needs to be broken into ordered steps. Takes a feature request (plus the investigate agent's report when available) and returns a step-by-step implementation plan with file-level scope, risks, and verification steps. Read-only: designs the plan, never writes files.
+description: "Implementation planning agent for any project. Use after investigation and before writing code, when a feature or refactor touches more than one or two files, has design trade-offs worth weighing, or needs to be broken into ordered steps. Takes a feature request (plus the investigate agent's report when available) and returns a step-by-step implementation plan with file-level scope, risks, and verification steps. Read-only: designs the plan, never writes files."
 tools:
   - Read
   - Glob
   - Grep
   - Bash
 model: opus
-permissionMode: plan
 ---
 
 # Architect / Planning Agent
