@@ -46,8 +46,8 @@ and `investigate` now runs a different way (see CONTRIBUTING.md on majors).
   cheaper still, but one run lost its whole report and every run was slower.
 
 ### Measured
-The head-to-head measured the definition before the checklist change, which
-came from the qa pass.
+The readers-on-Haiku arm was measured twice: first before the qa pass's
+checklist change, then re-run on the final version.
 
 One 191-file test repo with 48 planted facts, 3 runs per arm, against
 1.7.6 as the baseline (found and missed are out of 48 and per run; made up
@@ -57,7 +57,9 @@ has no ceiling):
 - 2.0.0 with every agent on Sonnet: found 48 in every run, missed 0, made up
   0, about $5.57 a run.
 - 2.0.0 as shipped, readers on Haiku: found 48 in every run, missed 0, made
-  up 0, about $2.62 a run and about the same time as all-Sonnet.
+  up 0, about $2.31 a run and about 708 seconds, a little faster than
+  all-Sonnet's 764. This is the re-run on the final version. Before the
+  checklist change the same arm cost about $2.62 and 796 seconds a run.
 
 The raw head-to-head verdict was BAR MISSED, from scorer false positives on
 decoys the reports marked dead. The owner chose to fix the scorer the first
@@ -65,7 +67,8 @@ time, and the rescored verdict is BAR MET. The readers-on-Haiku arm also
 scored BAR MISSED raw (3 made up in one run, decoys the report marked dead
 under a bold run-in label). The owner had the scorer fixed a second time and
 every stored report rescored at no cost; the result was BAR MET, and the
-baseline stayed at 0 made up.
+baseline stayed at 0 made up. The re-run on the final version met the bar on
+the scorer as fixed, with no rescore.
 
 Plan mode: spawning works under it, both in a manual install (agents copied
 to `.claude/agents/`) and with a local copy of `investigate` shadowing the

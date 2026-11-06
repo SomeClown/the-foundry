@@ -131,8 +131,9 @@ it can't stop one in flight, and a run that breaches it skips the paid graders,
 `timeout_seconds: 3600` is what bounds a run.
 
 **What it cost.** Measured on 2026-11-05, with the readers on Haiku (the
-shipped setup), a run took about $2.62 and 796 seconds on the 191-file test
-repo, against about $0.47 and 109 seconds for 1.7.6. The same sweep with every
+shipped setup) on the final 2.0.0 definition, a run took about $2.31 and 708
+seconds on the 191-file test repo (the run before the checklist change cost
+$2.62), against about $0.47 and 109 seconds for 1.7.6. The same sweep with every
 reader on Sonnet, which is what led to the switch, cost $5.57 a run.
 
 **How `compare.py` scores.** The harness's `aggregate-result.json` holds each

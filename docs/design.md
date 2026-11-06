@@ -300,8 +300,8 @@ approved; the numbers are from the build log in
   list by path. This closes a silent gap the design's own anti-goals rule out: a
   lead could report an area as done with files unread. A failed or cut-off lead
   gets one restart. The head-to-head measured the definition as it stood before
-  this change, and no run of the changed definition has been made. A re-run of the
-  readers arm (about $8 for 3 runs) was left to the owner.
+  this change, and the owner had the readers arm re-run on the final definition. It met the
+  bar: 48/48/48 found, 0 missed, 0 made up, $2.31 and 708 s a run.
 - **The nesting limit can be raised or lowered.** The constraint "can lower the
   limit" above is wrong; the owner's environment can do either.
 - **Line-number accuracy on Haiku was never measured.** Two Haiku runs report a

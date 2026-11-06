@@ -314,7 +314,7 @@ version, so you don't have to take my word for it:
   running `investigate` as an agent-team teammate leaves only the instructions.
   It stops above 500 files and asks instead. That costs more than
   one agent reading everything: on one test repo of 191 files, one full sweep
-  with the readers on Haiku cost about $2.62 and about 800 seconds a run (the
+  with the readers on Haiku cost about $2.31 and about 710 seconds a run (the
   mean of three eval runs, judge cost included), against about $0.47 and 109
   seconds for 1.7.6's single-agent read (the mean of three eval runs, labeled
   the same way; those are one test repo's figures, dated 2026-11-05). The sweep
