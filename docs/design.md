@@ -266,3 +266,72 @@ ten.
 
 - Whether plan mode blocks spawning in a manual install (tested in Part 8).
 - The real cost, which only the test can give.
+
+### As built (2026-11-05)
+
+What changed from the design above during the build. The approved text stays as
+approved; the numbers are from the build log in
+`docs/plans/2026-11-05-per-file-investigation.md`.
+
+- **`file-reader` runs on Haiku, reversing decision 5B** on the owner's word
+  after the Haiku check ("Fix scorer, then switch"). `investigate` and the area
+  leads stay on Sonnet. Readers on Haiku found 48 of 48 in all three runs, at a
+  mean of $2.62 and 796 s against Sonnet's $5.57 and 764 s: 53% cheaper, 4%
+  slower. Everything on Haiku averaged $1.71 and 1723 s and found 0, 48, and 48.
+  Run 1 found nothing because `investigate` returned a 53.7KB report, the harness
+  saved it to a file, the sandbox blocked the session from reading it, and only
+  the preview came back. Every run was slower, 1.5 to 3.4 times as slow as
+  Sonnet's mean. That arm had `investigate` on Haiku, so it and the leads stayed
+  on Sonnet.
+- **The head-to-head, against the bar.** Raw result: BAR MISSED. The new version
+  found 48.00 and missed 0.00 against the baseline's 39.33 found and 8.67 missed
+  (clauses 1 and 2 pass), but made up 3.00 against 0.00 (clause 3 fails). All
+  nine counted items were decoys that the reports marked as dead, in layouts the
+  scorer didn't recognize. The owner chose to fix the scorer rather than rule the
+  items out by hand. Two scorer fixes followed (a decoy is cleared by a marker on
+  an ancestor list item, a lead-in line ending in a colon, or a bold label; later,
+  by a bold run-in label ending in a full stop). Rescored from the stored reports
+  with no new runs: BAR MET. New arm 48.00 found, 0.00 missed, 0.00 made up, $5.57,
+  764 s; baseline 39.33 found, 8.67 missed, 0.00 made up, $0.47, 109 s. The
+  readers-on-Haiku arm was rescored to 48/48/48 found and 0 made up, BAR MET.
+  Everything on Haiku stayed BAR MISSED.
+- **Part 7 amendment (qa fix batch 1).** Area leads return a per-file checklist,
+  and the top-level `investigate` reconciles those checklists against its file
+  list by path. This closes a silent gap the design's own anti-goals rule out: a
+  lead could report an area as done with files unread. A failed or cut-off lead
+  gets one restart. The head-to-head measured the definition as it stood before
+  this change, and no run of the changed definition has been made. A re-run of the
+  readers arm (about $8 for 3 runs) was left to the owner.
+- **The nesting limit can be raised or lowered.** The constraint "can lower the
+  limit" above is wrong; the owner's environment can do either.
+- **Line-number accuracy on Haiku was never measured.** Two Haiku runs report a
+  reader that was off by one on a line number, which a lead corrected by grep.
+- **The reader's gotcha template mirrors the test prompt's fact shapes.** This
+  came from Task 3 and no ruling recorded it.
+- **Rulings that changed what got built:**
+  - Mode: on a new codebase, a full sweep unless the brief asks one narrow
+    question or names files; on a known one, scoped unless the brief asks for the
+    whole thing. A focus alone doesn't make a read scoped. In scoped mode the stop,
+    the split, the gap check, and Coverage count the scoped set.
+  - A fourth mode line, `Mode: single agent, not a per-file read`, for the
+    fallback. Leads' Coverage has no mode line.
+  - On a fallback, unread files are given as a count per folder, not by path. A
+    lead that fell back keeps the mode line, and the first-line flag names its
+    area.
+  - A stop reply (STOPPED BEFORE READING) takes precedence over the not-a-per-file
+    flag, and carries no Coverage section.
+  - Dispatch-name order: the plugin name `the-foundry:file-reader` first, then
+    `file-reader`, treating "not found" as a naming miss rather than a failure to
+    spawn. Leads are given the working name on a `Reader agent:` line, limited to
+    the two reader names.
+  - Concurrency retry continues in batches of 5 for readers; leads stay one at a
+    time. After a second refusal there is no first-line flag, and the unstarted
+    files are listed by path in Coverage.
+  - Untracked files are listed, not read, on a full sweep, and read when a scoped
+    read names them. They don't count toward the 500-file stop.
+  - Plan mode (Task 9): spawning works in a manual install and in a shadow copy
+    of `investigate`. In a manual install the first batch fails once under the
+    plugin name before the bare name works, and `investigate` mentions the
+    plan-mode notice on its first line.
+  - Full sweeps run one at a time unless each brief says the codebase is known or
+    asks one narrow question.
