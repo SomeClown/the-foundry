@@ -4,6 +4,12 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.0.1] — 2026-11-06
+
+A docs-only patch. The README and the privacy statement now say plainly how
+the plugin handles credentials: none shipped, none read, and `ship` and
+`devops` use the logins you already have. No behavior change.
+
 ## [2.0.0] — 2026-11-05
 
 A major version, because the team changed: `file-reader` is a tenth agent,

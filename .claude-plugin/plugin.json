@@ -1,7 +1,7 @@
 {
   "name": "the-foundry",
   "description": "A portable software-development agent team for Claude Code: ten specialized subagents with enforced permissions and tiered models, plus brainstorm, run-plan, debug, and ship skills for the orchestrating session.",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "author": {
     "name": "Teren Bryson",
     "url": "https://github.com/SomeClown"

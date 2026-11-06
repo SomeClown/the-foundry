@@ -341,6 +341,15 @@ version, so you don't have to take my word for it:
   or tags (`git` and the GitHub CLI, `gh`), and only after you approve a list
   of the exact steps. It never runs a production command: deploys are handed
   to you as commands to paste.
+- **Credentials.** The Foundry ships no credentials, reads no credential files
+  or tokens, and never asks for, prints, or stores a token, key, or password.
+  Two parts use a login you already have, through the normal tools that hold
+  it: `ship` (git and `gh` against your own repository, only after you approve
+  the listed steps) and `devops` when you ask it to run a deploy (your SSH or
+  cloud CLI login, under your session's permissions; it stops before rotating
+  credentials or anything it can't undo, and refers to secrets by name, never
+  by value). The plugin never sees the token itself: git, `gh`, ssh, and the
+  cloud CLIs handle that. Nothing else in the plugin uses a login.
 - **The scripts.** `skills/run-plan/scripts/task-brief` (bash and awk) copies
   one task out of a plan into a file. `skills/debug/scripts/find-polluter`
   (Python) runs your project's pytest suite in different orders to find a

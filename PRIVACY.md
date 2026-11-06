@@ -19,6 +19,10 @@ permissions you've set:
 - **Your remote:** the `ship` skill pushes, opens pull requests, merges, and
   tags in your own repository, using the git and GitHub CLI login you already
   have, and only after you approve the exact steps.
+- **Credentials:** the plugin ships none and reads no credential files or
+  tokens. `ship` (and `devops`, when you ask it to run a deploy) use the git,
+  `gh`, SSH, or cloud CLI logins you already have; those tools handle the
+  token, and the plugin never sees it.
 
 Your code and conversations reach Anthropic the same way they do in any Claude
 Code session; the plugin adds no other destination.
