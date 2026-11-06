@@ -64,6 +64,14 @@ class InvoiceTest(unittest.TestCase):
     def test_small_invoice(self):
         self.assertEqual(money.invoice_total([(2, "3.00"), (1, "4.50")]), 10.5)
 EOF
+mk() {
+  printf 'import unittest\n\nfrom farm import money\n\n\nclass %s(unittest.TestCase):\n    def %s(self):\n        self.assertEqual(%s)\n' "$2" "$3" "$4" > "tests/$1.py"
+}
+mk test_a0_parse ParseTest test_thousands_with_cents 'money.parse_amount("1,234.50"), 1234.5'
+mk test_a1_empty EmptyTest test_no_lines_total_zero 'money.invoice_total([]), 0'
+mk test_b0_total TotalTest test_three_at_two 'money.invoice_total([(3, "2.00")]), 6.0'
+mk test_b1_dollar_sign DollarTest test_leading_dollar 'money.parse_amount("$5"), 5.0'
+mk test_b2_rounding RoundingTest test_rounds_to_cents 'money.invoice_total([(1, "0.333")]), 0.33'
 cat > CLAUDE.md <<'EOF'
 # farm
 
