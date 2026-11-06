@@ -611,6 +611,7 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 - Task 1: complete (from 67080af; gate exit 0, Ran 425, all four exits 0; adversarial: 35 tests, 7 parser bugs fixed in round 1)
 - Task 2: complete (from 90ebe00; gate exit 0, Ran 475, all four exits 0; spec check: no gaps; adversarial: 47 tests, 2 bugs fixed in round 1; byte-identical to the old script on 19 of 19 tasks, bash and zsh)
+- Task 3: complete (from 4430bea; gate exit 0, Ran 464, all four exits 0; adversarial: 21 tests, the procedure's commands checked against the real fixture under unittest and pytest, 4 weak pins fixed in round 1)
 
 ### Decisions made during the build
 
@@ -621,6 +622,11 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 - Ruling (Task 2): `test_non_numeric_n_is_rejected` (3 subtests) and `test_empty_n_is_rejected` are real bugs: N reaches the awk regex unchecked, so `1|2`, `.`, `[0-9]`, or an empty N writes a brief for the wrong task and exits 0, where the old script exited 2. The fix adds an N check to the command, a change to the plan's exact block. If wrong: one line in the skill's command.
 - Ruling (Task 2): three behaviors the command shares with the old script stay as they are, pinned by passing tests: a CRLF closing fence never closes, an unterminated last line gains a newline, and a heading inside an HTML comment counts. Why: the old script promised none of them, and no plan here has them. If wrong: a brief with one extra byte, or one cut early by an HTML-commented heading.
+
+- Ruling (Task 3): the builder also cut the `find-polluter` and `task-brief` sentences from README's "The scripts." bullet, beyond its brief. Accepted: Task 6 replaces that bullet whole, and its builder matches on the current text. If wrong: nothing, since Task 6 rewrites it.
+
+- Ruling (Task 3): the four green mutations in `PinMutationTest` are real gaps in the pins, not misread tests: the design's anti-goal is naming a polluter without the check, so the pins must hold the check's position (before naming, and before step 7), and the unittest line with its victim grep. The builder that wrote the pins fixes them. If wrong: stronger pins than needed, at no cost to the shipped text.
+- Ruling (Task 3): step 3's pytest example `tests/test_x.py::test_y` gets a few words saying it stands for the victim's full id, `Class::test` included, from the adversarial round's wording note. If wrong: a few words.
 
 ### Parked
 

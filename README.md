@@ -118,7 +118,7 @@ the orchestrating session itself:
 |---|---|
 | `brainstorm` | Talks a new feature through with you before the architect sees it. Numbered questions with a recommended option (answer "1A, 2B" and move on), the design played back in numbered parts for approval, a cold read by a fresh subagent to catch what the design left out, and a written section in `docs/design.md`. Nothing gets built until you approve it. Say you're on your phone and it batches every question into one message. |
 | `run-plan` | Runs an architect plan task by task: the builder builds, `test-engineer` tries to break it, failures go back for at most three fix rounds, and the project's gate has to pass with a real exit code before the task is committed. Then a `qa` pass over the whole branch, fix batches, and `docs`. It keeps a build log in the plan file, so a session that loses its memory halfway through a twelve-task plan picks up where it left off instead of building task 3 twice. |
-| `debug` | No fix without a root cause. It starts by asking what you saw (where, how often, since when), makes the failure happen on demand (a hang gets a watchdog so it fails with stack traces instead of just sitting there), tests one hypothesis at a time, and pins the cause with a test that fails every time before `implement` touches the code. It knows the usual suspects: a test that leaves state behind (with a script that bisects the suite to find it), a race that only loses under load, a fixed sleep a slow CI runner outlasts, and the test that was the bug all along. Three failed fixes and it stops to question the design with you. |
+| `debug` | No fix without a root cause. It starts by asking what you saw (where, how often, since when), makes the failure happen on demand (a hang gets a watchdog so it fails with stack traces instead of just sitting there), tests one hypothesis at a time, and pins the cause with a test that fails every time before `implement` touches the code. It knows the usual suspects: a test that leaves state behind (found by halving the suite until one test is left, then proved by running it right before the victim), a race that only loses under load, a fixed sleep a slow CI runner outlasts, and the test that was the bug all along. Three failed fixes and it stops to question the design with you. |
 | `ship` | Takes finished work from a branch to production: the gate, push, PR, CI (including the check GitHub leaves "in progress" after its run passed), merge, a local image check, the tag, and a wait for the tag's own build before it hands you the deploy commands, so nobody pulls an image that doesn't exist yet. It learns each project's habits from its runbook and history (PRs or straight to `main`, annotated or lightweight tags), asks once with every step listed, and never runs a production command itself. You do the deploy; it updates the status docs afterwards and asks before pushing them. |
 
 All four came from watching how features actually got built, bugs got
@@ -330,10 +330,7 @@ version, so you don't have to take my word for it:
   credentials or anything it can't undo, and refers to secrets by name, never
   by value). The plugin never sees the token itself: git, `gh`, ssh, and the
   cloud CLIs handle that. Nothing else in the plugin uses a login.
-- **The scripts.** `skills/run-plan/scripts/task-brief` (bash and awk) copies
-  one task out of a plan into a file. `skills/debug/scripts/find-polluter`
-  (Python) runs your project's pytest suite in different orders to find a
-  test that leaves state behind. `evals-expensive/compare.py` and
+- **The scripts.** `evals-expensive/compare.py` and
   `evals-expensive/sync_case.py` (Python) are run by hand, read result JSON
   and the case files, and stay local. The `evals-expensive/` scaffold writes a
   `bin/git` wrapper into its scratch fixture. None of them touches the

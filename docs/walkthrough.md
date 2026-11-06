@@ -284,7 +284,7 @@ which passed locally. The user says "just re-run it." The session says in one
 sentence that it's measuring first, because a re-run that goes green teaches
 nothing. Alone, the test passes 20 of 20. The whole suite in random order (CI
 does that; my machine doesn't) fails it 6 times in 20, so the baseline smells
-like state left behind. The skill's `find-polluter` script names the culprit:
+like state left behind. Halving the suite, as the skill's techniques file lays out, names the culprit, and the check proves it (alone, the victim passes; right after the culprit, it fails):
 `test_export_custom_start` sets `app.config["SEASON_START"]` directly and never
 puts it back. The code is right and the test is the bug, so `test-engineer`
 writes the pin (polluter first, watched failing) and the fix (`monkeypatch`,

@@ -104,9 +104,10 @@ Use whichever of these fits; most bugs fall to one or two.
   same thing) and list every difference, including the ones that "can't
   matter".
 - **Passes alone, fails in the suite.** Either another test leaves state
-  behind (pollution: find it with `scripts/find-polluter`), or load changes
-  the timing (a race: force the interleaving). The techniques file covers
-  both.
+  behind (pollution: halve the tests that run before it until one is left,
+  then prove it with the check under *Pollution* in the techniques file), or
+  load changes the timing (a race: force the interleaving). The techniques
+  file covers both.
 - **A wrong value deep in the stack.** Trace it backwards, caller by caller,
   to where it first went wrong, and fix it there, not where it surfaced.
 - **Legwork.** For a long trace through unfamiliar code or history, dispatch

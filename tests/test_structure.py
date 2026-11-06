@@ -277,20 +277,55 @@ class SkillFilesTest(unittest.TestCase):
     def test_files_a_skill_points_at_exist(self):
         for path in sorted(SKILLS.glob("*/SKILL.md")):
             text = path.read_text(encoding="utf-8")
-            for ref in sorted(set(re.findall(r"`((?:scripts|references)/[\w./-]+)", text))):
+            for ref in sorted(set(re.findall(r"`(references/[\w./-]+)", text))):
                 target = path.parent / ref
                 with self.subTest(skill=path.parent.name, ref=ref):
                     self.assertTrue(target.exists(), f"{ref} doesn't exist")
-                    if ref.startswith("scripts/"):
-                        self.assertTrue(os.access(target, os.X_OK), f"{ref} isn't executable")
-                        self.assertTrue(target.read_text(encoding="utf-8").startswith("#!"), f"{ref} has no shebang")
 
-    def test_every_script_is_tested(self):
-        # A script nobody tests is how the task-brief fence bug shipped.
-        tests = " ".join(p.read_text(encoding="utf-8") for p in (ROOT / "tests").glob("test_*.py"))
-        for script in sorted(SKILLS.glob("*/scripts/*")):
-            with self.subTest(script=script.name):
-                self.assertTrue(script.name in tests, f"no test mentions {script.name}")
+    def test_no_skill_ships_scripts(self):
+        self.assertEqual(list(SKILLS.glob("*/scripts")), [])
+
+
+class DebugPollutionProcedureTest(unittest.TestCase):
+    PHRASES = [
+        "**The check (required).**",
+        "the victim alone: it passes",
+        "the polluter, then the victim, in one run with nothing else",
+        "not the run's exit code",
+        "Before you name a polluter",
+        "python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y",
+        "2>&1 | grep -E '^test_y '",
+        "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y'",
+    ]
+    SKILL_PHRASE = "the check under *Pollution* in the techniques file"
+
+    def pollution(self):
+        text = (SKILLS / "debug" / "references" / "techniques.md").read_text(encoding="utf-8")
+        start = text.index("## Pollution: passes alone, fails in the suite")
+        return " ".join(text[start : text.index("## Races", start)].split())
+
+    def skill(self):
+        return " ".join((SKILLS / "debug" / "SKILL.md").read_text(encoding="utf-8").split())
+
+    def test_procedure_carries_the_check(self):
+        body = self.pollution()
+        for phrase in self.PHRASES:
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, body)
+
+    def test_check_comes_before_reading_the_polluter(self):
+        body = self.pollution()
+        self.assertLess(body.index("**The check (required).**"), body.index("**Read what the polluter changes"))
+
+    def test_skill_points_at_the_check(self):
+        self.assertIn(self.SKILL_PHRASE, self.skill())
+
+    def test_each_phrase_can_fail(self):
+        body = self.pollution()
+        for phrase in self.PHRASES:
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, body.replace(phrase, ""))
+        self.assertNotIn(self.SKILL_PHRASE, self.skill().replace(self.SKILL_PHRASE, ""))
 
 
 class DocsAgreeTest(unittest.TestCase):
