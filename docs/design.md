@@ -335,3 +335,98 @@ approved; the numbers are from the build log in
     plan-mode notice on its first line.
   - Full sweeps run one at a time unless each brief says the codebase is known or
     asks one narrow question.
+
+## 2. Directory file rules (v2.1.0, approved 2026-11-06)
+
+The plugin directory refused 2.0.1 on two checks that only Verified
+organizations get past, and there's no way to apply to become one. The plugin
+may ship only Markdown, text, JSON, YAML, and images (plus a license, a
+readme, `.gitignore`, and the icon), and its frontmatter may use only keys on
+an allowed list. The Foundry ships two scripts, `find-polluter` and
+`task-brief`, and keeps 21 more files of Python and shell in its tests and
+evals. Two agents carry `permissionMode`. This change makes what the
+directory installs pass both checks, without losing the tests and evals that
+hold the repo to its own README, and without making the two skills that used
+the scripts less exact than they are.
+
+**Owner decisions (2026-11-06):** the owner took every recommendation in the
+plan (`docs/plans/2026-11-06-directory-file-rules.md`, §4):
+
+- 1C: the directory reads a `dist` branch, built from `main` at each release
+  without `tests/`, `evals/`, `evals-expensive/`, or `docs/plans/`. The repo
+  root stays the plugin folder, and `main` keeps everything.
+- 2: probe first. A probe branch holding the 27 files `dist` would hold gets
+  the portal's Validate, without a submission, before any code changes.
+- 3: this design section, approved before Task 1.
+- 4: widen the `debug-polluted-test` fixture so halving actually happens, add
+  a grader that requires the final check, and run a v2.0.1 baseline on it.
+- 5: about $5.65 of evals forecast, capped at $11 with the baseline.
+- 6: version 2.1.0.
+- 7: drop `permissionMode`. The README tells manual-install users how to add
+  it to their own copies.
+- 8: the GitHub marketplace keeps `"source": "./"` on `main`.
+- 9: leave the non-blocking warnings, except what moving the dev files off
+  the shipped tree fixes anyway.
+
+**Goals**
+
+- Everything the directory installs passes its file-type and frontmatter
+  checks, and a test fails if that ever stops being true.
+- run-plan's brief stays a byte-exact copy of the plan's task.
+- debug still names the right polluter, and proves it before naming it.
+
+**Non-goals**
+
+- Changing what any agent does, or what users of the GitHub marketplace get.
+- Becoming a Verified organization.
+- Rewording §1. It's an approved record; this section supersedes it on
+  `permissionMode`.
+
+**Anti-goals** (a failure even if it technically works)
+
+- A program disguised as Markdown: a heredoc to write out and run, or code
+  renamed to an allowed extension.
+- A brief the model writes out by hand, where a value can drift.
+- Naming a polluter without the check: the victim passes alone, and fails
+  run right after the polluter with nothing else.
+- A `dist` branch anyone edits by hand.
+
+**The behavior**
+
+- **The brief.** run-plan's SKILL.md gives a short `awk` command, run through
+  Bash, that copies Task N out of the plan from its heading to the next task
+  heading or the next heading at the same level or higher, skipping headings
+  inside code fences. It prints the same `<path> (<N> lines)` line the script
+  did.
+- **The polluter search.** debug's techniques file gives a written halving
+  procedure, using the project's own test runner, that reads the victim's own
+  result, not the run's exit code, and ends in the required check.
+- **Frontmatter.** Agents use `name`, `description`, `tools`, and `model`;
+  skills use `name` and `description`. A test holds them to that.
+- **`dist`.** CONTRIBUTING gives the commands that build it from a tagged
+  `main`, and the release validates its export before the push. A test pins
+  the four left-out folders to those commands, and another fails if a
+  shipped path holds a file type the directory refuses.
+
+**The probe (2026-11-06).** The portal's Validate, run on
+`probe/directory-rules` at 7bc9414 without submitting, passed with neither
+finding, and the form took the branch. The same form run on `main` at
+341a16f, as a control, did flag both, naming `evals-expensive/compare.py` and
+`agents/architect.md · permissionMode`, so Validate does run these checks.
+
+**Calls I made**
+
+- `permissionMode` is the frontmatter key the portal objects to. The
+  submission's report named no key; the control run above named it.
+- `docs/plans/` leaves the shipped tree with the tests and evals. It's build
+  history, not something a user needs, and it holds a line the scanner
+  flagged.
+- `dist` carries no history from `main`: each commit's parent is the previous
+  `dist` commit.
+
+**Left to the builder:** everything the plan specifies, task by task.
+
+**Open:** whether the existing submission can switch its branch to `dist`
+while it shows "Needs changes", or needs a withdraw and resubmit with the
+same repo and path. The Settings tab's branch field is enabled, but its note
+says the branch can't change under review. That gets settled at ship time.
