@@ -1,34 +1,65 @@
-"""Tests for skills/run-plan/scripts/task-brief (fence handling, task boundaries, exit codes)."""
+"""Tests for the brief command in skills/run-plan/SKILL.md (fence handling, task boundaries, failures)."""
+import os
+import re
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
-SCRIPT = Path(__file__).resolve().parent.parent / "skills" / "run-plan" / "scripts" / "task-brief"
+ROOT = Path(__file__).resolve().parent.parent
+SKILL = ROOT / "skills" / "run-plan" / "SKILL.md"
+REAL_PLAN = ROOT / "docs" / "plans" / "2026-11-05-per-file-investigation.md"
 
 FENCE = "`" * 3
 
 
+def brief_command():
+    """Return the body of the one bash block between Step 2 and Step 3 of the skill."""
+    text = SKILL.read_text()
+    start = text.index("### Step 2: Write the brief")
+    end = text.index("### Step 3", start)
+    blocks = re.findall(r"^```bash\n(.*?)^```$", text[start:end], re.S | re.M)
+    if len(blocks) != 1:
+        raise AssertionError(f"expected one bash block in Step 2, found {len(blocks)}")
+    return blocks[0]
+
+
 class TaskBriefTest(unittest.TestCase):
-    def run_brief(self, plan_text, n):
-        """Write plan_text to a temp dir, run task-brief, return (exit code, brief text or None, stderr)."""
+    def run_brief(self, plan_text, n, shell="bash"):
+        """Write plan_text to a temp dir, run the brief command, return (exit code, brief text or None, stdout, stderr)."""
         with tempfile.TemporaryDirectory() as tmp:
             plan = Path(tmp) / "plan.md"
-            plan.write_text(plan_text)
-            outdir = Path(tmp) / "out"
-            proc = subprocess.run(
-                [str(SCRIPT), str(plan), str(n), str(outdir)],
-                capture_output=True,
-                text=True,
-            )
-            brief = outdir / f"task-{n}-brief.md"
-            text = brief.read_text() if brief.exists() else None
-            return proc.returncode, text, proc.stdout, proc.stderr
+            if plan_text is not None:
+                plan.write_text(plan_text)
+            return self.run_command(plan, n, Path(tmp) / "out", shell)
+
+    def run_command(self, plan, n, outdir, shell="bash"):
+        argv = [shell, "-f", "-c"] if shell == "zsh" else [shell, "-c"]
+        proc = subprocess.run(
+            [*argv, brief_command()],
+            capture_output=True,
+            text=True,
+            env={
+                "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                "PLAN": str(plan),
+                "N": str(n),
+                "OUT": str(outdir),
+            },
+        )
+        brief = Path(outdir) / f"task-{n}-brief.md"
+        text = brief.read_text() if brief.exists() else None
+        return proc.returncode, text, proc.stdout, proc.stderr
 
     def assertBrief(self, plan_text, n, expected):
         code, text, _, err = self.run_brief(plan_text, n)
         self.assertEqual(code, 0, err)
         self.assertEqual(text, expected)
+
+    def assertMissing(self, plan_text, n):
+        code, text, _, _ = self.run_brief(plan_text, n)
+        self.assertNotEqual(code, 0)
+        self.assertIsNone(text)
 
     def test_literal_backtick_sample_inside_fence(self):
         # A fence whose content line starts with three backticks must not flip state.
@@ -55,9 +86,7 @@ class TaskBriefTest(unittest.TestCase):
             "after\n"
         )
         self.assertBrief(plan, 1, plan.split("# Plan\n\n", 1)[1])
-        code, text, _, _ = self.run_brief(plan, 9)
-        self.assertEqual(code, 3)
-        self.assertIsNone(text)
+        self.assertMissing(plan, 9)
 
     def test_tilde_fence_containing_backtick_lines(self):
         plan = (
@@ -73,7 +102,7 @@ class TaskBriefTest(unittest.TestCase):
             plan, 1,
             "### Task 1: Tilde\n\n~~~\n```\n### Task 2: fake\n~~~\n\ntail\n\n",
         )
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
 
     def test_closing_fence_must_match_character(self):
         # A tilde line does not close a backtick fence.
@@ -85,7 +114,7 @@ class TaskBriefTest(unittest.TestCase):
             "```\n\n"
             "end\n"
         )
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
         self.assertEqual(self.run_brief(plan, 1)[1], plan)
 
     def test_closing_fence_must_be_at_least_as_long(self):
@@ -97,7 +126,7 @@ class TaskBriefTest(unittest.TestCase):
             "````\n\n"
             "### Task 3: Three\n"
         )
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
         self.assertEqual(self.run_brief(plan, 3)[0], 0)
 
     def test_closing_fence_cannot_have_trailing_text(self):
@@ -110,7 +139,7 @@ class TaskBriefTest(unittest.TestCase):
             "```\n\n"
             "### Task 3: Three\n"
         )
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
         self.assertEqual(self.run_brief(plan, 3)[0], 0)
 
     def test_closing_fence_allows_trailing_whitespace(self):
@@ -133,7 +162,7 @@ class TaskBriefTest(unittest.TestCase):
                     f"{indent}```\n\n"
                     "### Task 3: Three\n"
                 )
-                self.assertEqual(self.run_brief(plan, 2)[0], 3)
+                self.assertMissing(plan, 2)
                 self.assertEqual(self.run_brief(plan, 3)[0], 0)
 
     def test_four_space_indent_is_not_a_fence(self):
@@ -156,7 +185,7 @@ class TaskBriefTest(unittest.TestCase):
             "```\n\n"
             "### Task 3: Three\n"
         )
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
         self.assertEqual(self.run_brief(plan, 3)[0], 0)
 
     def test_backtick_info_string_with_backtick_is_not_a_fence(self):
@@ -177,7 +206,7 @@ class TaskBriefTest(unittest.TestCase):
             "~~~\n\n"
             "### Task 3: Three\n"
         )
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
         self.assertEqual(self.run_brief(plan, 3)[0], 0)
 
     def test_comment_inside_fence_does_not_end_task(self):
@@ -198,7 +227,7 @@ class TaskBriefTest(unittest.TestCase):
     def test_unclosed_fence_runs_to_end_of_file(self):
         plan = "### Task 1: One\n\n```\n### Task 2: fake\n"
         self.assertBrief(plan, 1, plan)
-        self.assertEqual(self.run_brief(plan, 2)[0], 3)
+        self.assertMissing(plan, 2)
 
     def test_task_1_is_not_task_10(self):
         plan = (
@@ -231,27 +260,41 @@ class TaskBriefTest(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertRegex(out, r"/out/task-1-brief\.md \(3 lines\)\n$")
 
-    def test_exit_3_when_task_missing(self):
+    def test_missing_task_fails_and_writes_nothing(self):
         code, text, _, err = self.run_brief("### Task 1: One\n\nbody\n", 2)
-        self.assertEqual(code, 3)
+        self.assertNotEqual(code, 0)
         self.assertIsNone(text)
         self.assertIn("no heading for Task 2", err)
 
-    def test_exit_2_on_bad_arguments(self):
+    def test_missing_plan_fails_and_writes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
-            plan = Path(tmp) / "plan.md"
-            plan.write_text("### Task 1: One\n")
-            out = str(Path(tmp) / "out")
-            cases = {
-                "too few args": [str(plan), "1"],
-                "missing plan": [str(Path(tmp) / "nope.md"), "1", out],
-                "non-numeric": [str(plan), "x", out],
-                "empty number": [str(plan), "", out],
-            }
-            for name, args in cases.items():
-                with self.subTest(name):
-                    proc = subprocess.run([str(SCRIPT), *args], capture_output=True, text=True)
-                    self.assertEqual(proc.returncode, 2, proc.stderr)
+            code, text, _, _ = self.run_command(Path(tmp) / "nope.md", 1, Path(tmp) / "out")
+        self.assertNotEqual(code, 0)
+        self.assertIsNone(text)
+
+    def test_command_is_the_one_bash_block_in_step_2(self):
+        self.assertIn('awk -v n="$N"', brief_command())
+
+    def real_slice(self, n):
+        lines = REAL_PLAN.read_text().splitlines(keepends=True)
+        start = next(i for i, l in enumerate(lines) if l.startswith(f"### Task {n}:"))
+        end = next(
+            (i for i in range(start + 1, len(lines)) if lines[i].startswith(("### Task", "### 3."))),
+            len(lines),
+        )
+        return "".join(lines[start:end])
+
+    def test_real_plan_round_trip(self):
+        plan = REAL_PLAN.read_text()
+        for n in (1, 2, 12):
+            with self.subTest(task=n):
+                self.assertBrief(plan, n, self.real_slice(n))
+
+    @unittest.skipIf(shutil.which("zsh") is None, "zsh not installed")
+    def test_same_brief_under_zsh(self):
+        code, text, _, err = self.run_brief(REAL_PLAN.read_text(), 2, shell="zsh")
+        self.assertEqual(code, 0, err)
+        self.assertEqual(text, self.real_slice(2))
 
 
 if __name__ == "__main__":

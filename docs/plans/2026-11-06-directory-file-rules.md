@@ -610,6 +610,7 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 ### Progress
 
 - Task 1: complete (from 67080af; gate exit 0, Ran 425, all four exits 0; adversarial: 35 tests, 7 parser bugs fixed in round 1)
+- Task 2: complete (from 90ebe00; gate exit 0, Ran 475, all four exits 0; spec check: no gaps; adversarial: 47 tests, 2 bugs fixed in round 1; byte-identical to the old script on 19 of 19 tasks, bash and zsh)
 
 ### Decisions made during the build
 
@@ -618,4 +619,10 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 - Ruling (Task 1): fold in the probe's "Frontmatter value may be misread" note (5 findings: `agents/architect.md`, `agents/file-reader.md`, `agents/investigate.md`, `agents/uiux.md`, `skills/ship/SKILL.md`) by double-quoting each `description` value. Why: Task 1 already edits agent front matter, and the fix is mechanical. If wrong: a front-matter parser in the tests that doesn't strip quotes, caught by the gate.
 
+- Ruling (Task 2): `test_non_numeric_n_is_rejected` (3 subtests) and `test_empty_n_is_rejected` are real bugs: N reaches the awk regex unchecked, so `1|2`, `.`, `[0-9]`, or an empty N writes a brief for the wrong task and exits 0, where the old script exited 2. The fix adds an N check to the command, a change to the plan's exact block. If wrong: one line in the skill's command.
+- Ruling (Task 2): three behaviors the command shares with the old script stay as they are, pinned by passing tests: a CRLF closing fence never closes, an unterminated last line gains a newline, and a heading inside an HTML comment counts. Why: the old script promised none of them, and no plan here has them. If wrong: a brief with one extra byte, or one cut early by an HTML-commented heading.
+
 ### Parked
+
+- Task 2 (spec check): README's "The scripts." bullet still names `skills/run-plan/scripts/task-brief` until Task 6 replaces it, as planned. Task 6's builder is told to confirm it.
+- Task 2 (spec check): the grader files `brief-script-finds-task-1.md` and `-2.md` keep "script" in their names; the brief says graders don't change, and nothing else names them.
