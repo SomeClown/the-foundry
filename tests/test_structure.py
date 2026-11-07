@@ -517,7 +517,7 @@ class DirectoryFileRulesTest(unittest.TestCase):
 
     def test_contributing_builds_dist_without_exactly_the_dev_only_folders(self):
         text = (ROOT / "CONTRIBUTING.md").read_text()
-        line = "git rm -r -q --cached --ignore-unmatch tests evals evals-expensive docs/plans"
+        line = "git rm -r -q -f --cached --ignore-unmatch tests evals evals-expensive docs/plans"
         self.assertIn(line, text.splitlines())
         names = line.split("--ignore-unmatch ", 1)[1].split()
         self.assertEqual(names, [d.rstrip("/") for d in self.DEV_ONLY])

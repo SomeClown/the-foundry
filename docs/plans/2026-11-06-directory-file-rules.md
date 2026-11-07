@@ -615,7 +615,7 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 - Task 4: complete (from d8e5739; gate exit 0, Ran 464, all four exits 0; fixture check: 8 tests, only the victim fails, alone exit 0, pair exit 1; no adversarial round, per the plan)
 - Task 6: complete (from d72b2b3 after Task 5's commits; gate exit 0, Ran 506, all four exits 0; adversarial: 30 tests, guard held, 7 release-command bugs fixed in round 1; rehearsed in a scratch clone by the orchestrator: dist 27 files, both validates exit 0)
 - Task 7: complete (from 3ca38fe; gate exit 0, Ran 506, all four exits 0; CHANGELOG numbers checked against this log by the orchestrator; one overclaiming phrase fixed in round 1; no adversarial round)
-- Task 5: complete after fix batch 1 (bar met on 39ca705; see below). Owner OK'd the runs (2026-11-06). Bar missed; stopped for the owner. Results:
+- Task 5: complete after fix batch 1 (bar met on 39ca705 for `debug-polluted-test`, the case that missed; see below). Owner OK'd the runs (2026-11-06). The first try missed the bar, and the run stopped for the owner. Results of that first try:
   - First try of the three branch commands refused to start (`not a trusted plugin directory`; the plan's commands lacked `--trust-plugin`), $0. Re-run with the flag.
   - debug tag × 2: exit 1, $3.03, 501 s. debug-polluted-test 0.75 (`ran-the-check` FAIL in both runs, votes FAIL FAIL FAIL and FAIL PASS FAIL; `fixed-the-polluter`, `right-cause`, `victim-untouched` passed in both). debug-production-report 0.83 (`asks-and-hands-over` failed run 2). The other four cases 1.00.
   - architect-plan-format × 2: exit 0, $1.02, 184 s, 1.00 in both runs (both brief graders passed).
@@ -647,6 +647,9 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 - Ruling (Task 7): no adversarial round on the version bump and CHANGELOG. Why: `test_version_matches_the_newest_changelog_entry` covers the contract, and the orchestrator checked every number against this log. If wrong: a CHANGELOG error that qa should catch.
 
+- Ruling (Task 5, from qa lens 1's triage): `asks-and-hands-over` (debug-production-report, run 2) is unrelated to this branch: the grader checks debug's first reply to a production report, which this branch didn't touch, and it also failed in the kept 2026-10-23 run (case 0.67). A known flaky formatting grader. If wrong: a production-report regression shipped unnoticed.
+- Ruling (Task 5, from qa lens 1's triage): `item-d` (run-plan-decisions, run 2) is most likely variance: the case allows only Skill and Read in 4 turns, so the brief command never runs, and the section it tests (run-plan's red flags and rulings) didn't change; it passed 2/2 on 2026-10-23. Unconfirmed, since no trace was kept. If wrong: run-plan's longer skill text shifted one ruling.
+
 ### From Task 5 (fix batch 1)
 
 - Owner (2026-11-06): "Both, then re-run": the procedure makes the check visible, and the grader judges it by substance.
@@ -654,9 +657,24 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 - Grader and tests (test-engineer): `ran-the-check` now passes a loop that starts each run as its own process, and doesn't count "suspect" as naming. Mutation tests match on flattened whitespace, so a rewrap doesn't break them.
 - Gate: exit 0, Ran 473, all four exits 0.
 - Re-run on 39ca705 with traces: debug-polluted-test × 2, $0.89, 125 s, 1.00 in both, `ran-the-check` PASS PASS PASS in both. The bar is met. Total Task 5 spend: $7.80 of the $11 cap.
-- What the traces show: the grader's change is what moved the votes. The procedure's new form didn't visibly take: neither run called the result a suspect in its text, and neither halved. Run 2 paired each candidate with the victim in one loop, then ran the pair as a command of its own; run 1 ran the victim alone and checked the shared state in process. Both still found the right polluter and cause and left the victim alone.
+- What the traces show: the grader's change is what moved the votes. The procedure's new form didn't visibly take: neither run called the result a suspect in its text. Run 1 halved once (`--- halves`, first half failed, second passed) before pairing, and run 2 didn't halve. Run 2 paired each candidate with the victim in one loop, then ran the pair as a command of its own; run 1 ran the victim alone and checked the shared state in process. Both still found the right polluter and cause and left the victim alone.
 - Ruling: the bar is met, so the build goes on to Task 6, with the finding above carried into the CHANGELOG's Measured notes. Why: the measured outcome (right polluter, right cause, victim untouched, check in substance) holds in 4 of the last 4 runs; how closely agents follow the procedure's form is a separate question. If wrong: a reviewer reading a trace sees a linear search where the skill says halve.
 - Ruling: one mutation stays green: a loosening suffix after a pinned phrase ("or alongside other runs, if you like"). The pins are substring checks, and catching every rewording would mean pinning whole sentences. If wrong: a weakened step 6 that only a reviewer would catch.
+
+### From the qa pass
+
+Two read-only qa reviewers on b60dcaf: lens 1 (spec and directory compliance) and lens 2 (correctness, tests, docs truth). Lens 1: 4 medium (2 for the owner), 5 low. Lens 2: 1 high, 6 medium, 8 low. Both confirmed the 27-file `dist` and every CHANGELOG figure.
+
+- Fix batch 1 (release block, CONTRIBUTING and evals/README): lens 2's HIGH (a stale local `main` on an old tag builds the refused 2.0.1 tree, and the export validate can't see either rule that refused it); `git rm --cached` failing from a branch that changed a dev-only file; the `dist` parent taken without a fetch; CONTRIBUTING's validate without `--strict`; the routine eval commands without `--trust-plugin`; the evals/README debug row missing `ran-the-check`. Test findings folded into its adversarial round: release tests that pass without a `dist`, ignored return codes, zsh dropped without a skip, the feature-branch test not touching a dev-only folder.
+- Fix batch 2 (run-plan brief command, debug procedure, docs truth): the brief command trusting a non-empty file (noclobber keeps a stale brief, awk failing mid-file under a UTF-8 locale), no guard on unset `PLAN`/`OUT`, step 2's wording on where the variables go (both lenses); the unittest grep matching the wrong `test_y`; README's "bundles no scripts" (both lenses); three CHANGELOG phrases ("neither halved", "and their tests", "the bar was met" unscoped); the `.gitignore` comment. Test findings folded into its adversarial round: the hardcoded private venv (3 skips elsewhere, and the name in a public repo), `tests.` imports that need the repo root as cwd, the tautological mutation test, the unset-OUT test passing only because `/` is read-only, `test_no_skill_ships_scripts` reading the filesystem instead of git, plus a noclobber test and a UTF-8 locale test.
+- Ruling (fix batch 1): both failing adversarial tests are real bugs. A quoted key (`"permissionMode": plan`) slips past the front-matter check, which is the hole the check exists for; a valid key with a space before the colon (`name : a`) stops the build, which is a false stop on valid YAML. If wrong: one test to delete.
+- Ruling (fix batch 1): the block stops when an unpushed local `dist` from a failed export validate exists, rather than building over it. Kept, and CONTRIBUTING says to delete the local `dist` and build again. Why: an unpushed `dist` commit that failed validation shouldn't become the next one's parent. If wrong: one extra command at release.
+- Parked (fix batch 1): the version read takes the last `"version"` on a line, so a one-line `plugin.json` with a nested version would read wrong (ours is pretty-printed); several tags on one `main` commit; agents in subfolders; front matter with no closing `---`. None occurs in this repo, and `DirectoryFileRulesTest` covers the working tree at every commit.
+- Fix batch 1: complete (from b60dcaf; gate exit 0, Ran 531, all four exits 0; adversarial: release tests rewritten to 55 with a local bare origin in every fixture, 2 front-matter bugs fixed in round 1; the module now takes ~37 s of a ~47 s suite)
+- Done by the orchestrator: the triage rulings above; the build log's self-contradicting Task 5 line and its "neither halved".
+- To the docs task: design §2's intro reads as present tense (two scripts, two agents with `permissionMode`), and it names a plan path `dist` won't hold (lens 1, 8). The "As built" subsection records both.
+- For the owner, not fixed: a free portal Validate on the exact tree before tagging (lens 1, 2); restoring descriptive names and comments in the awk block (lens 1, 4); a ~$0.50 traced re-run of `item-d`.
+- Closed: both parked items (README's "The scripts." bullet was replaced in Task 6; the `brief-script-finds-task-*` grader names stay for continuity with older results).
 
 ### Parked
 

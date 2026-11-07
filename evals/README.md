@@ -21,7 +21,7 @@ From the repo root. Run the cases for the skill you changed, before releasing
 it; running everything costs real money (see below).
 
 ```bash
-claude plugin eval . --tag ship --scaffold --allow-tools Bash Write Edit \
+claude plugin eval . --tag ship --scaffold --trust-plugin --allow-tools Bash Write Edit \
   --judge-model sonnet --threshold 0.8 --no-publish
 ```
 
@@ -64,7 +64,7 @@ so a full run is about $9; a single skill's cases are $1 to $3.
 |---|---|---|
 | `brainstorm` | small request, opening, numbered questions, phone batch, gate holds, writes design | Just does a fully specified change; one open question to start; numbered questions with the recommendation first; every question at once when the user's on a phone; nothing built on a passing "sounds great"; the design as a new numbered section of `docs/design.md` with anti-goals and the assistant's own calls marked |
 | `run-plan` | decisions, resume | The fix-round cap, one writer at a time, rulings instead of stalls, production off limits; picking up after compaction without redoing finished tasks |
-| `debug` | polluted test, wrong total, flaky pressure, user's fix is right, decisions, production report | Root cause before any fix, a failing test first, the fix in the right place (the polluting test, the parser, the test that raced), measuring before bumping a sleep, agreeing when the user's fix is the right one, never running production commands |
+| `debug` | polluted test, wrong total, flaky pressure, user's fix is right, decisions, production report | Root cause before any fix, a failing test first, the fix in the right place (the polluting test, the parser, the test that raced), measuring before bumping a sleep, a polluter proven (the `ran-the-check` grader on debug-polluted-test) before it is named, agreeing when the user's fix is the right one, never running production commands |
 | `ship` | asks before pushing, decisions, CI pending in the app | Preflight catches an unbumped version; the repo's own way of releasing; one ask before any push or tag; a bare "Done" isn't approval; the stuck-check re-run; waiting for the tag's build; handing the merge back when the PR monitor can't say CI passed |
 | `agents` | qa spec check, architect plan format, implement test-first | qa's spec-check mode catches a floor that should be a ceiling, an unrequested database dependency, missing tests, and a report that overclaims; the architect's plan has its header, `### Task N:` headings that run-plan's own brief command can split (checked by running it), exact Verify commands, and repo-relative paths; implement runs the failing test before it edits the code |
 

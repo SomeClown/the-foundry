@@ -31,7 +31,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    prompt by staring at it. Then run the gate:
    ```bash
    python3 -m unittest discover -s tests -q
-   claude plugin validate .
+   claude plugin validate --strict .
    claude plugin validate --strict .claude-plugin/plugin.json
    claude plugin validate --profile directory .
    ```
@@ -45,7 +45,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    text, JSON, YAML, or an image, and agent and skill front matter takes only
    the keys the plugin directory accepts; the structural tests fail otherwise.
 3. If you changed what a skill does, run its behavior cases:
-   `claude plugin eval . --tag <skill> --scaffold --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
+   `claude plugin eval . --tag <skill> --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
    A new behavior worth keeping gets a case of its own. See
    [evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) for how to read a failure and how a
    case is built.
@@ -81,18 +81,37 @@ edit it by hand:
 (
 set -e
 cd "$(git rev-parse --show-toplevel)"
-TAG=$(git describe --tags --exact-match main 2>/dev/null) || { echo "error: need a local main with a tag exactly on it" >&2; exit 1; }
+die() { echo "error: $*" >&2; exit 1; }
+git fetch -q origin || die "git fetch origin failed"
+TAG=$(git describe --tags --exact-match main 2>/dev/null) || die "need a local main with a tag exactly on it"
+VER=$(git show main:.claude-plugin/plugin.json | sed -n 's/.*"version"[^"]*"\([^"]*\)".*/\1/p' | head -n 1)
+[ "$TAG" = "v$VER" ] || die "main is tagged $TAG but its plugin.json says version $VER"
+git merge-base --is-ancestor origin/main main || die "origin/main is not an ancestor of local main"
 export GIT_INDEX_FILE="$(git rev-parse --absolute-git-dir)/dist-index"; trap 'rm -f "$GIT_INDEX_FILE"' EXIT
 git read-tree main
-git rm -r -q --cached --ignore-unmatch tests evals evals-expensive docs/plans
+git rm -r -q -f --cached --ignore-unmatch tests evals evals-expensive docs/plans
 TREE=$(git write-tree); MSG="dist: $TAG from $(git rev-parse --short main)"
-PARENT=$(git rev-parse -q --verify refs/heads/dist || git rev-parse -q --verify refs/remotes/origin/dist || true)
+BAD=$(git ls-tree -r --name-only "$TREE" | awk '{n=$0; sub(/.*\//,"",n)} n=="LICENSE" || n==".gitignore" {next} tolower($0) !~ /[^\/]\.(md|txt|json|yaml|yml|png|jpg|jpeg|gif|webp|ico)$/')
+[ -z "$BAD" ] || die "the directory refuses these files in the built tree: $BAD"
+BAD=$(git ls-tree -r --name-only "$TREE" | grep -E '^(agents/[^/]+|skills/[^/]+/SKILL)\.md$' | while read -r P; do
+  OK="name description"; [ "${P#agents/}" = "$P" ] || OK="name description tools model"
+  git show "${TREE}:$P" | awk -v ok="$OK" -v p="$P" 'BEGIN {split(ok, a, " "); for (i in a) k[a[i]] = 1} /^---[ \t\r]*$/ {if (++d == 2) exit; next} d == 1 && /^[^ \t#-][^:]*:/ {key = $0; sub(/:.*/, "", key); gsub(/^[ \t\r]+|[ \t\r]+$/, "", key); if (key ~ /^\042.*\042$/ || key ~ /^\047.*\047$/) key = substr(key, 2, length(key) - 2); if (!(key in k)) print p ": " key}'
+done)
+[ -z "$BAD" ] || die "front-matter keys the directory refuses: $BAD"
+DIST=$(git rev-parse -q --verify refs/heads/dist || true); REMOTE=$(git rev-parse -q --verify refs/remotes/origin/dist || true)
+if [ -n "$REMOTE" ]; then
+  [ -z "$DIST" ] || git merge-base --is-ancestor "$DIST" "$REMOTE" || die "local dist has commits origin/dist lacks (unpushed or diverged dist work)"
+  PARENT=$REMOTE
+else
+  PARENT=$DIST
+fi
+[ -z "$PARENT" ] || [ "$(git rev-parse "$PARENT^{tree}")" != "$TREE" ] || die "$TAG is already built: the parent of dist has this exact tree"
 if [ -n "$PARENT" ]; then C=$(git commit-tree "$TREE" -p "$PARENT" -m "$MSG"); else C=$(git commit-tree "$TREE" -m "$MSG"); fi
 git update-ref refs/heads/dist "$C"
 )
 ```
 
-Then check the tree the directory will see, and push `dist` with the release:
+Then check the tree the directory will see, and push `dist` with the release. If the export fails validation, delete the local `dist` (`git branch -D dist`) before building again, since the block stops on an unpushed local `dist`:
 
 ```bash
 T=$(mktemp -d); git archive dist | tar -x -C "$T"
