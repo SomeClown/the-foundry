@@ -38,8 +38,8 @@ victim failed, so nothing gets run twice.
    fail by itself without touching the victim):
 
    ```
-   pytest -q -p no:randomly -p no:cacheprovider -rA <half> tests/test_x.py::test_y 2>&1 | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y'
-   python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y 2>&1 | grep -E '^test_y '
+   pytest -q -p no:randomly -p no:cacheprovider -rA <half> tests/test_x.py::test_y 2>&1 | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'
+   python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y 2>&1 | grep -E '^test_y \(tests.test_x.XTest.test_y\)'
    ```
 
    `tests/test_x.py::test_y` and `tests.test_x.XTest.test_y` stand for the

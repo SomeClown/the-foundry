@@ -1,7 +1,7 @@
 # macOS
 .DS_Store
 
-# Python (the scripts' tests)
+# Python (the tests)
 __pycache__/
 
 # Eval runs (claude plugin eval)

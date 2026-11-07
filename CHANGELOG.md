@@ -31,7 +31,8 @@ Validate came back clean of both rules, where a control on 2.0.1 flagged
   double-quoted, as its Validate asked.
 
 ### Removed
-- `find-polluter`, `task-brief`, and their tests.
+- `find-polluter` and its tests, and the `task-brief` script. `task-brief`'s
+  tests now test run-plan's command.
 
 ### Measured
 Task 5 ran the changed cases on real sessions, 2 runs each. Cost and score:
@@ -51,11 +52,13 @@ separate processes, and an interim "exactly one module" before the pin run.
 
 Fix batch 1 made the procedure show the check and the grader judge it by
 substance. The re-run on the fixed version ($0.89, 125 seconds) scored 1.00
-in both, `ran-the-check` passing unanimously, and the bar was met.
+in both, `ran-the-check` passing unanimously. That re-run covered only
+`debug-polluted-test`, and it met the bar.
 
 The traces say the grader's change moved the votes. The agents did not follow
 the procedure's new form. Neither run called its result a suspect, and
-neither halved. Both still found the right polluter and cause and left the
+only run 1 halved, once, before pairing each file with the victim; run 2
+only paired. Both still found the right polluter and cause and left the
 victim alone, 4 of the last 4 runs. Total spend on Task 5 was $7.80.
 
 ## [2.0.1] — 2026-11-06

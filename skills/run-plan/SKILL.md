@@ -66,13 +66,18 @@ going on. Changes the build log does explain are a task in progress: see
 
 ### Step 2: Write the brief
 
-Set three shell variables: `PLAN` (the plan file), `N` (the task number), and
-`OUT` (the work dir). Then run this exactly as written, in one Bash call:
+Three shell variables go in: `PLAN` (the plan file), `N` (the task number),
+and `OUT` (the work dir). Bash state doesn't carry from one call to the next,
+so start the same Bash call with `PLAN=... N=... OUT=...` and run this right
+after them, exactly as written:
 
 ```bash
 case "$N" in ''|*[!0-9]*) echo "N must be one or more digits, got: $N" >&2; exit 2 ;; esac
+case "$PLAN" in '') echo "PLAN is not set" >&2; exit 2 ;; esac
+case "$OUT" in '') echo "OUT is not set" >&2; exit 2 ;; esac
+[ -r "$PLAN" ] || { echo "can't read the plan: $PLAN" >&2; exit 2; }
 mkdir -p "$OUT"; B="$OUT/task-$N-brief.md"
-awk -v n="$N" '
+LC_ALL=C awk -v n="$N" '
   { match($0, /^ */); i = RLENGTH; s = substr($0, i + 1) }
   i <= 3 && match(s, /^(`+|~+)/) {
     c = substr(s, 1, 1); k = RLENGTH; r = substr(s, k + 1)
@@ -85,7 +90,7 @@ awk -v n="$N" '
     if (p && ($0 ~ /^#+[ \t]+Task[ \t]+[0-9]/ || h <= ph)) p = 0
   }
   p
-' "$PLAN" > "$B"
+' "$PLAN" >| "$B" || { rm -f "$B"; echo "could not read $PLAN" >&2; exit 1; }
 if [ -s "$B" ]; then echo "$B ($(wc -l < "$B" | tr -d ' ') lines)"; else rm -f "$B"; echo "no heading for Task $N in $PLAN" >&2; false; fi
 ```
 
@@ -93,7 +98,8 @@ It copies from the task's heading (`### Task N: ...`, at any heading level) up
 to the next task heading, or the next heading at the same level or higher. It
 skips headings inside fenced code blocks, so a `# comment` in a code sample
 doesn't end the task early. It prints the brief's path and line count, or says
-there's no heading for Task N, or stops if N isn't all digits. Don't write the brief by hand, and don't trim
+there's no heading for Task N, or stops if N isn't all digits, PLAN or OUT is
+empty, or the plan can't be read. Don't write the brief by hand, and don't trim
 it: it's the plan's own text, byte for byte.
 
 The brief is the task's requirements. Exact values (names, limits, messages,

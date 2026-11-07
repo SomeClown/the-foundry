@@ -283,7 +283,10 @@ class SkillFilesTest(unittest.TestCase):
                     self.assertTrue(target.exists(), f"{ref} doesn't exist")
 
     def test_no_skill_ships_scripts(self):
-        self.assertEqual(list(SKILLS.glob("*/scripts")), [])
+        # Tracked files only: a stray untracked __pycache__ or .DS_Store must not fail this.
+        out = subprocess.run(["git", "-C", str(ROOT), "ls-files", "skills"], capture_output=True, text=True, check=True)
+        scripts = [f for f in out.stdout.splitlines() if re.match(r"skills/[^/]+/scripts/", f)]
+        self.assertEqual(scripts, [])
 
 
 class DebugPollutionProcedureTest(unittest.TestCase):
@@ -296,8 +299,8 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         "call it the suspect",
         "as commands of their own, not inside a loop or alongside other runs",
         "python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y",
-        "2>&1 | grep -E '^test_y '",
-        "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y'",
+        r"2>&1 | grep -E '^test_y \(tests.test_x.XTest.test_y\)'",
+        "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'",
     ]
     SKILL_PHRASE = "the check under *Pollution* in the techniques file"
 
@@ -327,13 +330,6 @@ class DebugPollutionProcedureTest(unittest.TestCase):
 
     def test_skill_points_at_the_check(self):
         self.assertIn(self.SKILL_PHRASE, self.skill())
-
-    def test_each_phrase_can_fail(self):
-        body = self.pollution()
-        for phrase in self.PHRASES:
-            with self.subTest(phrase=phrase):
-                self.assertNotIn(phrase, body.replace(phrase, ""))
-        self.assertNotIn(self.SKILL_PHRASE, self.skill().replace(self.SKILL_PHRASE, ""))
 
 
 class DocsAgreeTest(unittest.TestCase):

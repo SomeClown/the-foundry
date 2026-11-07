@@ -20,12 +20,49 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from tests import test_structure
-
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tests"))
+import test_structure  # noqa: E402
+
 TECHNIQUES = ROOT / "skills" / "debug" / "references" / "techniques.md"
 SCAFFOLD = ROOT / "evals" / "debug-polluted-test" / "scaffold.sh"
-PYTEST_PYTHON = Path.home() / "dev" / "discord-newsbot" / ".venv" / "bin" / "python"
+
+
+def find_pytest_python():
+    """An interpreter that can run pytest, or None.
+
+    FOUNDRY_PYTEST_PYTHON first, then this interpreter, then the interpreter named
+    on the first line of the `pytest` script on PATH.
+    """
+    candidates = []
+    named = os.environ.get("FOUNDRY_PYTEST_PYTHON")
+    if named:
+        candidates.append(named)
+    candidates.append(sys.executable)
+    script = shutil.which("pytest")
+    if script:
+        try:
+            first = Path(script).read_text(encoding="utf-8", errors="replace").splitlines()[0]
+        except (OSError, IndexError):
+            first = ""
+        if first.startswith("#!"):
+            candidates.append(first[2:].split()[0])
+    for candidate in candidates:
+        try:
+            done = subprocess.run([candidate, "-m", "pytest", "--version"], capture_output=True, timeout=60)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if done.returncode == 0:
+            return Path(candidate)
+    return None
+
+
+PYTEST_PYTHON = find_pytest_python()
+NO_PYTEST = "no interpreter with pytest: set FOUNDRY_PYTEST_PYTHON to one"
+
+UNITTEST_ANCHOR = r"^test_y \(tests.test_x.XTest.test_y\)"
+UNITTEST_GREP = f" | grep -E '{UNITTEST_ANCHOR}'"
+PYTEST_GREP = " | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'"
 
 HEADING = "## Pollution: passes alone, fails in the suite"
 POLLUTER = "tests.test_a_currency"
@@ -103,7 +140,7 @@ class UnittestLineTest(Fixture):
         self.assertTrue(out[0].endswith("ok"), out)
 
 
-@unittest.skipUnless(PYTEST_PYTHON.exists(), "no pytest python at ~/dev/discord-newsbot/.venv")
+@unittest.skipUnless(PYTEST_PYTHON, NO_PYTEST)
 class PytestLineTest(Fixture):
     def test_half_with_the_polluter_shows_the_victim_failed(self):
         _, out = self.sh(fill_pytest(step3_commands()[0], "tests/test_a_currency.py"))
@@ -112,6 +149,39 @@ class PytestLineTest(Fixture):
 
     def test_half_without_the_polluter_shows_the_victim_passed(self):
         _, out = self.sh(fill_pytest(step3_commands()[0], "tests/test_e_invoice.py"))
+        self.assertEqual(len(out), 1, out)
+        self.assertTrue(out[0].startswith("PASSED " + VICTIM_PYTEST), out)
+
+
+class DecoyTest(Fixture):
+    """The victim greps match the victim's full id and nothing that merely starts like it."""
+
+    def setUp(self):
+        self.report = Path(self.tmp) / "tests" / "test_c_report.py"
+        original = self.report.read_text(encoding="utf-8")
+        self.addCleanup(self.report.write_text, original, encoding="utf-8")
+        self.report.write_text(
+            original
+            + f"    def {VICTIM_NAME}2(self):\n        self.assertTrue(True)\n"
+            + f"\n\nclass OtherTest(unittest.TestCase):\n    def {VICTIM_NAME}(self):\n"
+            + "        self.assertTrue(True)\n",
+            encoding="utf-8",
+        )
+
+    def test_unittest_grep_skips_a_longer_name_and_a_same_named_method_in_another_class(self):
+        # Both decoys run (the list shows them); only the victim's own line comes back.
+        _, everything = self.sh(f"{sys.executable} -m unittest -v tests.test_c_report 2>&1")
+        self.assertEqual(len([l for l in everything if l.startswith(VICTIM_NAME)]), 3, everything)  # victim, longer name, other class
+        for half in (POLLUTER, QUIET):
+            with self.subTest(half=half):
+                decoys = f"tests.test_c_report.OtherTest tests.test_c_report.ReportTest.{VICTIM_NAME}2"
+                _, out = self.sh(fill_unittest(step3_commands()[1], f"{half} {decoys}"))
+                self.assertEqual(len(out), 1, out)
+                self.assertIn("(" + VICTIM_UNITTEST + ")", out[0])
+
+    @unittest.skipUnless(PYTEST_PYTHON, NO_PYTEST)
+    def test_pytest_grep_skips_a_longer_name(self):
+        _, out = self.sh(fill_pytest(step3_commands()[0], "tests/test_c_report.py"))
         self.assertEqual(len(out), 1, out)
         self.assertTrue(out[0].startswith("PASSED " + VICTIM_PYTEST), out)
 
@@ -137,7 +207,7 @@ class CheckTest(Fixture):
         code, out = self.sh(f"{sys.executable} -m unittest -v {QUIET} {VICTIM_UNITTEST} 2>&1")
         self.assertEqual(code, 0, out)
 
-    @unittest.skipUnless(PYTEST_PYTHON.exists(), "no pytest python")
+    @unittest.skipUnless(PYTEST_PYTHON, NO_PYTEST)
     def test_the_check_under_pytest(self):
         py = f"{PYTEST_PYTHON} -m pytest -q -p no:randomly -p no:cacheprovider"
         alone, _ = self.sh(f"{py} {VICTIM_PYTEST}")
@@ -282,7 +352,23 @@ class PinMutationTest(unittest.TestCase):
         self.assertEqual((result.failures, result.errors), ([], []))
 
     def test_deleting_the_victim_grep_is_caught(self):
-        self.assertCaught(self.tech, lambda t: t.replace(" | grep -E '^test_y '", "", 1))
+        self.assertCaught(self.tech, lambda t: t.replace(UNITTEST_GREP, "", 1))
+
+    def test_deleting_the_pytest_grep_is_caught(self):
+        self.assertCaught(self.tech, lambda t: t.replace(PYTEST_GREP, "", 1))
+
+    def test_loosening_the_unittest_grep_to_a_bare_name_is_caught(self):
+        self.assertCaught(self.tech, lambda t: t.replace(UNITTEST_ANCHOR, "^test_y ", 1))
+
+    def test_dropping_the_class_from_the_unittest_anchor_is_caught(self):
+        self.assertCaught(self.tech, lambda t: t.replace(r"^test_y \(tests.test_x.XTest.test_y\)",
+                                                         r"^test_y \(tests.test_x", 1))
+
+    def test_dropping_the_pytest_end_anchor_is_caught(self):
+        self.assertCaught(self.tech, lambda t: t.replace("test_y( |$)'", "test_y'", 1))
+
+    def test_dropping_the_pytest_line_start_anchor_is_caught(self):
+        self.assertCaught(self.tech, lambda t: t.replace("grep -E '^(PASSED|FAILED|ERROR) ", "grep -E '", 1))
 
 
 if __name__ == "__main__":

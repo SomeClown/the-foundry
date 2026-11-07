@@ -274,9 +274,10 @@ references are just documents — no tooling required.
 > "Sunlight is said to be the best of disinfectants."
 > — Louis Brandeis, who was talking about banks, but the principle travels
 
-The short version: the Foundry is Markdown. It bundles
+The short version: what the plugin directory installs is Markdown. It bundles
 no scripts, no hooks, no MCP servers, no slash commands, and no telemetry, and nothing in
-it phones home. Everything it does, it does through tools Claude Code already
+it phones home. An install from this repo's own marketplace also brings the
+tests and eval scaffolds, which run only when you run them. Everything it does, it does through tools Claude Code already
 has, under whatever permissions you've given your session. Here's the long
 version, so you don't have to take my word for it:
 
