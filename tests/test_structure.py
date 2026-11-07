@@ -437,7 +437,7 @@ class EvalLibraryTest(unittest.TestCase):
 
 
 class RepoSizeLimitTest(unittest.TestCase):
-    """The plugin directory takes the whole repo, including evals-expensive/, so it has to stay inside the directory's limits."""
+    """The limits the plugin directory sets, held for the whole repo so `dist` can never exceed them."""
 
     def tracked(self):
         out = subprocess.run(["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True)
@@ -488,6 +488,39 @@ class DirectoryScannerTest(unittest.TestCase):
                 m = pattern.search(text)
                 with self.subTest(file=rel, pattern=why):
                     self.assertTrue(m is None, f"{rel}: {why}: {m.group(0) if m else ''!r}")
+
+
+class DirectoryFileRulesTest(unittest.TestCase):
+    """The plugin directory takes only some file types; `dist` is `main` minus the dev-only folders."""
+
+    DEV_ONLY = ("tests/", "evals/", "evals-expensive/", "docs/plans/")
+    ALLOWED_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico"}
+    ALLOWED_NAMES = {"LICENSE", ".gitignore"}
+
+    def refused(self, paths):
+        out = []
+        for p in paths:
+            if p.startswith(self.DEV_ONLY):
+                continue
+            name = p.rsplit("/", 1)[-1]
+            if Path(p).suffix.lower() not in self.ALLOWED_SUFFIXES and name not in self.ALLOWED_NAMES:
+                out.append(p)
+        return out
+
+    def test_shipped_files_are_types_the_directory_takes(self):
+        out = subprocess.run(["git", "-C", str(ROOT), "ls-files"], capture_output=True, text=True, check=True)
+        self.assertEqual(self.refused(out.stdout.splitlines()), [])
+
+    def test_refused_can_fail(self):
+        got = self.refused(["skills/x/scripts/y", "agents/a.md", "tests/t.py", "x.sh"])
+        self.assertEqual(got, ["skills/x/scripts/y", "x.sh"])
+
+    def test_contributing_builds_dist_without_exactly_the_dev_only_folders(self):
+        text = (ROOT / "CONTRIBUTING.md").read_text()
+        line = "git rm -r -q --cached --ignore-unmatch tests evals evals-expensive docs/plans"
+        self.assertIn(line, text.splitlines())
+        names = line.split("--ignore-unmatch ", 1)[1].split()
+        self.assertEqual(names, [d.rstrip("/") for d in self.DEV_ONLY])
 
 
 if __name__ == "__main__":

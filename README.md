@@ -274,8 +274,8 @@ references are just documents — no tooling required.
 > "Sunlight is said to be the best of disinfectants."
 > — Louis Brandeis, who was talking about banks, but the principle travels
 
-The short version: the Foundry is Markdown and a few small scripts. It bundles
-no hooks, no MCP servers, no slash commands, and no telemetry, and nothing in
+The short version: the Foundry is Markdown. It bundles
+no scripts, no hooks, no MCP servers, no slash commands, and no telemetry, and nothing in
 it phones home. Everything it does, it does through tools Claude Code already
 has, under whatever permissions you've given your session. Here's the long
 version, so you don't have to take my word for it:
@@ -330,17 +330,23 @@ version, so you don't have to take my word for it:
   credentials or anything it can't undo, and refers to secrets by name, never
   by value). The plugin never sees the token itself: git, `gh`, ssh, and the
   cloud CLIs handle that. Nothing else in the plugin uses a login.
-- **The scripts.** `evals-expensive/compare.py` and
-  `evals-expensive/sync_case.py` (Python) are run by hand, read result JSON
-  and the case files, and stay local. The `evals-expensive/` scaffold writes a
-  `bin/git` wrapper into its scratch fixture. None of them touches the
-  network.
-- **The tests and evals.** `tests/` runs those scripts against throwaway
-  folders. The `evals/` cases run only when you invoke `claude plugin eval .`
-  yourself; their `scaffold.sh` scripts, which build small fixture repos in
-  the harness's temporary workspace, run only if you also pass `--scaffold`.
-  `evals-expensive/` runs only with `--eval-dir evals-expensive`, and it isn't
-  part of a routine run.
+- **Commands the skills give your session.** `run-plan` copies each task out
+  of the plan with one `awk` command written in the skill, and `debug` finds a
+  test that leaves state behind by running your own test runner on halves of
+  the suite. Both run through your session's Bash, under your permissions, and
+  neither touches the network.
+- **The tests and evals.** They live on the repository's `main` branch, not in
+  the copy the plugin directory installs. `tests/` holds the repo to its own
+  README. The `evals/` cases run only when you invoke `claude plugin eval .`
+  yourself; their `scaffold.sh` scripts, which build small fixture repos in the
+  harness's temporary workspace, run only if you also pass `--scaffold`, and
+  `evals-expensive/` runs only with `--eval-dir evals-expensive`.
+  `evals-expensive/compare.py` and `evals-expensive/sync_case.py` (Python) are
+  run by hand, read result JSON and the case files, and stay local; the
+  `evals-expensive/` scaffold writes a `bin/git` wrapper into its scratch
+  fixture. None of them touches the network. Installing from this GitHub
+  repository's own marketplace brings them along; they still run only when you
+  run them.
 
 None of it sends your code or data anywhere beyond what any Claude Code
 session already does with the files it reads. The
@@ -366,8 +372,7 @@ If you improve an agent in a way that isn't specific to your setup, send it
 back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 [CHANGELOG](CHANGELOG.md).
 
-The Foundry tests itself, too, in two layers. `tests/` checks the skills'
-scripts and holds the repo to its own README (a read-only agent that grows a
+The Foundry tests itself, too, in two layers. `tests/` checks run-plan's brief command and holds the repo to its own README (a read-only agent that grows a
 Write tool, or a skill count that goes stale, fails the suite). `evals/` is a
 library of behavior cases for `claude plugin eval .`, each one a situation that
 once caught a skill doing the wrong thing; the second run of it caught the

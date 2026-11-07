@@ -2,8 +2,8 @@
 
 The Foundry doesn't collect, store, or send any data. There's no server, no
 account, no analytics, and no telemetry; nothing in the plugin reports back to
-me or to anyone else. It's Markdown instructions for Claude Code, a few small
-scripts that run on your machine, and their tests.
+me or to anyone else. It's Markdown instructions for Claude Code. The repository's `main` branch also
+holds its tests and eval cases, which run only when you run them.
 
 What it does do, it does inside your own Claude Code session, under the
 permissions you've set:
@@ -29,7 +29,8 @@ Code session; the plugin adds no other destination.
 [Anthropic's own privacy policy](https://www.anthropic.com/legal/privacy)
 covers that part.
 
-Beyond the two workflow scripts, `evals-expensive/compare.py` and
+The skills ship no scripts: `run-plan` and `debug` give your session commands
+that run through its own Bash. On the `main` branch, `evals-expensive/compare.py` and
 `evals-expensive/sync_case.py` run only when you run them by hand, stay local,
 use no network, and read result JSON; the eval scaffold writes a `bin/git`
 wrapper into its scratch fixture.
