@@ -16,7 +16,10 @@ Validate came back clean of both rules, where a control on 2.0.1 flagged
   file type outside Markdown, text, JSON, YAML, and a few image formats in a
   shipped path, and no front-matter key beyond the ones agents and skills use.
 - A `dist` branch the plugin directory reads, built by a release step in
-  CONTRIBUTING.md. The step stops on an untagged or missing `main`.
+  CONTRIBUTING.md. The step fetches first, parents the new commit on
+  `origin/dist`, and stops on a stale, untagged, or mis-tagged `main`, a file
+  type or front-matter key the directory refuses, a release already built, or
+  a local `dist` with commits `origin/dist` lacks.
 
 ### Changed
 - run-plan's brief is a command written in the skill, not a script. It
