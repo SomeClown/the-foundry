@@ -677,6 +677,8 @@ Two read-only qa reviewers on b60dcaf: lens 1 (spec and directory compliance) an
 - Done by the orchestrator: the triage rulings above; the build log's self-contradicting Task 5 line and its "neither halved".
 - To the docs task: design §2's intro reads as present tense (two scripts, two agents with `permissionMode`), and it names a plan path `dist` won't hold (lens 1, 8). The "As built" subsection records both.
 - For the owner, not fixed: a free portal Validate on the exact tree before tagging (lens 1, 2); restoring descriptive names and comments in the awk block (lens 1, 4); a ~$0.50 traced re-run of `item-d`.
+- Owner (2026-11-06), on the final report: 1, validate first (a throwaway branch holding the exact `dist` tree goes through the portal's free Validate before anything is tagged); 2A, the awk block keeps its short names; 3A, no `item-d` re-run.
+- Portal Validate on the exact tree (owner's OK, 2026-11-06): `probe/dist-2.1.0` at 5802ec9, the `dist` commit the release block built from a302652 tagged v2.1.0 in a scratch clone (27 files), pushed, validated without submitting, then deleted. Result: passed, 7 checks, 4 warnings, neither blocking rule. "36 files" is 27 files plus 9 folders, the same count the probe got. Warnings: 3 unrecognized plugin.json fields and README's download-and-run pattern (both non-blocking, left per §4 decision 9), plus two notes (the icon passed as an image; the repo already has a submission).
 - Closed: both parked items (README's "The scripts." bullet was replaced in Task 6; the `brief-script-finds-task-*` grader names stay for continuity with older results).
 
 ### Parked
