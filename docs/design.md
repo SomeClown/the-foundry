@@ -430,3 +430,52 @@ finding, and the form took the branch. The same form run on `main` at
 while it shows "Needs changes", or needs a withdraw and resubmit with the
 same repo and path. The Settings tab's branch field is enabled, but its note
 says the branch can't change under review. That gets settled at ship time.
+
+### As built (2026-11-06)
+
+What changed from the design above during the build. The approved text stays as
+approved; the figures are from the build log in
+`docs/plans/2026-11-06-directory-file-rules.md`.
+
+- **The opening describes 2.0.1, not 2.1.0.** It says the Foundry ships two
+  scripts and that two agents carry `permissionMode`. 2.1.0 has neither. The
+  plan path §2 names lives only in the repo; `dist` doesn't hold
+  `docs/plans/`.
+- **The brief command's final shape.** It is longer than the "short `awk`
+  command" above. It refuses an N that isn't all digits, and an empty `PLAN` or
+  `OUT`, with exit 2. It stops if the plan can't be read. It runs `awk` under
+  `LC_ALL=C`, because a UTF-8 locale made `awk` fail partway through a file. It
+  writes the brief with `>|`, so a shell with `noclobber` set overwrites a stale
+  brief instead of keeping it, and it deletes the brief and stops when `awk`
+  fails or finds no heading, so a leftover file is never trusted. The output line
+  is unchanged. Briefs are byte-identical to the old script's on all 19 tasks of
+  both plans, under bash and zsh. Still open for the owner: the `awk` block uses
+  one-letter variables (`i`, `s`, `c`, `k`, `r`, `f`, `fc`, `fk`, `p`, `ph`,
+  `h`) and has no comments. Restoring descriptive names is a call I haven't made.
+- **The debug procedure says what halving leaves is a suspect.** Task 5's first
+  try missed the bar: `debug-polluted-test` scored 0.75, with `ran-the-check`
+  failing in both runs. Step 4 now calls what halving leaves a suspect until
+  step 6 holds, and step 6 runs its two checks (the victim alone passes; the
+  victim right after the suspect fails) as commands of their own. The traces
+  showed both runs did run the check; the grader's wording read it one way for a
+  loop of separate processes. The sentence about suspects, though, never visibly
+  took: neither later run used the word in its text.
+- **`ran-the-check` judges by substance.** It passes a loop that starts each run
+  as its own process, and it doesn't count "suspect" as naming. After the
+  change, `debug-polluted-test` scored 1.00 in both runs. The owner chose this
+  fix and the procedure's rewording together.
+- **The release block checks more than the design lists.** The qa pass added
+  these stops. The tag on `main` must match `plugin.json`'s version, and
+  `origin/main` must be an ancestor of local `main`; a stale local `main` on an
+  old tag had built the refused 2.0.1 tree. The built tree is checked for refused
+  file types and front-matter keys before the commit is written. The parent comes
+  from `origin/dist` after a fetch. The block stops if the tag is already built
+  (the parent has the same tree) and if a local `dist` holds commits `origin/dist`
+  lacks.
+- **Eval spend: $7.80 of the $11 cap.** The first try cost $6.04, the traced
+  re-run $0.87, and the re-run after the fix $0.89. Results on the changed
+  cases: `debug-polluted-test` 1.00 after the fix, where v2.0.1's baseline on the
+  widened fixture scored 0.63; `architect-plan-format` 1.00; `run-plan-resume`
+  1.00. Two graders failed once each and are ruled unrelated or variance:
+  `asks-and-hands-over` (it also failed in the 2026-10-23 run) and `item-d`
+  (unconfirmed, no trace kept).

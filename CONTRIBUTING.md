@@ -38,6 +38,11 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    A change to `investigate` or `file-reader` also gets the nesting smoke
    case, and the head-to-head in `evals-expensive/` with the owner's OK,
    since it costs real money.
+   `tests/test_debug_pollution_procedure.py` runs debug's procedure against its
+   fixture under pytest as well as unittest. It looks for an interpreter with
+   pytest in `FOUNDRY_PYTEST_PYTHON`, then the one running the tests, then the
+   `pytest` on your `PATH`; with none, those tests skip, and the skip reason
+   names the variable. Set it to a venv's `python` for a green run with no skips.
    `tests/` holds the brief command's tests and the structural checks (the README's
    promises about who can write, which model each agent runs, and how many
    skills there are, against the actual files). Nothing outside `tests/`,

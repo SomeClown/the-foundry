@@ -3,7 +3,7 @@
 > "Trust, but verify."
 > — Russian proverb, borrowed by a US president, overused by everyone since
 
-The tests in `tests/` check the Foundry's scripts and that the repo agrees
+The tests in `tests/` check run-plan's brief command, debug's procedure, and that the repo agrees
 with itself. They can't check whether a skill makes a model *behave* the way
 it should: ask numbered questions with a recommendation first, hold the gate
 when the user says "sounds great, build it", measure a flaky test before
