@@ -4,6 +4,60 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.1.0] — 2026-11-06
+
+A minor version. The plugin directory refused 2.0.1 on its file-type and
+front-matter checks. I probed a branch with the fixes, and the portal's
+Validate came back clean of both rules, where a control on 2.0.1 flagged
+`evals-expensive/compare.py` and `agents/architect.md`.
+
+### Added
+- Structural guards in `tests/` for the two rules the directory enforces: no
+  file type outside Markdown, text, JSON, YAML, and a few image formats in a
+  shipped path, and no front-matter key beyond the ones agents and skills use.
+- A `dist` branch the plugin directory reads, built by a release step in
+  CONTRIBUTING.md. The step stops on an untagged or missing `main`.
+
+### Changed
+- run-plan's brief is a command written in the skill, not a script. It
+  refuses a task number that isn't all digits.
+- debug's polluter search is a written procedure that ends in a required
+  check: what halving leaves is a suspect until the check holds, run as two
+  commands of their own.
+- `architect` and `investigate` no longer carry `permissionMode: plan`. It
+  never applied in a plugin install. A manual install that wants it adds the
+  line to its own copies (README).
+- The five agent and skill descriptions the directory flagged are
+  double-quoted, as its Validate asked.
+
+### Removed
+- `find-polluter`, `task-brief`, and their tests.
+
+### Measured
+Task 5 ran the changed cases on real sessions, 2 runs each. Cost and score:
+- debug cases: $3.03 and 501 seconds. `debug-polluted-test` scored 0.75
+  and `debug-production-report` 0.83; the other four cases scored 1.00.
+- architect plan format: $1.02 and 184 seconds, 1.00 in both runs.
+- run-plan cases: $1.03 and 193 seconds. `run-plan-decisions` scored 0.93,
+  `run-plan-resume` 1.00.
+- The v2.0.1 baseline on the widened `debug-polluted-test`: $0.96, 124
+  seconds, 0.63. `victim-untouched` failed in both runs.
+
+The bar was missed on `ran-the-check`, which failed in both debug runs. I
+kept the traces and re-ran ($0.87, 1.00 in both). In both runs the agent had
+run the pair as a process of its own before the write-up, so the check was
+there. The split votes came from how the grader read the form: a loop of
+separate processes, and an interim "exactly one module" before the pin run.
+
+Fix batch 1 made the procedure show the check and the grader judge it by
+substance. The re-run on the fixed version ($0.89, 125 seconds) scored 1.00
+in both, `ran-the-check` passing unanimously, and the bar was met.
+
+The traces say the grader's change moved the votes. The agents did not follow
+the procedure's new form. Neither run called its result a suspect, and
+neither halved. Both still found the right polluter and cause and left the
+victim alone, 4 of the last 4 runs. Total spend on Task 5 was $7.80.
+
 ## [2.0.1] — 2026-11-06
 
 A docs-only patch. The README and the privacy statement now say plainly how

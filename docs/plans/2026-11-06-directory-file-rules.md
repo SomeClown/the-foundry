@@ -614,6 +614,7 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 - Task 3: complete (from 4430bea; gate exit 0, Ran 464, all four exits 0; adversarial: 21 tests, the procedure's commands checked against the real fixture under unittest and pytest, 4 weak pins fixed in round 1)
 - Task 4: complete (from d8e5739; gate exit 0, Ran 464, all four exits 0; fixture check: 8 tests, only the victim fails, alone exit 0, pair exit 1; no adversarial round, per the plan)
 - Task 6: complete (from d72b2b3 after Task 5's commits; gate exit 0, Ran 506, all four exits 0; adversarial: 30 tests, guard held, 7 release-command bugs fixed in round 1; rehearsed in a scratch clone by the orchestrator: dist 27 files, both validates exit 0)
+- Task 7: complete (from 3ca38fe; gate exit 0, Ran 506, all four exits 0; CHANGELOG numbers checked against this log by the orchestrator; one overclaiming phrase fixed in round 1; no adversarial round)
 - Task 5: complete after fix batch 1 (bar met on 39ca705; see below). Owner OK'd the runs (2026-11-06). Bar missed; stopped for the owner. Results:
   - First try of the three branch commands refused to start (`not a trusted plugin directory`; the plan's commands lacked `--trust-plugin`), $0. Re-run with the flag.
   - debug tag × 2: exit 1, $3.03, 501 s. debug-polluted-test 0.75 (`ran-the-check` FAIL in both runs, votes FAIL FAIL FAIL and FAIL PASS FAIL; `fixed-the-polluter`, `right-cause`, `victim-untouched` passed in both). debug-production-report 0.83 (`asks-and-hands-over` failed run 2). The other four cases 1.00.
@@ -643,6 +644,8 @@ Work dir: `.git/foundry-run/2026-11-06-directory-file-rules/`
 
 - Ruling (Task 6): all 7 failing release tests in `tests/test_directory_release.py` are real bugs: CONTRIBUTING's dist block checks nothing between steps, so an untagged main, a tag behind main, no main, a missing dev folder, a run from a subfolder, or a dist only on origin each writes a wrong dist commit and exits 0. If wrong: a stricter release step than needed.
 - Ruling (Task 6): `.svg` stays refused by the guard. Why: the portal's refusal lists Markdown, text, JSON, YAML, and PNG/JPEG/GIF/WebP/ICO, not SVG, though the older checklist calls SVG text. If wrong: an SVG would need adding to the allowed set before it could ship.
+
+- Ruling (Task 7): no adversarial round on the version bump and CHANGELOG. Why: `test_version_matches_the_newest_changelog_entry` covers the contract, and the orchestrator checked every number against this log. If wrong: a CHANGELOG error that qa should catch.
 
 ### From Task 5 (fix batch 1)
 
