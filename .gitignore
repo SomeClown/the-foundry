@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Python (the tests)
+__pycache__/
+
+# Eval runs (claude plugin eval)
+evals/results/
+
+# Eval runs (the expensive cases)
+evals-expensive/results/
