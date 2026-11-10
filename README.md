@@ -385,13 +385,20 @@ up.
 
 I'd be remiss not to mention Tony Mattke over at [Router Jockey](https://routerjockey.com), who not only is a great friend who inspired me to move to Hugo, but also has some amazing content on his blog. He deep dives into a variety of topics, all well worth a gander. One series of articles I'd highly recommend, if you're not overly comfortable with version control, begins here: [Git for Network Engineers](https://routerjockey.com/git-for-network-engineers-part-1/). 
 
-Project built by [Teren Bryson](https://packetqueue.net) — forged, fittingly, by the
-team building itself: the agents' own investigate/qa/docs runs shaped their
-final form. Developed with Claude Code, mostly in my highly customized terminal (oh-my-zsh, heavily customized vim, etc., with a tad bit of a JetBrains IDE. More on that coming in a later entry).
+Project built by [Teren Bryson](https://packetqueue.net). I wrote each agent's job,
+chose its tools and its model, and set the rules for how work moves between
+them, then put the team to work on real projects and kept what held up. Its own
+investigate, qa, and docs runs caught a good share of what I changed along the
+way, which is the point of having them. The story of how it started is on my
+blog: [The First Rule of The Foundry](https://packetqueue.net/blog/the-first-rule-of-the-foundry/).
+The sequel, [The Fourth Rule of The Foundry](https://packetqueue.net/blog/the-fourth-rule-of-the-foundry/),
+covers the tenth agent, the four skills, and the test that showed the
+investigator was skimming.
+Developed with Claude Code, mostly in my highly customized terminal (oh-my-zsh, heavily customized vim, etc., with a tad bit of a JetBrains IDE. More on that coming in a later entry).
 
-And yes, I know: a team of machines doing the software jobs, assembled by the
-machines themselves, distributed so more machines can do it elsewhere. Agent
-Smith was the villain. I've decided not to worry about it.
+And yes, I know: a team of machines doing the software jobs, distributed so
+more machines can do it elsewhere. Agent Smith was the villain. I've decided
+not to worry about it.
 
 ## License
 
