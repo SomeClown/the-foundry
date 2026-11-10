@@ -4,6 +4,14 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.1.1] — 2026-11-10
+
+A docs-only patch. The README's credits now say who built the team: I wrote
+each agent's job, chose its tools and its model, and set how work moves
+between them. They used to say the team assembled itself. The credits also
+link the two blog posts about the Foundry, the release in August and the
+follow-up on the tenth agent. No behavior change.
+
 ## [2.1.0] — 2026-11-06
 
 A minor version. The plugin directory refused 2.0.1 on its file-type and
