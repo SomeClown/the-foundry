@@ -283,6 +283,31 @@ still reachable, resume it for the fix (it knows the code). Record "From the
 qa pass (fix batch K)" in the build log. Anything qa says only the user can
 decide goes into the final report as a question, not into a fix batch.
 
+### Retro
+
+Add a `### Retro` section to the build log: one line for each time the team
+needed correcting during the run, drawn from the log. That's a BLOCKED or
+NEEDS_CONTEXT, each fix round and what it fixed, a test that misread the
+brief, a qa finding the builder or test-engineer should have caught, and
+anything the user corrected. Each line names the agent or skill, what it did,
+what it should have done, and where in the log it came from:
+
+```
+- implement: edited the victim test, not the polluter; should have fixed the polluter (Task 3, fix round 1)
+```
+
+Write what happened, not theories, and no code, file contents, or secrets.
+Nothing needed correcting: write `- none`.
+
+Then read `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/foundry-retro.md` (it may not
+exist yet) and append the same lines under a heading with the date, the
+project folder's name, and `run-plan <plan file>`. If it can't be written,
+say so in the report and go on. When a new line has the same agent or skill
+making the same kind of mistake as an earlier line in that file, the report
+quotes both and offers to work out a fix with the user through `brainstorm`.
+Never edit an agent or skill file yourself, here or in the plugin's install
+folder: a fix goes through the user and the repo's own review.
+
 ### Docs
 
 Dispatch `the-foundry:docs` with the design section, the plan, and the build
@@ -302,6 +327,7 @@ One message:
 - **Decisions I made**: every ruling from the build log, each with what it
   costs if it's wrong, so the user can check them
 - parked findings and declined qa findings, with reasons
+- the retro's line count, and any repeat it found, quoted
 - questions only the user can answer, numbered, with options and a
   recommendation
 - the next step (push, PR, release) as a question. Shipping waits for their
@@ -352,6 +378,9 @@ Work dir: <path>
 - Task 3: <finding>, parked because <reason>.
 
 ### From the qa pass (fix batch 1)
+- ...
+
+### Retro
 - ...
 ```
 

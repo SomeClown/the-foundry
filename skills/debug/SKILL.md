@@ -197,6 +197,18 @@ smallest version").
   pre-existing failure) get named with their evidence and offered as their
   own hunts, one at a time. Fixing them inside this one muddies what this
   fix proved.
+- **Retro.** Append one line for each time the hunt needed correcting to
+  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/foundry-retro.md`, under a heading
+  with the date, the project folder's name, and `debug <slug>`: a fix that
+  didn't hold, a step skipped and caught (a fix before the pin, a suspect
+  named before the check), a dispatched agent's work redone, anything the
+  user corrected. Each line names the agent or skill, what it did, what it
+  should have done, and the evidence, with no code, file contents, or
+  secrets; `- none` if nothing did. Read the file first: when a new line
+  repeats an earlier one (same agent or skill, same kind of mistake), the
+  report quotes both and offers to work out a fix through `brainstorm`.
+  Never edit an agent or skill file yourself. If the file can't be written,
+  say so and go on.
 - **Report to the user:** the cause in plain words, the evidence, the fix,
   the proof (the loop count and the gate's exit code), and anything left
   open. Commits and pushes follow the project's usual rules.
