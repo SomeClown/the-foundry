@@ -129,7 +129,8 @@ dispatch, where they'll drift.
 - the report contract: "Write your full report to `<work dir>/task-N-report.md`.
   Reply with only: status (DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, or
   BLOCKED), files changed, the gate's exit code, and any concerns. Don't
-  commit, and don't dispatch other agents."
+  commit, don't dispatch other agents, and don't load the Foundry's own
+  skills (a project's own design skill is fine)."
 
 Keep the agent's id from the result; fix rounds resume it.
 
@@ -157,6 +158,17 @@ task's, but look at `git status --short` before `git add -A`: caches, build
 output, or anything the plan's rules say never to commit get staged by name
 instead (`git add <paths>`), and the build log notes that the project needs a
 `.gitignore` line. Rebuild the package after each fix round.
+
+Before packaging, check that `git rev-parse --short HEAD` is the sha noted at
+step 1. If it isn't, a builder committed against its contract, and
+`git diff --cached` would leave that work out of the package. Note it in the
+build log, and package against the noted sha, written into the command as a
+literal (`abc1234` here):
+
+```
+git add -A
+{ git diff --cached --stat abc1234; git diff --cached -U10 abc1234; } > <work dir>/task-N-diff.txt
+```
 
 For a task that later tasks build on, or one with exact contracts (a schema, a
 public API, a message format), dispatch `the-foundry:qa` in **spec-check
@@ -255,9 +267,13 @@ commits only: pushing waits for the user.
 Package the whole branch:
 
 ```
-MB=$(git merge-base <default branch> HEAD)
-{ git log --oneline $MB..HEAD; git diff --stat $MB HEAD; git diff -U10 $MB HEAD; } > <work dir>/branch-diff.txt
+MB=$(git merge-base <default branch> HEAD) && [ -n "$MB" ] || { echo "no merge-base with <default branch>" >&2; exit 2; }
+{ git log --oneline "$MB..HEAD"; git diff --stat "$MB" HEAD; git diff -U10 "$MB" HEAD; } > <work dir>/branch-diff.txt
 ```
+
+Run both lines in the same Bash call: `MB` doesn't carry to the next one, and
+an empty `MB` would package the wrong diff without an error. The first line
+stops with a message when there's no merge-base.
 
 Then dispatch `the-foundry:qa` with the
 package, the design section, the plan, and the build log's parked items to

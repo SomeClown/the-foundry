@@ -137,14 +137,39 @@ class AgentFilesTest(unittest.TestCase):
         for banned in ("mcp__Claude_Browser__form_input", "mcp__Claude_Browser__javascript_tool"):
             self.assertNotIn(banned, tools)
 
-    def test_an_agent_told_to_load_a_skill_holds_the_skill_tool(self):
-        # frontend was told to load a project skill without holding `Skill`.
+    SKILL_WORDS = re.compile(
+        r"\b(?:load|loads|loading|loaded|use|uses|using|invoke|invokes)\b[^.]{0,80}\bskills?\b"
+        r"|\bskills?\b[^.]{0,80}\b(?:load|loaded|loading|use|used|using|invoke|invoked)\b"
+        r"|`Skill`|\bSkill tool\b",
+        re.I,
+    )
+
+    def test_an_agent_that_mentions_loading_or_using_a_skill_holds_the_skill_tool(self):
+        # frontend was told to load a project skill without holding `Skill`. Any agent whose body
+        # talks about loading or using a skill, or names the Skill tool, must hold it.
+        triggered = set()
         for name, fm in agents().items():
             body = " ".join((AGENTS / f"{name}.md").read_text(encoding="utf-8").split("---", 2)[2].split())
-            if re.search(r"\bload\b[^.]{0,80}\bskill|\bskills?\b[^.]{0,80}\bload\b", body, re.I):
+            if self.SKILL_WORDS.search(body):
+                triggered.add(name)
                 with self.subTest(agent=name):
-                    self.assertIn("Skill", fm["tools"], "its instructions load a skill, but it has no Skill tool")
+                    self.assertIn("Skill", fm["tools"], "its instructions load or use a skill, but it has no Skill tool")
+        # Not vacuous: the two agents known to load skills are among those found.
+        self.assertTrue({"frontend", "uiux"} <= triggered, triggered)
 
+    def test_frontend_and_uiux_hold_the_skill_tool_by_name(self):
+        # Whatever their wording says, these two load skills (a project's theme skill; the design skills).
+        for name in ("frontend", "uiux"):
+            with self.subTest(agent=name):
+                self.assertIn("Skill", agents()[name]["tools"])
+
+    def test_an_agent_holding_the_skill_tool_says_which_skills_it_loads(self):
+        # Holding Skill is only safe with a limit on which skills (they hold Bash and Write).
+        for name, fm in agents().items():
+            if "Skill" in fm["tools"]:
+                body = " ".join((AGENTS / f"{name}.md").read_text(encoding="utf-8").split("---", 2)[2].split())
+                with self.subTest(agent=name):
+                    self.assertRegex(body, r"(?i)never (?:load )?the Foundry's own `brainstorm`, `debug`, `run-plan`, or `ship`")
 
     def test_file_reader_holds_exactly_read(self):
         reader = agents()["file-reader"]
@@ -307,7 +332,7 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         "call it the suspect",
         "as commands of their own, not inside a loop or alongside other runs",
         "python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y",
-        r"2>&1 | grep -E '^(test_y \(tests\.test_x\.XTest(\.test_y)?\)|(FAIL|ERROR): test_y \(tests\.test_x\.XTest(\.test_y)?\)|Ran [0-9]+ test)'",
+        r"2>&1 | grep -E '^(test_y \(tests\.test_x\.XTest(\.test_y)?\)|(FAIL|ERROR): test_y \(tests\.test_x\.XTest(\.test_y)?\)|ERROR: setUp(Class|Module) \(tests\.test_x(\.XTest)?\)|Ran [0-9]+ test)'",
         "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'",
         "take the order from a failing run instead",
         # Step 1: where the seed comes from, and how to list that run's order.
@@ -321,7 +346,9 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         "a `FAIL:` or `ERROR:` line for the victim: it failed",
         "(a failing subtest adds a suffix after the id, and a test that prints while it runs can hide its verdict on its own line, so only these lines count)",
         "the victim's own line and the `Ran` line, and no such header: it didn't fail",
-        "no victim line: the id or class didn't match, so fix it before you trust the run",
+        "So is an `ERROR: setUpClass` or `ERROR: setUpModule` line naming the victim's class or module",
+        "the victim never ran because its setup failed",
+        "no victim line, and no `setUpClass` or `setUpModule` line either: the id or class didn't match, so fix it before you trust the run",
         "no `Ran` line: the run stopped before it finished, so there's no result",
         # Steps 4 and 5: the halving may end on one test id.
         "Repeat until one file is left (one test id, if the candidates were ids from a random-order run).",
@@ -400,6 +427,144 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         self.assertLess(start, text.index("--randomly-seed=$i"))
         self.assertLess(text.index("--randomly-seed=$i"), end)
         self.assertLess(text.index("pytest -q -rA 2>&1 | grep"), text.index("--randomly-seed=$i"))
+
+
+class Batch2PinsTest(unittest.TestCase):
+    """Sentences the qa pass found nothing pinning: each was restored to its old text in a scratch
+    copy and the suite stayed green. Short phrases, read with whitespace folded, so a re-wrap passes."""
+
+    def text(self, *parts):
+        return " ".join((ROOT.joinpath(*parts)).read_text(encoding="utf-8").split())
+
+    def body(self, agent):
+        raw = (AGENTS / f"{agent}.md").read_text(encoding="utf-8")
+        return " ".join(raw.split("---", 2)[2].split())
+
+    def after(self, text, heading):
+        self.assertIn(heading, text)
+        return text[text.index(heading):]
+
+    # uiux: the fallback, in all three places, and no "not optional".
+    def test_uiux_falls_back_to_its_own_design_knowledge_in_all_three_places(self):
+        body = self.body("uiux")
+        load = body[body.index("## Load Your Skills First"): body.index("## Orient First")]
+        self.assertIn("If it isn't, say so in your report and work from your own design knowledge", load)
+        self.assertIn("Load `frontend-design:frontend-design` first when it's installed (see Load Your Skills First), then produce a **direction brief**", body)
+        dataviz = self.after(body, "## Data Visualization")
+        self.assertIn("load the `dataviz` skill first when it's installed", dataviz)
+        self.assertIn("Without it, work those out from your own design knowledge", dataviz)
+
+    def test_uiux_has_no_not_optional(self):
+        self.assertNotIn("not optional", self.body("uiux").lower())
+
+    # devops: stops before what it can't undo; the report has a slot for it.
+    def test_devops_stops_before_a_command_it_cant_undo_and_goes_on_only_on_a_yes(self):
+        body = self.body("devops")
+        self.assertIn("or any command you can't undo", body)
+        self.assertIn("then stop and report; go on only when you're resumed with the user's yes", body)
+
+    def test_devops_report_list_has_the_stopped_waiting_for_a_yes_slot(self):
+        report = self.after(self.body("devops"), "What to Report Back")
+        self.assertIn("If you stopped before a command you can't undo: the exact command, what it will do, and that you're waiting for the user's yes", report)
+
+    # test-engineer: may write its report file, doesn't stash or revert, reports "not seen failing".
+    def test_test_engineer_may_write_the_report_file_its_brief_names(self):
+        self.assertIn("a report file the brief names", front_matter(AGENTS / "test-engineer.md")["description"])
+        self.assertIn("You modify only test files, test configuration, and any report file your brief names", self.body("test-engineer"))
+
+    def test_test_engineer_does_not_stash_or_revert_a_fix_already_in_the_tree(self):
+        self.assertIn("if the fix is already in the tree, don't stash or revert it to watch the test fail: say it wasn't seen failing",
+                      self.body("test-engineer"))
+
+    def test_test_engineer_report_list_has_the_not_seen_failing_slot(self):
+        report = self.after(self.body("test-engineer"), "What to Report Back")
+        self.assertIn("A regression test whose fix was already in the tree: say it wasn't seen failing", report)
+
+    # README: bug-fix order; test-engineer cell and rule agree with the agent; investigate is the orchestrator's.
+    def test_readme_bug_fix_order_is_pin_then_fix(self):
+        self.assertIn("**Bug fix:** `debug` finds the cause and pins it with a failing test, then `implement` fixes it.",
+                      self.text("README.md"))
+
+    def test_readme_test_engineer_cell_and_rule_agree_with_the_agent_file(self):
+        readme = self.text("README.md")
+        row = next(r for r in readme.split("| `") if r.startswith("test-engineer`"))
+        self.assertIn("Yes (tests, and a report file the brief names)", row)
+        self.assertIn("test-engineer touches only tests (and a report file its brief names)", readme)
+        # The agent file says the same thing, in its description and its body.
+        self.assertIn("report file", front_matter(AGENTS / "test-engineer.md")["description"])
+        self.assertIn("report file your brief names", self.body("test-engineer"))
+
+    def test_readme_describes_the_investigate_rule_as_the_orchestrators(self):
+        readme = self.text("README.md")
+        heading = "Division-of-labor rules the agents enforce on themselves:"
+        selfenforced = readme[readme.index(heading): readme.index("One rule is the orchestrator's")]
+        self.assertNotIn("runs alone", selfenforced)
+        self.assertIn("One rule is the orchestrator's, since only it can see both sides: `investigate` runs alone, scoped or full, and nothing else that starts agents runs alongside it.", readme)
+
+    # run-plan.
+    def run_plan(self):
+        return self.text("skills", "run-plan", "SKILL.md")
+
+    def test_run_plan_keeps_no_base_shell_variable(self):
+        text = (SKILLS / "run-plan" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertNotRegex(text, r"\bBASE\b")
+        self.assertNotRegex(text, r"\$\{?BASE")
+
+    def test_run_plan_setup_copies_the_gate_and_its_expected_failures_into_the_rules_file(self):
+        text = self.run_plan()
+        self.assertIn("`<work dir>/rules.md`, then the gate from step 4 with any failures it's expected to show, marked as not this task's to fix", text)
+        self.assertIn("this file is the only place a builder sees the gate", text)
+
+    def test_run_plan_step_5_hands_test_engineer_the_testing_strategy_by_heading(self):
+        self.assertIn("the rules file, and the plan's Testing Strategy section by heading", self.run_plan())
+
+    def test_run_plan_builder_contract_says_not_to_load_the_foundrys_skills(self):
+        self.assertIn("don't load the Foundry's own skills", self.run_plan())
+
+    def test_run_plan_qa_pass_guards_an_empty_merge_base_in_one_bash_call(self):
+        text = self.run_plan()
+        self.assertIn('MB=$(git merge-base <default branch> HEAD) && [ -n "$MB" ] || { echo "no merge-base with <default branch>" >&2; exit 2; }', text)
+        self.assertIn('git diff --stat "$MB" HEAD', text)
+        self.assertIn("Run both lines in the same Bash call: `MB` doesn't carry to the next one", text)
+
+    def test_run_plan_step_4_checks_head_against_the_noted_sha_and_packages_against_a_literal(self):
+        text = self.run_plan()
+        self.assertIn("check that `git rev-parse --short HEAD` is the sha noted at step 1", text)
+        self.assertIn("a builder committed against its contract", text)
+        self.assertIn("written into the command as a literal", text)
+        self.assertIn("git diff --cached --stat abc1234; git diff --cached -U10 abc1234", text)
+
+    # frontend and uiux never load the Foundry's own skills.
+    def test_frontend_and_uiux_never_load_the_foundrys_own_skills(self):
+        for agent in ("frontend", "uiux"):
+            with self.subTest(agent=agent):
+                self.assertRegex(self.body(agent), r"(?i)never (?:load )?the Foundry's own `brainstorm`, `debug`, `run-plan`, or `ship`")
+                self.assertIn("belong to the orchestrating session", self.body(agent))
+
+    # Every flagged eval command carries --ablation none.
+    @staticmethod
+    def eval_commands(text):
+        """Each command that starts at `plugin` + ` eval .` and carries flags, joined across
+        backslash continuations and cut at the closing backtick of an inline code span."""
+        found = []
+        for m in re.finditer(r"claude plugin eval \.", text):
+            rest = text[m.start():]
+            command = re.split(r"`|\n(?<!\\\n)", rest.replace("\\\n", " "), maxsplit=1)[0]
+            if " --" in command:
+                found.append(command)
+        return found
+
+    def test_every_eval_command_in_the_docs_carries_ablation_none(self):
+        for name, at_least in (("evals/README.md", 4), ("CONTRIBUTING.md", 1)):
+            with self.subTest(doc=name):
+                commands = self.eval_commands((ROOT / name).read_text(encoding="utf-8"))
+                self.assertGreaterEqual(len(commands), at_least, commands)
+                for command in commands:
+                    self.assertIn("--ablation none", command)
+
+    # The walkthrough's rules-file line.
+    def test_walkthrough_rules_file_line_mentions_the_gate(self):
+        self.assertIn("copies the plan's rules and its gate into a `rules.md`", self.text("docs", "walkthrough.md"))
 
 
 class RetroTest(unittest.TestCase):

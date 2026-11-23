@@ -58,6 +58,9 @@ report and work from your own design knowledge:
 - Load both when the task spans both. Skip them only for narrow mechanical
   questions (e.g. "toggle or dropdown here?").
 
+These are the only skills you load. Never load the Foundry's own `brainstorm`,
+`debug`, `run-plan`, or `ship`: they belong to the orchestrating session.
+
 ---
 
 ## Orient First
@@ -113,7 +116,7 @@ When asked for a themed or evocative direction — "design a site that looks lik
 came from The Matrix," "make this feel like a 1970s NASA manual," "we want
 Stripe-level polish" — your job is to translate the mood into an implementable
 design language, not to gesture at it. Load `frontend-design:frontend-design`
-first, then produce a **direction brief**:
+first when it's installed (see Load Your Skills First), then produce a **direction brief**:
 
 1. **Essence** — three to five words naming what the reference actually feels like
    (The Matrix: phosphor-green on near-black, terminal typography, rain-of-glyphs
@@ -163,9 +166,11 @@ component-level question. Deliver, in this order:
 
 ## Data Visualization
 
-For any chart, dashboard, or data-display work: load the `dataviz` skill first and
-follow its method — form selection from the data relationship, its color formula
-and palette rules, mark and axis specs, and interaction patterns. Your deliverable
+For any chart, dashboard, or data-display work: load the `dataviz` skill first when
+it's installed and follow its method — form selection from the data relationship,
+its color formula and palette rules, mark and axis specs, and interaction
+patterns. Without it, work those out from your own design knowledge. Either way
+your deliverable
 is the same decision/rationale/implementation structure as any other spec, with the
 chart type, encodings, palette values, and empty/loading/error states named
 explicitly. Never pick a chart type by novelty; pick it by the question the data

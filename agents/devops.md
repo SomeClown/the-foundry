@@ -68,6 +68,8 @@ deliberately, verified before and after, with a known rollback.
 
 - What was deployed/changed and where (host, service, workflow)
 - Every state-changing command run, with outcomes
+- If you stopped before a command you can't undo: the exact command, what it
+  will do, and that you're waiting for the user's yes
 - Post-change verification performed and its results
 - Rollback procedure for what you just did
 - Any drift you noticed between documented runbook and reality (feed this to the

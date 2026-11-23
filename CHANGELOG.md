@@ -7,6 +7,29 @@ All notable changes to The Foundry. Format loosely follows
 ## [Unreleased]
 
 ### Fixed
+- Sentences an earlier round left behind, now matching the text next to
+  them: `test-engineer`'s description, the README's agents table and its
+  "touches only tests" bullet now allow the report file its body already
+  allows; `uiux`'s direction-brief and dataviz sections now fall back to its
+  own design knowledge when a skill isn't installed, as its skills section
+  does; `devops` and `test-engineer` each have a report line for what their
+  bodies tell them to say (stopped before a command it can't undo; a
+  regression test not seen failing); the README's "rules the agents enforce
+  on themselves" list no longer holds the orchestrator's `investigate` rule.
+- `frontend` and `uiux` hold the `Skill` tool with no limit on which skills.
+  Each now says it loads only a project's design skill (frontend) or its two
+  design skills (uiux), never the Foundry's own `brainstorm`, `debug`,
+  `run-plan`, or `ship`, and run-plan's builder report contract says the same.
+- run-plan's qa-pass command left `MB` empty if a session ran its two lines in
+  separate Bash calls, packaging the wrong diff with no error. It now stops
+  with a message when there's no merge-base, and says to run both in one call.
+  Step 4 never checked that `HEAD` was still the sha noted at step 1, so a
+  builder that committed left its work out of the task's package. It now
+  packages against the noted sha, written in as a literal.
+- debug's unittest check read a victim whose `setUpClass` or `setUpModule`
+  failed as "the id didn't match", since the victim never gets a line. The
+  grep now shows that `ERROR: setUpClass` or `setUpModule` line, and the
+  reading says the victim failed.
 - `frontend` was told to load a project's theme or design-system skill but
   had no `Skill` tool. It has one now, and a structural test fails any agent
   whose instructions load a skill without it.

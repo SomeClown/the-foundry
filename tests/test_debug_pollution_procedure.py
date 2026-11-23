@@ -61,7 +61,8 @@ PYTEST_PYTHON = find_pytest_python()
 NO_PYTEST = "no interpreter with pytest: set FOUNDRY_PYTEST_PYTHON to one"
 
 UNITTEST_ID = r"test_y \(tests\.test_x\.XTest(\.test_y)?\)"
-UNITTEST_REGEX = rf"^({UNITTEST_ID}|(FAIL|ERROR): {UNITTEST_ID}|Ran [0-9]+ test)"
+UNITTEST_SETUP = r"ERROR: setUp(Class|Module) \(tests\.test_x(\.XTest)?\)"
+UNITTEST_REGEX = rf"^({UNITTEST_ID}|(FAIL|ERROR): {UNITTEST_ID}|{UNITTEST_SETUP}|Ran [0-9]+ test)"
 UNITTEST_GREP = f" | grep -E '{UNITTEST_REGEX}'"
 
 FAILED, DIDNT_FAIL, NO_MATCH, NO_RESULT = "failed", "didn't fail", "didn't match", "no result"
@@ -70,9 +71,10 @@ FAILED, DIDNT_FAIL, NO_MATCH, NO_RESULT = "failed", "didn't fail", "didn't match
 def read_unittest_output(lines):
     """Step 3's four readings of the unittest grep's output, and nothing smarter.
 
-    A `FAIL:` or `ERROR:` line for the victim: it failed. No `Ran` line: the run stopped, no
-    result. No victim line: the id or class didn't match. The victim's line and `Ran`, no header:
-    it didn't fail. (The grep only lets the victim's own lines through, so any line that is not a
+    A `FAIL:` or `ERROR:` line for the victim, or an `ERROR: setUpClass` / `setUpModule` line
+    naming its class or module: it failed. No `Ran` line: the run stopped, no result. No victim
+    line (and no setUp line): the id or class didn't match. The victim's line and `Ran`, no
+    header: it didn't fail. (The grep only lets the victim's own lines through, so any line that is not a
     header or the `Ran` line is the victim's.)
     """
     if any(l.startswith(("FAIL: ", "ERROR: ")) for l in lines):
@@ -332,7 +334,13 @@ class CannedOutputTest(unittest.TestCase):
         sections = []
         for name, where in decoys:
             sections += ["=" * 70, f"FAIL: {name} ({where})", "-" * 70, "Traceback (most recent call last):"]
-        sections += ["=" * 70, "ERROR: setUpClass (tests.test_x.XTest)", "-" * 70]
+        # Setup and teardown headers that are not the victim's own class or module.
+        for header in ("ERROR: setUpClass (tests.test_x.OtherTest)", "ERROR: setUpClass (tests.test_x2.XTest)",
+                       "ERROR: setUpClass (tests.other.XTest)", "ERROR: setUpClass (tests.test_x.XTestMore)",
+                       "ERROR: setUpModule (tests.test_x2)", "ERROR: setUpModule (tests.test_w)",
+                       "ERROR: tearDownClass (tests.test_x.XTest)", "ERROR: tearDownModule (tests.test_x)",
+                       "ERROR: setUpClass (tests.test_x.XTest.test_y)", " ERROR: setUpClass (tests.test_x.XTest)"):
+            sections += ["=" * 70, header, "-" * 70]
         for header in headers:
             sections += ["=" * 70, header, "-" * 70, "Traceback (most recent call last):", "AssertionError: x"]
         return "\n".join(body + [""] + sections + ["", "-" * 70, self.RAN, "", "FAILED (failures=7)", ""])
@@ -378,6 +386,27 @@ class CannedOutputTest(unittest.TestCase):
             self.check(fmt, [f"test_y ({ident}) ... "],
                        [f"FAIL: test_y ({ident}) (i=0)", f"FAIL: test_y ({ident}) (i=1)"], FAILED)
 
+    def test_a_failing_setUpClass_or_setUpModule_of_the_victim_reads_failed(self):
+        # The header names the class or module, and the victim never gets a line.
+        for fmt in self.FORMATS:
+            for header in ("ERROR: setUpClass (tests.test_x.XTest)", "ERROR: setUpModule (tests.test_x)"):
+                self.check(fmt, [], [header], FAILED, [header, self.RAN])
+                self.check(fmt, [], [header], FAILED, [header, self.RAN])
+
+    def test_a_failing_setUpClass_with_no_ran_line_reads_failed_not_no_result(self):
+        # A header for the victim settles it even if the run was cut off afterwards.
+        text = "ERROR: setUpClass (tests.test_x.XTest)\n"
+        for shell in available_shells():
+            with self.subTest(shell=shell):
+                out = run_in(SHELLS[shell], grep_part(step3_commands()[1]), stdin=text)
+                self.assertEqual(read_unittest_output(out), FAILED, out)
+
+    def test_tearDownClass_and_tearDownModule_headers_do_not_change_the_victims_reading(self):
+        # The victim passed; the class's teardown failing afterwards is not its failure.
+        for fmt, ident in self.FORMATS.items():
+            line = f"test_y ({ident}) ... ok"
+            self.check(fmt, [line], [], DIDNT_FAIL, [line, self.RAN])
+
     def test_no_victim_line_reads_didnt_match(self):
         for fmt in self.FORMATS:
             self.check(fmt, [], [], NO_MATCH, [self.RAN])
@@ -410,7 +439,7 @@ class UnittestLineRealRunTest(unittest.TestCase):
     HALF = "tests.test_b tests.test_w tests.test_x.XTest.test_y_other tests.test_x.OtherTest"
     DOCS = [None, "Checks the total.", "Checks a ... b.",
             "Checks the total.\n\n        Second paragraph, more detail.\n        "]
-    DECOY_NAMES = ("test_y_other", "OtherTest", "test_w", "test_b")
+    DECOY_NAMES = ("test_y_other", "OtherTest", "test_w", "test_b", "test_v")
 
     @classmethod
     def setUpClass(cls):
@@ -592,15 +621,72 @@ class UnittestLineRealRunTest(unittest.TestCase):
                 out = self.run_line(python, shell)
                 self.assertEqual(read_unittest_output(out), DIDNT_FAIL, out)
 
-    def test_a_failing_setUpClass_reads_didnt_match_because_the_victim_never_ran(self):
-        # unittest's header names the class (`ERROR: setUpClass (tests.test_x.XTest)`) and the
-        # victim has no line, so the readings say "the id or class didn't match". The victim did
-        # not pass; this pins the reading as it stands (see the report: the text misdirects here).
+    def test_a_failing_setUpClass_reads_failed(self):
+        # unittest's header names the class and the victim has no line; both Pythons.
         self.write_victim("pass", in_class=["@classmethod", "def setUpClass(cls):", "    raise RuntimeError('class')"])
-        self.assert_reading(NO_MATCH)
+        # A half without the victim's class (the default half runs one of its methods, which would
+        # set the class up a second time and show a second header).
+        self.assert_reading(FAILED, headers=1, half="tests.test_b")
 
-    def test_a_failing_setUpModule_reads_didnt_match_because_the_victim_never_ran(self):
+    def test_a_failing_setUpModule_reads_failed(self):
         self.write_victim("pass", before_class=["", "def setUpModule():", "    raise RuntimeError('module')"])
+        self.assert_reading(FAILED, headers=1)
+
+    def test_a_setUpClass_inherited_from_a_base_class_reads_failed(self):
+        # The header names the victim's class, not the base class, so the grep sees it.
+        (Path(self.tmp) / "tests" / "base.py").write_text(
+            "import unittest\n\n\nclass Base(unittest.TestCase):\n    @classmethod\n"
+            "    def setUpClass(cls):\n        raise RuntimeError('base')\n", encoding="utf-8")
+        self.addCleanup((Path(self.tmp) / "tests" / "base.py").unlink)
+        (Path(self.tmp) / "tests" / "test_x.py").write_text(
+            "import unittest\nfrom tests.base import Base\n\n\nclass XTest(Base):\n    def test_y(self):\n"
+            "        pass\n", encoding="utf-8")
+        self.assert_reading(FAILED, headers=1, half="")
+
+    def test_a_failing_setUpClass_in_a_decoy_class_is_not_the_victims(self):
+        source = self.victim_source("pass").replace(
+            "class OtherTest(unittest.TestCase):",
+            "class OtherTest(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n"
+            "        raise RuntimeError('decoy')\n")
+        (Path(self.tmp) / "tests" / "test_x.py").write_text(source, encoding="utf-8")
+        self.assertIn("setUpClass", source)
+        self.assert_reading(DIDNT_FAIL)
+
+    def test_failing_setUpClass_and_setUpModule_in_another_module_are_not_the_victims(self):
+        self.write_victim("pass")
+        for body in ("import unittest\n\n\ndef setUpModule():\n    raise RuntimeError('decoy')\n\n\n"
+                     "class XTest(unittest.TestCase):\n    def test_y(self):\n        pass\n",
+                     "import unittest\n\n\nclass XTest(unittest.TestCase):\n    @classmethod\n"
+                     "    def setUpClass(cls):\n        raise RuntimeError('decoy')\n    def test_y(self):\n"
+                     "        pass\n"):
+            path = Path(self.tmp) / "tests" / "test_v.py"
+            path.write_text(body, encoding="utf-8")
+            with self.subTest(body=body.splitlines()[2]):
+                self.assert_reading(DIDNT_FAIL, half=self.HALF + " tests.test_v")
+            path.unlink()
+
+    def test_a_failing_tearDownClass_or_tearDownModule_reads_didnt_fail(self):
+        # Odd corner, pinned as it stands: the victim passed, and only its class's teardown failed.
+        self.write_victim("pass", in_class=["@classmethod", "def tearDownClass(cls):", "    raise RuntimeError('t')"])
+        self.assert_reading(DIDNT_FAIL)
+        self.write_victim("pass", before_class=["", "def tearDownModule():", "    raise RuntimeError('t')"])
+        self.assert_reading(DIDNT_FAIL)
+
+    def test_a_module_that_fails_to_import_reads_didnt_match(self):
+        # Odd corner, pinned as it stands: unittest reports `_FailedTest` under the module's last
+        # name, so there is no victim line and "didn't match, fix it" is what the text says. The
+        # module is the thing to fix, which the reading does send the reader to look at.
+        (Path(self.tmp) / "tests" / "test_x.py").write_text("import no_such_module_anywhere\n", encoding="utf-8")
+        self.assert_reading(NO_MATCH, headers=0)
+
+    def test_a_module_with_a_syntax_error_reads_no_result(self):
+        (Path(self.tmp) / "tests" / "test_x.py").write_text("def (:\n", encoding="utf-8")
+        self.assert_reading(NO_RESULT)
+
+    def test_a_setUpClass_that_skips_reads_didnt_match(self):
+        # Odd corner, pinned as it stands: a SkipTest in setUpClass leaves no victim line, no header
+        # and `Ran 0 tests`, so it reads like a wrong id, where a skipped test reads "didn't fail".
+        self.write_victim("pass", in_class=["@classmethod", "def setUpClass(cls):", "    raise unittest.SkipTest('s')"])
         self.assert_reading(NO_MATCH)
 
 
@@ -727,7 +813,9 @@ class PinMutationTest(unittest.TestCase):
             "lists that order)": "lists the order)",
             "line for the victim: it failed": "line for the victim: it didn't fail",
             "and no such header: it didn't fail": "and no such header: it failed",
-            "no victim line: the id or class didn't match": "no victim line: the victim passed",
+            "no victim line, and no `setUpClass` or `setUpModule` line either: the id or class didn't match":
+                "no victim line: the victim passed",
+            "the victim never ran because its setup failed": "the victim passed but its setup failed",
             "so there's no result": "so it passed",
             "so only these lines count": "so any line counts",
             "nothing to open: go to step 6": "nothing to open: go to step 5",
@@ -837,6 +925,27 @@ class PinMutationTest(unittest.TestCase):
         self.assertCaught(self.tech, lambda t: t.replace(
             rf"|(FAIL|ERROR): {UNITTEST_ID}", "", 1))
 
+    def test_dropping_the_setup_alternative_is_caught(self):
+        self.assertCaught(self.tech, lambda t: t.replace("|" + UNITTEST_SETUP, "", 1))
+
+    def test_dropping_class_or_module_from_the_setup_alternative_is_caught(self):
+        for old, new in (("setUp(Class|Module)", "setUpClass"), ("setUp(Class|Module)", "setUpModule")):
+            with self.subTest(keep=new):
+                self.assertCaught(self.tech, lambda t: t.replace(old, new, 1))
+
+    def test_dropping_the_module_name_from_the_setup_alternative_is_caught(self):
+        # Without tests.test_x, any module's setUp failure would read as the victim's.
+        self.assertCaught(self.tech, lambda t: t.replace(r"setUp(Class|Module) \(tests\.test_x(\.XTest)?\)", r"setUp(Class|Module) \(tests", 1))
+
+    def test_dropping_the_optional_class_from_the_setup_alternative_is_caught(self):
+        # Without (\.XTest)? a setUpClass line never matches; without the group's ? setUpModule never does.
+        self.assertCaught(self.tech, lambda t: t.replace(r"test_x(\.XTest)?\)|Ran", r"test_x\.XTest\)|Ran", 1))
+        self.assertCaught(self.tech, lambda t: t.replace(r"test_x(\.XTest)?\)|Ran", r"test_x\)|Ran", 1))
+
+    def test_dropping_the_setup_alternatives_closing_paren_is_caught(self):
+        # Without it XTest would also match XTestMore.
+        self.assertCaught(self.tech, lambda t: t.replace(r"test_x(\.XTest)?\)|Ran", r"test_x(\.XTest)?|Ran", 1))
+
     def test_dropping_error_from_the_header_alternative_is_caught(self):
         self.assertCaught(self.tech, lambda t: t.replace("(FAIL|ERROR): ", "FAIL: ", 1))
 
@@ -925,8 +1034,10 @@ class PinMutationTest(unittest.TestCase):
     def test_deleting_each_of_the_four_readings_is_caught(self):
         readings = [
             "a `FAIL:` or `ERROR:` line for the victim: it failed",
+            "So is an `ERROR: setUpClass` or `ERROR: setUpModule` line naming the victim's class or module",
+            "the victim never ran because its setup failed",
             "the victim's own line and the `Ran` line, and no such header: it didn't fail",
-            "no victim line: the id or class didn't match, so fix it before you trust the run",
+            "no victim line, and no `setUpClass` or `setUpModule` line either: the id or class didn't match, so fix it before you trust the run",
             "no `Ran` line: the run stopped before it finished, so there's no result",
         ]
         for reading in readings:
@@ -939,7 +1050,7 @@ class PinMutationTest(unittest.TestCase):
 
     def test_swapping_two_readings_is_caught(self):
         def swap(t):
-            t = flat_sub(t, "line for the victim: it failed", "@@A")
+            t = flat_sub(t, "line for the victim: it failed (", "@@A (")
             t = flat_sub(t, "and no such header: it didn't fail", "line for the victim: it failed")
             return flat_sub(t, "@@A", "and no such header: it didn't fail")
         self.assertCaught(self.tech, swap)

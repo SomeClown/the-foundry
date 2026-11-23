@@ -68,7 +68,7 @@ Design principles that came out of that experience:
 | `uiux` | Design advisor — aesthetic/creative direction, visual critique in a browser, dataviz, greenfield design systems | No | opus |
 | `implement` | General implementer — backend, business logic, APIs, data models | Yes (app code) | sonnet |
 | `frontend` | Front-end implementer — templates, components, CSS, client JS; verifies visually in a browser | Yes (UI code) | sonnet |
-| `test-engineer` | Writes and runs tests; bootstraps a suite where none exists | Yes (tests only) | sonnet |
+| `test-engineer` | Writes and runs tests; bootstraps a suite where none exists | Yes (tests, and a report file the brief names) | sonnet |
 | `qa` | Independent review — security, logic bugs, quality; ranked findings; runs builds/tests to verify | No | opus |
 | `devops` | Build, CI/CD, migrations, deploys, service config; treats production as hot | Yes (config/infra) | sonnet |
 | `docs` | Keeps CLAUDE.md / README / runbooks truthful after changes land | Yes (docs only) | sonnet |
@@ -147,9 +147,7 @@ brainstorm → investigate → architect → run-plan: [ implement / frontend (u
 Division-of-labor rules the agents enforce on themselves:
 
 - Read-only agents (investigate, file-reader, architect, uiux, qa) never write files.
-- `investigate` runs alone, scoped or full: nothing else that starts agents
-  runs alongside it (the orchestrator's rule, since only it can see both).
-- test-engineer touches only tests; docs only documentation; devops only
+- test-engineer touches only tests (and a report file its brief names); docs only documentation; devops only
   config/infra. Application-code fixes always route back through
   implement/frontend.
 - qa findings go to the orchestrator, which decides what implement fixes —
@@ -157,6 +155,10 @@ Division-of-labor rules the agents enforce on themselves:
   The orchestrator. That's the whole org chart.)
 - Project-specific implementers can exist per-repo (in that project's
   `.claude/agents/`) and take precedence over the generic ones for their niche.
+
+One rule is the orchestrator's, since only it can see both sides: `investigate`
+runs alone, scoped or full, and nothing else that starts agents runs alongside
+it.
 
 Want to see the whole thing run end to end? There's a
 [worked example](docs/walkthrough.md) tracing one real-shaped feature through

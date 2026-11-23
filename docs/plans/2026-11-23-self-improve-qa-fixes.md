@@ -35,6 +35,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 
 ### Progress
 - Batch 1: complete (from eb3cc78; gate: Ran 612, OK on python3 3.14.7 (1 skip, the seeded-loop run test, no pytest-randomly) and on /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: 2 bugs in the first unittest line fixed in round 1, the line replaced by one grep in round 2 on a ruling; 2 of 3 rounds used)
+- Batch 2: complete (from d357f25; gate: Ran 695, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: no bugs, no fix rounds; every fix qa found unpinned now has a pin with a mutation that proves it)
 
 ### Decisions made during the build
 
@@ -42,9 +43,12 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Ruling (before Batch 1): no architect pass. The batches are qa findings with file and line, and the retro's open choices went to the owner as five questions. If wrong: a batch turns out bigger than one dispatch and gets split.
 - Ruling (Batch 1): both adversarial failures are real bugs, not misread tests. The brief says the line reads the victim's own result; a victim that writes to stderr (`... noise`, verdict on the next line) and a failing subTest (a bare `... `) both come out with no verdict, which step 4 can take for "didn't fail". If wrong: one fix round spent on cases nobody hits.
 - Ruling (Batch 1, after fix round 1): the 600-character awk line is correct but not something a session can adapt by hand or a reader can check, and it decides the verdict out of sight. Replace it with one grep that shows three things (the victim's own line, a `FAIL:` or `ERROR:` header for the victim, the `Ran N tests` footer) and let the prose say how to read them. If wrong: the session misreads three lines where one would have done; the tests run the grep against real runs either way.
+- Ruling (Batch 2): item 8 (the setup-failure reading) was carried from Batch 1 into this batch's brief instead of spending Batch 1's third fix round on it. Same file, one alternative in the grep. If wrong: nothing; it landed here.
 
 ### Parked
 
+- Batch 2: odd corners of the unittest readings, pinned as they stand: a `tearDownClass` failure after a passing victim reads "didn't fail"; a module that won't import reads "didn't match"; a `SkipTest` raised in class or module setup reads "didn't match".
+- Batch 2 → Batch 3: `agents/frontend.md`'s new sentence is indented 2 spaces where the list item uses 3; the new test file and class are named after this run (`test_batch2_pin_mutations.py`, `Batch2PinsTest`) and want names a later reader understands.
 - Batch 1 → carried into Batch 2 (item 8): a failing `setUpClass` or `setUpModule` in the victim's class leaves only `Ran 0 tests`, which the readings call "didn't match, fix the id". The id is right and the victim never passed. Found by test-engineer in round 2, pinned as it stands.
 - Batch 1: a victim that prints its own `FAIL: test_y (...)` or `Ran 3 tests` line at the start of a line fools the grep. Left: it takes a test that prints unittest's own summary lines. Pinned as accepted.
 - Batch 1: a unittest victim that's an unexpected success, skipped, or an expected failure shows no failure header, so the four readings call it "didn't fail". Left: a pollution search's victim is a plain failing test, and the victim's own line still shows.

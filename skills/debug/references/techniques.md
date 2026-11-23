@@ -46,7 +46,7 @@ victim failed, so nothing gets run twice.
 
    ```
    pytest -q -p no:randomly -p no:cacheprovider -rA <half> tests/test_x.py::test_y 2>&1 | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'
-   python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y 2>&1 | grep -E '^(test_y \(tests\.test_x\.XTest(\.test_y)?\)|(FAIL|ERROR): test_y \(tests\.test_x\.XTest(\.test_y)?\)|Ran [0-9]+ test)'
+   python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y 2>&1 | grep -E '^(test_y \(tests\.test_x\.XTest(\.test_y)?\)|(FAIL|ERROR): test_y \(tests\.test_x\.XTest(\.test_y)?\)|ERROR: setUp(Class|Module) \(tests\.test_x(\.XTest)?\)|Ran [0-9]+ test)'
    ```
 
    `tests/test_x.py::test_y` and `tests.test_x.XTest.test_y` stand for the
@@ -57,10 +57,14 @@ victim failed, so nothing gets run twice.
    is how to read them:
    - a `FAIL:` or `ERROR:` line for the victim: it failed (a failing subtest
      adds a suffix after the id, and a test that prints while it runs can hide
-     its verdict on its own line, so only these lines count);
+     its verdict on its own line, so only these lines count). So is an
+     `ERROR: setUpClass` or `ERROR: setUpModule` line naming the victim's
+     class or module: the victim never ran because its setup failed, and
+     `Ran` may say 0 tests;
    - the victim's own line and the `Ran` line, and no such header: it didn't
      fail;
-   - no victim line: the id or class didn't match, so fix it before you trust
+   - no victim line, and no `setUpClass` or `setUpModule` line either: the id
+     or class didn't match, so fix it before you trust
      the run;
    - no `Ran` line: the run stopped before it finished, so there's no result.
 
