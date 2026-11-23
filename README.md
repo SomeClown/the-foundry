@@ -196,31 +196,24 @@ thing it leaves behind is the retro file, if your runs have written one:
 
 ### Manually (the artisanal method)
 
-If plugins aren't your thing, the agent files work fine copied straight into
-your user-level agents directory:
+If plugins aren't your thing, the files work fine placed by hand. Get a copy of
+[this repository](https://github.com/SomeClown/the-foundry) (GitHub's own clone
+or download button will do), then put the files in `agents/` into your
+user-level agents folder, `~/.claude/agents/`, and the folders in `skills/` into
+your user-level skills folder, `~/.claude/skills/`. Claude Code's own
+documentation says where user-level and project-level definitions live: see
+[subagents](https://code.claude.com/docs/en/sub-agents) for agents and
+[skills](https://code.claude.com/docs/en/skills) for skills.
 
-```bash
-git clone https://github.com/SomeClown/the-foundry.git
-mkdir -p ~/.claude/agents
-cp the-foundry/agents/*.md ~/.claude/agents/
-```
-
-The skills go in your user-level skills directory the same way:
-
-```bash
-mkdir -p ~/.claude/skills
-cp -R the-foundry/skills/* ~/.claude/skills/
-```
-
-Or put either into a single project's `.claude/` directory to scope them to that
-repo. New Claude Code sessions pick them up automatically — agent definitions
-load at session start, so restart any running session. Note that user-level
-`.claude/agents/` definitions override same-named plugin agents, which is a
+Either can go in a single project's `.claude/` folder instead, to scope them to
+that repo. New Claude Code sessions pick them up automatically; agent
+definitions load at session start, so restart any running session. Note that
+user-level agent definitions override same-named plugin agents, which is a
 feature: install the plugin, then shadow any agent you want to customize. In a
 manual install the bare name `file-reader` resolves to a project's own
-`.claude/agents/file-reader.md` first, if a trusted project has one, and
-`cp the-foundry/agents/*.md ~/.claude/agents/` overwrites an existing user agent
-of the same name.
+`.claude/agents/file-reader.md` first, if a trusted project has one. And
+putting an agent file into your user-level agents folder overwrites an existing
+user agent of the same name, so look before you drop.
 
 ### Optional: run them as an agent team
 

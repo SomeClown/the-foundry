@@ -4,6 +4,11 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+### Changed
+- The README's manual-install section now describes the steps in words and links to Claude Code's docs, because the directory's review read the old commands as a download-and-run.
+
 ## [2.2.0] — 2026-11-23
 
 A minor version, and a self-improvement pass: I had `qa` review the Foundry
