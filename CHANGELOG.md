@@ -91,6 +91,20 @@ All notable changes to The Foundry. Format loosely follows
   orchestrator's rule; it stops above 500 files so the session can ask; the
   `debug` skill's working file is in the list of what the plugin writes; and
   `tests/` is described as checking debug's polluter procedure too.
+- Nothing told the session to check a claim before building on it, and the
+  retro's first repeat showed it: a qa finding marked "by reading; not run"
+  became an eval prefix and docs that were wrong, and a design call of the
+  session's own lost a stopped run's later lines. Now `qa` puts a `Verified:`
+  line in each finding (`ran ...` or `by reading`); `run-plan`'s fix-batch
+  step takes a finding shown by running as it is, checks one shown only by
+  reading with the cheapest thing that could prove it wrong before a fix is
+  briefed, and parks one only a paid run could check, asking about it in the
+  final report with its cost; the build log says which of the three each
+  accepted finding was. Calls the session adds to the design mid-run get
+  `brainstorm`'s builder check before a builder is briefed (the user's own
+  answers don't), and the orchestrator notes say the same of the Foundry's own
+  findings. `evals/run-plan-decisions` has a new situation (h) and grader for
+  it.
 
 ### Added
 - A retro at the end of `run-plan` and `debug` (design §3). The session

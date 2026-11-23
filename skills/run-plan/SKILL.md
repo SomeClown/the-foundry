@@ -289,7 +289,22 @@ package and its own lens line.
 ### Fix batches
 
 You decide which findings get fixed; declining one deliberately is fine, as
-long as it goes in the build log with the reason. Group the accepted findings
+long as it goes in the build log with the reason.
+
+**Know how each finding was shown before you build on it.** qa's report says,
+on a `Verified:` line in each finding, whether it ran something or only read.
+A finding qa showed by running goes into a batch; it needs no second check.
+A finding shown only by reading gets the cheapest check that could prove it
+wrong, run by you before any fix is briefed: a command, a read of the code or
+of the tool's own help, or a read-only agent if it's bigger. If the check
+shows it's wrong, decline it with the reason. If only a paid run could check
+it (a real model session, a deploy), park it: no fix is built on it, it goes
+in the final report as a question with its cost, and the run carries on. A
+`Verified:` line that's missing counts as by reading. Each accepted finding's
+line in the build log says which it was: shown by running (by qa), checked by
+you (and how), or parked (needs a paid run, with the cost).
+
+Group the accepted findings
 by area into batches. Each batch is one builder dispatch, then its own
 adversarial round, then the gate, then a commit with its log line, exactly as
 a task. Findings that live only in test files go to test-engineer, folded into
@@ -413,7 +428,9 @@ One message:
 - the final gate's command and exit code, quoted
 - **Decisions I made**: every ruling from the build log, each with what it
   costs if it's wrong, so the user can check them
-- parked findings and declined qa findings, with reasons
+- parked findings and declined qa findings, with reasons; a finding parked
+  because only a paid run could check it goes in the questions below, with
+  its cost
 - the retro's line count, and any repeat it found, quoted
 - questions only the user can answer, numbered, with options and a
   recommendation
@@ -427,7 +444,11 @@ Only these stop the run:
 - **A fix cap was hit** (three rounds on one task or batch). Bring the failing
   tests, what was tried, and two or three ways forward with a recommendation.
 - **The plan is wrong in a way that changes what gets built**, and the design
-  doesn't settle it.
+  doesn't settle it. When the user's answers leave gaps and you fill them
+  with calls of your own, write those into the design as yours ("Calls I
+  made"), and give them `brainstorm`'s builder check (a cold read by a fresh
+  read-only agent) before any builder is briefed on them. The user's own
+  answers don't need it.
 - **Anything irreversible or outside the branch**: production, a migration on
   real data, deleting anything that isn't the run's scratch, a push, a merge,
   a tag, a release. The one write outside the branch that doesn't stop the run
@@ -468,7 +489,12 @@ Work dir: <path>
 - Task 3: <finding>, parked because <reason>.
 
 ### From the qa pass (fix batch 1)
-- ...
+- Finding 1 (MEDIUM): fix. Shown by running (by qa: the failing request).
+- Finding 2 (LOW): fix. Checked by me: read the helper's own docs; it does
+  reject an empty value.
+- Finding 3 (HIGH): parked. Only a paid model session could check it (about
+  $3); asked in the final report.
+- Finding 4 (LOW): declined. <reason>
 
 ### Retro
 - ...
@@ -522,4 +548,5 @@ Then:
 | "I'll paste the plan so the agent has context" | Brief path, rules path, cited sections. Not the plan. |
 | "test-engineer and implement can run together to save time" | One writer at a time. |
 | "That qa finding is wrong; I'll skip it" | Decline it in the build log, with the reason. |
+| "qa said so, so I'll brief the fix" | Look at its `Verified:` line. Only read? Check it first, or park it if only a paid run can. |
 | "I'll push so CI can check it" | Pushing waits for the user. |

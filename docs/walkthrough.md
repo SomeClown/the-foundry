@@ -234,7 +234,8 @@ The plan dropped something the design said, and it would have belonged to Task
 design disagree, the design wins. Then the ranked findings. One MEDIUM: the delete route fetched the
 blackout by ID without checking it belonged to the given season (an IDOR,
 minor here but free to fix). Two LOWs: the form accepts an end date before the
-start, and the blackout list isn't paginated. The session fixes the gap, the
+start, and the blackout list isn't paginated. Each finding carries a `Verified:` line, and the MEDIUM's
+says qa ran the request, so it needs no second check. The session fixes the gap, the
 MEDIUM, and the first LOW as fix batch 1, resuming the original `implement`
 (it knows the code), with its own adversarial round, gate, and commit. It
 declines the other LOW, on the record, because discovering a finding again in

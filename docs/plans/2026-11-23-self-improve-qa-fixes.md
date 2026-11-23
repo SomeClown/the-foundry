@@ -48,6 +48,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Batch 4: complete (from c629b21; gate: Ran 857, OK on both Pythons (1 and 5 skips), validates 0/0/0; the eval prefix removed and the docs corrected, who a retro line names, debug's Production paragraph; adversarial: no bugs, no fix rounds; one phrase sent back by me, the ban on a leading `cd`)
 - Re-run after Batch 4, on 8a73e2d: debug-production-report x 4: exit 0, $0.76, 105 s. 1.00 in all four runs; `asks-and-hands-over` PASS PASS PASS each time (12 of 12 votes, against 0 of 6 before the fix). Paid spend so far: $5.35 of the $15 cap.
 - The retro's first repeat (`run-plan [missed]`, twice) went to the owner through `brainstorm` on 2026-11-23. Owner decisions: 1A (an unchecked finding is checked in run-plan's fix-batch step), 2A (qa labels each finding as run or read), 3A (design calls the session adds mid-run get brainstorm's cold read before they're briefed), 4A (a finding only a paid run can check is parked and reported with its cost). Batch 5 builds it; the brief is `fix-5-brief.md` in the work dir, with the calls I made.
+- Batch 5: complete (from b57cd50; gate: Ran 928, OK on both Pythons (1 and 5 skips), validates 0/0/0; run-plan checks a read-only finding before building on it and parks one only a paid run can check, qa labels each finding, the session's own design calls get a cold read; adversarial: no bugs, no fix rounds; the new eval situation h hasn't been run)
 
 ### Decisions made during the build
 
@@ -64,6 +65,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 
 ### Parked
 
+- Batch 5, from the cold read, all left: the cold-read rule sits in section 5's "only these stop the run" list and could be read as a stop; "run by you" doesn't say the check leaves the tree untouched; "parked" now has two meanings in run-plan; a parked HIGH finding's question doesn't have to carry its severity; a read-only agent as a "cheapest check" costs something, and "paid run" has no threshold.
 - Batch 4, from the cold read, all left: pipes in a production command are neither allowed nor banned; a dispatched agent's work redone once fits both "counts" and "left out"; "corrected on the spot" could be read to cover a user's correction; evals/README states the harness's own-home behavior as fact from one run.
 - Batch 3, from the last cold read, all left for the owner or a first real run: the tie-break puts `user` last, so a user correction that also fits `missed` is recorded as `missed`; a line exactly `FOUNDRY_RETRO_END` still ends the entry (the text forbids it, nothing enforces it); with any-date matching, a later separate run of the same plan that records an identical line has it dropped as already written; the no-repo fallback names no command; a resumed debug hunt's "name already in the file" doesn't say which file.
 - Batch 3: in a git worktree the project's name is the worktree's folder, so one project can show under two names. A relative `FOUNDRY_RETRO_FILE` resolves against the Bash call's folder. `tests/test_investigate_batch1.py` keeps its older batch-named title. All left.

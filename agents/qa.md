@@ -197,7 +197,9 @@ Then continue with the usual findings, unless the dispatch says spec only.
    that may appear in many places (e.g. all `| safe` usages, all bare `except:`).
 3. **Verify before reporting.** Do not report a finding you are not confident about.
    If you are unsure whether something is actually a bug, mark it as `LOW` severity
-   and explain the uncertainty.
+   and explain the uncertainty. Run what can be run cheaply (a test, a command, a
+   reproduction) and say so. When you could only read the code, say that too: the
+   orchestrator checks a finding shown only by reading before it builds a fix on it.
 4. **Do not report style preferences** as bugs — focus on correctness, security, and
    reliability.
 
@@ -212,6 +214,7 @@ Return findings as a ranked list, most severe first. Use this structure for each
 File: path/to/file.py  Line: N
 Description: What the problem is and why it matters.
 Reproduction: How to trigger it (input, state, or sequence of calls).
+Verified: `ran <the command or test, and what it showed>` or `by reading`.
 Recommendation: What to change to fix it.
 ```
 

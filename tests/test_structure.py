@@ -568,6 +568,166 @@ class SelfConsistencyPinsTest(unittest.TestCase):
         self.assertIn("copies the plan's rules and its gate into a `rules.md`", self.text("docs", "walkthrough.md"))
 
 
+class CheckBeforeBuildingPinsTest(unittest.TestCase):
+    """run-plan checks a finding before building on it: qa labels how each was shown (a `Verified:` line),
+    the session checks a read-only one, parks one only a paid run can check, and gives its own design calls
+    a cold read. The wording sits in several files and must agree. Short phrases, whitespace folded."""
+
+    def text(self, *parts):
+        return " ".join(ROOT.joinpath(*parts).read_text(encoding="utf-8").split())
+
+    def between(self, text, start, end):
+        self.assertIn(start, text)
+        at = text.index(start)
+        return text[at: text.index(end, at)]
+
+    def run_plan(self):
+        return self.text("skills", "run-plan", "SKILL.md")
+
+    def fix_batches(self):
+        return self.between(self.run_plan(), "### Fix batches", "### Retro")
+
+    FIX_BATCH_CLAUSES = [
+        "You decide which findings get fixed; declining one deliberately is fine, as long as it goes in the build log with the reason.",
+        "**Know how each finding was shown before you build on it.**",
+        "qa's report says, on a `Verified:` line in each finding, whether it ran something or only read.",
+        "A finding qa showed by running goes into a batch; it needs no second check.",
+        "A finding shown only by reading gets the cheapest check that could prove it wrong, run by you before any fix is briefed: a command, a read of the code or of the tool's own help, or a read-only agent if it's bigger.",
+        "If the check shows it's wrong, decline it with the reason.",
+        "If only a paid run could check it (a real model session, a deploy), park it: no fix is built on it, it goes in the final report as a question with its cost, and the run carries on.",
+        "A `Verified:` line that's missing counts as by reading.",
+        "Each accepted finding's line in the build log says which it was: shown by running (by qa), checked by you (and how), or parked (needs a paid run, with the cost).",
+    ]
+
+    def test_fix_batches_carry_the_three_outcomes_who_checks_and_the_missing_line_rule(self):
+        body = self.fix_batches()
+        for clause in self.FIX_BATCH_CLAUSES:
+            with self.subTest(clause=clause[:60]):
+                self.assertIn(clause, body)
+
+    def test_the_fix_batch_paragraph_is_exactly_those_sentences_in_order_with_nothing_wedged_between(self):
+        # A sentence added in the middle ("check it anyway when unsure") would undo a clause without
+        # deleting it, so the paragraph is pinned whole.
+        self.assertIn(" ".join(self.FIX_BATCH_CLAUSES[1:]), self.fix_batches())
+
+    def test_the_fix_batch_clauses_come_in_order(self):
+        body = self.fix_batches()
+        positions = [body.index(c) for c in self.FIX_BATCH_CLAUSES]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_the_final_report_asks_about_a_parked_finding_with_its_cost(self):
+        body = self.between(self.run_plan(), "### Report to the user", "## 5. When to stop and ask")
+        self.assertIn("a finding parked because only a paid run could check it goes in the questions below, with its cost", body)
+
+    def test_a_design_call_of_the_sessions_own_gets_the_builder_check_and_the_users_answers_do_not(self):
+        body = self.between(self.run_plan(), "## 5. When to stop and ask", "## 6. The build log")
+        self.assertIn("When the user's answers leave gaps and you fill them with calls of your own, write those into the design as yours (\"Calls I made\"), and give them `brainstorm`'s builder check (a cold read by a fresh read-only agent) before any builder is briefed on them. The user's own answers don't need it.", body)
+        self.assertEqual(self.run_plan().count("The user's own answers don't need it."), 1, "say it once, where a session would look")
+
+    def test_the_build_log_example_shows_the_three_outcomes(self):
+        body = self.between(self.run_plan(), "### From the qa pass (fix batch 1)", "### Retro")
+        self.assertIn("Shown by running (by qa: the failing request).", body)
+        self.assertIn("Checked by me: read the helper's own docs", body)
+        self.assertIn("parked. Only a paid model session could check it (about $3); asked in the final report.", body)
+
+    def test_the_red_flags_table_has_the_row(self):
+        flags = self.run_plan()[self.run_plan().index("## Red flags"):]
+        self.assertIn("| \"qa said so, so I'll brief the fix\" | Look at its `Verified:` line. Only read? Check it first, or park it if only a paid run can. |", flags)
+
+    # qa
+    def qa(self):
+        return self.text("agents", "qa.md")
+
+    def test_qa_output_format_has_the_verified_line_between_reproduction_and_recommendation(self):
+        raw = (AGENTS / "qa.md").read_text(encoding="utf-8")
+        block = raw[raw.index("Return findings as a ranked list"):]
+        block = block[block.index("```"): block.index("```", block.index("```") + 3)]
+        lines = [l.strip() for l in block.splitlines()]
+        i = next(n for n, l in enumerate(lines) if l.startswith("Verified:"))
+        self.assertTrue(lines[i - 1].startswith("Reproduction:"), lines)
+        self.assertTrue(lines[i + 1].startswith("Recommendation:"), lines)
+        self.assertEqual(lines[i], "Verified: `ran <the command or test, and what it showed>` or `by reading`.")
+
+    def test_qa_step_3_agrees_with_the_verified_line(self):
+        body = self.qa()
+        self.assertIn("Do not report a finding you are not confident about.", body)
+        self.assertIn("Run what can be run cheaply (a test, a command, a reproduction) and say so. When you could only read the code, say that too: the orchestrator checks a finding shown only by reading before it builds a fix on it.", body)
+
+    def test_qa_keeps_cannot_verify_in_spec_check_mode(self):
+        self.assertIn("[CANNOT VERIFY]", self.qa())
+
+    # The other files
+    def test_brainstorm_section_8_runs_the_check_on_a_change_that_adds_the_sessions_calls(self):
+        body = self.between(self.text("skills", "brainstorm", "SKILL.md"), "## 8. The builder check", "## 9.")
+        self.assertIn("The check also runs on a change to an approved design that adds calls of your own", body)
+        self.assertIn("not just on a new section. The user's own answers don't need it.", body)
+
+    def test_the_orchestrator_notes_extend_outside_review_to_the_foundrys_own_findings(self):
+        body = self.text("docs", "orchestrator.md")
+        outside = body.index("Outside review comments")
+        sentence = "The same goes for the Foundry's own findings: one `qa` shows only by reading (its `Verified:` line says `by reading`) is checked before a fix is built on it."
+        self.assertIn(sentence, body)
+        self.assertLess(outside, body.index(sentence))
+        self.assertLess(body.index(sentence) - outside, 400, "the sentence must sit next to the outside-review rule")
+
+    def test_the_walkthrough_shows_the_verified_line(self):
+        self.assertIn("Each finding carries a `Verified:` line, and the MEDIUM's says qa ran the request, so it needs no second check.", self.text("docs", "walkthrough.md"))
+
+    # One label, written by qa and read by run-plan
+    def test_qa_and_run_plan_use_the_same_label_and_the_same_two_phrases(self):
+        label = re.search(r"^\s*(\w+): `ran <", (AGENTS / "qa.md").read_text(encoding="utf-8"), re.M).group(1)
+        self.assertEqual(label, "Verified")
+        run_plan, orchestrator, walkthrough = self.run_plan(), self.text("docs", "orchestrator.md"), self.text("docs", "walkthrough.md")
+        for where, body in (("run-plan", run_plan), ("orchestrator", orchestrator), ("walkthrough", walkthrough)):
+            with self.subTest(file=where):
+                self.assertIn(f"`{label}:`", body)
+        # The two things qa may write, and the words run-plan uses for them.
+        self.assertIn("`by reading`", self.qa())
+        self.assertIn("`ran <", self.qa())
+        self.assertIn("by reading", run_plan)
+        self.assertIn("whether it ran something or only read", run_plan)
+        self.assertIn("`by reading`", orchestrator)
+        # run-plan never names a label qa does not write.
+        for found in re.findall(r"`(\w+):` line", run_plan):
+            self.assertIn(found, ("Verified", "Reproduction"), f"run-plan reads a `{found}:` line qa does not write")
+
+    # The eval case
+    CASE = ROOT / "evals" / "run-plan-decisions"
+
+    def situations(self):
+        text = (ROOT / "evals" / "run-plan-decisions" / "prompt.md").read_text(encoding="utf-8")
+        return dict(re.findall(r"^([a-z])\. (.+)$", text, re.M))
+
+    def test_every_situation_has_its_grader_and_every_grader_names_its_own_item(self):
+        situations = self.situations()
+        letters = sorted(situations)
+        self.assertEqual(letters, [chr(ord("a") + i) for i in range(len(letters))], "situations are not a, b, c, ... without a gap")
+        self.assertIn("h", letters)
+        graders = sorted(p.stem for p in (ROOT / "evals" / "run-plan-decisions" / "graders").glob("item-*.md"))
+        self.assertEqual(graders, [f"item-{l}" for l in letters])
+        for letter in letters:
+            body = " ".join((ROOT / "evals" / "run-plan-decisions" / "graders" / f"item-{letter}.md").read_text(encoding="utf-8").split())
+            with self.subTest(item=letter):
+                self.assertIn(f"item ({letter})", body)
+                self.assertTrue(body.startswith("--- type: llm focus: last_message ---"), body[:60])
+
+    def test_situation_h_gives_two_findings_one_ran_one_read_only_that_only_a_paid_run_can_check(self):
+        h = self.situations()["h"]
+        for phrase in ("two findings", "shown by running a test", "Verified: by reading; not run", "only way to check it is a real model session that costs about $3"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, h)
+
+    def test_grader_h_wants_batch_one_park_the_other_with_its_cost_and_carry_on(self):
+        body = " ".join((ROOT / "evals" / "run-plan-decisions" / "graders" / "item-h.md").read_text(encoding="utf-8").split())
+        for phrase in (
+            "batches the first finding for a fix without checking it further",
+            "does not brief a fix: it parks it, puts it in the final report as a question with the cost (about $3), and carries on rather than stopping the run",
+            "FAIL if it briefs a fix for the second finding, drops it without asking, or stops the run to ask.",
+        ):
+            with self.subTest(phrase=phrase[:60]):
+                self.assertIn(phrase, body)
+
+
 class RetroTest(unittest.TestCase):
     """run-plan and debug keep a retro in one file outside the project (docs/design.md section 3,
     amended). Both skills carry the same path, command, kinds and rules; nothing else writes it; the
