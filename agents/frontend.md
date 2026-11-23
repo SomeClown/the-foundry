@@ -8,6 +8,7 @@ tools:
   - Glob
   - Grep
   - Bash
+  - Skill
   - mcp__Claude_Browser__preview_start
   - mcp__Claude_Browser__preview_stop
   - mcp__Claude_Browser__preview_logs

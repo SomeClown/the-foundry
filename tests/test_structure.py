@@ -137,6 +137,14 @@ class AgentFilesTest(unittest.TestCase):
         for banned in ("mcp__Claude_Browser__form_input", "mcp__Claude_Browser__javascript_tool"):
             self.assertNotIn(banned, tools)
 
+    def test_an_agent_told_to_load_a_skill_holds_the_skill_tool(self):
+        # frontend was told to load a project skill without holding `Skill`.
+        for name, fm in agents().items():
+            body = " ".join((AGENTS / f"{name}.md").read_text(encoding="utf-8").split("---", 2)[2].split())
+            if re.search(r"\bload\b[^.]{0,80}\bskill|\bskills?\b[^.]{0,80}\bload\b", body, re.I):
+                with self.subTest(agent=name):
+                    self.assertIn("Skill", fm["tools"], "its instructions load a skill, but it has no Skill tool")
+
 
     def test_file_reader_holds_exactly_read(self):
         reader = agents()["file-reader"]
