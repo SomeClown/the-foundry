@@ -49,6 +49,17 @@ All notable changes to The Foundry. Format loosely follows
   `debug` skill's working file is in the list of what the plugin writes; and
   `tests/` is described as checking debug's polluter procedure too.
 
+### Added
+- A retro at the end of `run-plan` and `debug` (design §3). The session
+  writes one line for each time the team needed correcting, from what the
+  run already logged, into the build log and into
+  `~/.claude/foundry-retro.md` (or under `CLAUDE_CONFIG_DIR`), so a repeat
+  shows across projects. When a mistake repeats one already in that file,
+  the report quotes both and offers to work out a fix through `brainstorm`.
+  The session never edits an agent or skill file itself. The README and
+  PRIVACY.md name the file, the one the plugin writes outside the project,
+  and structural tests hold all four to it.
+
 ## [2.1.1] — 2026-11-10
 
 A docs-only patch. The README's credits now say who built the team: I wrote
