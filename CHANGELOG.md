@@ -32,6 +32,23 @@ All notable changes to The Foundry. Format loosely follows
   passes `--ablation none`. Without it the harness adds a no-plugin baseline
   arm whose prompts can't load the plugin's skills, which only adds cost.
 
+### Changed
+- run-plan no longer keeps the base commit in a `BASE` shell variable, which
+  didn't survive from one Bash call to the next. The diff package compares
+  the staged task with `HEAD`, which is still the base, and the build log
+  names the sha noted at step 1.
+- run-plan hands `test-engineer` the plan's Testing Strategy section by
+  heading, since the brief holds only the task's own section.
+- `test-engineer` may write the report file its brief names, and no longer
+  stashes or reverts a fix already in the tree just to watch a regression
+  test fail; it says the test wasn't seen failing.
+- `devops` stops and reports before a command it can't undo, and goes on
+  only when resumed with the user's yes. A subagent can't wait for an answer.
+- README: `investigate` runs alone whether scoped or full, and that's the
+  orchestrator's rule; it stops above 500 files so the session can ask; the
+  `debug` skill's working file is in the list of what the plugin writes; and
+  `tests/` is described as checking debug's polluter procedure too.
+
 ## [2.1.1] — 2026-11-10
 
 A docs-only patch. The README's credits now say who built the team: I wrote
