@@ -479,3 +479,34 @@ approved; the figures are from the build log in
   1.00. Two graders failed once each and are ruled unrelated or variance:
   `asks-and-hands-over` (it also failed in the 2026-10-23 run) and `item-d`
   (unconfirmed, no trace kept).
+
+## 3. Retro log (approved 2026-11-23)
+
+The Foundry gets better when an agent's mistake on real work turns into a
+wording change and an eval case, and CONTRIBUTING asks for exactly that. But
+nothing kept those mistakes. They sat in one project's build log, or in a
+conversation that got compacted, so a pattern across projects never showed.
+
+**Owner decisions (2026-11-23):**
+
+- 1B: the retro goes in the run's own log and is appended to one file outside
+  the project, `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/foundry-retro.md`, so a
+  repeat shows across projects. The README and PRIVACY.md say so.
+- 2A: `run-plan` and `debug` write it, since they already keep a log. Not
+  `brainstorm` or `ship`.
+- 3B: when a new line repeats an earlier one, the report quotes both and
+  offers to work out a fix through `brainstorm`.
+
+**Goals**
+
+- One line per correction (who, what it did, what it should have done, where
+  it came from), drawn from what the run already logged. No new agents.
+- A repeat is pointed out to the user, with both lines quoted.
+
+**Non-goals**
+
+- The session never edits an agent or skill file itself, here or in the
+  plugin's install folder. A fix goes through the user and the repo's review.
+- No code, file contents, or secrets in the retro, and nothing leaves the
+  user's machine.
+- No eval case yet: one waits until a real run shows the step going wrong.
