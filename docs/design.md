@@ -510,3 +510,52 @@ conversation that got compacted, so a pattern across projects never showed.
 - No code, file contents, or secrets in the retro, and nothing leaves the
   user's machine.
 - No eval case yet: one waits until a real run shows the step going wrong.
+
+### Amended after the qa pass (2026-11-23)
+
+A qa review of the branch found that the file's first home, `~/.claude`, is a
+folder Claude Code protects. A write there prompts in the default and
+accept-edits modes, no allow rule in settings can pre-approve it, and it's
+denied where nothing can prompt. The same review found the retro counted the
+ordinary fix loop as a correction, and that stopped runs never wrote one.
+
+**Owner decisions (2026-11-23, second round). These replace the first round
+where they differ:**
+
+- 1A: the file is `~/.foundry/retro.md`, and `FOUNDRY_RETRO_FILE` moves it.
+  It no longer follows `CLAUDE_CONFIG_DIR`.
+- 2A: an entry keeps its heading (the date, the project folder's name, and
+  the run). A run with nothing to correct writes nothing to the file. The
+  README and PRIVACY.md say all of this, the names included.
+- 3A: the design follows the skills. `run-plan` keeps its copy in the build
+  log, which is committed with the plan, so "nothing leaves the user's
+  machine" is a promise about the cross-project file only. `debug` writes
+  the cross-project file only, since its working file is optional.
+- 4A: a correction is what the loop didn't catch by itself: a task that took
+  two or more fix rounds or came back BLOCKED, a test that misread the brief,
+  a qa finding the builder or `test-engineer` should have caught, a fix that
+  didn't hold, and anything the user corrected. One fix round, or a builder's
+  question, is the loop working. Each line carries one kind word from a short
+  list, so a repeat is the same agent or skill with the same kind word.
+- 5A: a run that stops early (the fix cap, three failed fixes, can't
+  reproduce) still writes its retro before it stops.
+
+**Calls I made**
+
+- The kind words: `blocked`, `fix-rounds`, `misread`, `missed`, `didnt-hold`,
+  `user`. A line reads `- <agent or skill> [<kind>]: what it did; what it
+  should have done (where it came from)`.
+- No double entries: before appending, the session looks for a heading with
+  the same date, project and run, and skips the append if it's there. That
+  covers a resumed session without a separate marker.
+- The session resolves the path with one Bash call before it reads or
+  appends, since the file tools don't expand a shell expression. It appends
+  and never rewrites the file, so two sessions finishing together don't lose
+  each other's lines. A missing folder or file is created.
+- The eval commands in `evals/README.md` and CONTRIBUTING.md point
+  `FOUNDRY_RETRO_FILE` at a scratch file, so planted-bug runs never reach the
+  real one.
+- The README's uninstall line says the file stays and how to remove it.
+  `run-plan`'s list of reasons to stop names the retro file as the one write
+  outside the branch that doesn't stop the run.
+- Left open: the file has no size limit. It can wait until a real file grows.
