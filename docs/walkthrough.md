@@ -163,7 +163,7 @@ implement and test-engineer stages. The session stays on `feat/blackout-dates`
 survives a compaction), copies the plan's rules and its gate into a `rules.md` there, and
 starts the build log as the plan's last section. Then, per task, using Task 2:
 
-1. *Brief and build.* Record `BASE=$(git rev-parse HEAD)`; run-plan's brief
+1. *Brief and build.* Note the base (`git rev-parse --short HEAD`); run-plan's brief
    command copies Task 2 into `<work dir>/task-2-brief.md`, where its exact
    values live and nowhere else. `implement` gets a short dispatch: where the
    task fits, the brief and rules paths, the Task 1 interfaces it needs, and

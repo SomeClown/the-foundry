@@ -61,7 +61,9 @@ plan to run, so run it. Section 5 lists the only reasons to stop.
 
 ### Step 1: Record the base
 
-`BASE=$(git rev-parse HEAD)`. Check `git status` is clean first (apart from
+Note `git rev-parse --short HEAD`: it's the base the build log names at step 8,
+and `HEAD` stays the base until then, since builders don't commit. Check
+`git status` is clean first (apart from
 the plan file's build log). Stray changes the build log doesn't explain mean
 the last task wasn't committed, or the user is editing too; ask which before
 going on. Changes the build log does explain are a task in progress: see
@@ -146,7 +148,7 @@ Package the task's diff every time; the adversarial round uses it too:
 
 ```
 git add -A
-{ git diff --cached --stat $BASE; git diff --cached -U10 $BASE; } > <work dir>/task-N-diff.txt
+{ git diff --cached --stat; git diff --cached -U10; } > <work dir>/task-N-diff.txt
 ```
 
 Staging first matters: builders don't commit, and a plain `git diff` leaves
@@ -168,7 +170,8 @@ check happens in the final qa review of the whole branch.
 ### Step 5: Adversarial round
 
 Dispatch `the-foundry:test-engineer` with the brief, the builder's report, the
-diff package, and the rules file. Its job is to break this task's behavior,
+diff package, the rules file, and the plan's Testing Strategy section by
+heading (the brief holds only the task's own section). Its job is to break this task's behavior,
 not to admire it: the brief's edge cases, error paths, boundary values, and
 every exact value the brief specifies. It writes tests only, reports failing
 tests as bugs with the test name and what the code did, writes its report to
@@ -355,8 +358,8 @@ Work dir: <path>
 **Resuming.** After compaction, a restart, or a new session: read the build
 log and `git log`, and trust them over your memory. A task with a `complete`
 line is done; don't redo it (its commit is the one whose subject starts
-`Task N:`). For the task in progress, BASE is `HEAD`, since its commit hasn't
-happened yet.
+`Task N:`). For the task in progress, the base is `HEAD`, since its commit
+hasn't happened yet.
 
 **Check for a dispatch still running first.** A background agent sent before
 compaction may still be working, and its result will arrive on its own.
