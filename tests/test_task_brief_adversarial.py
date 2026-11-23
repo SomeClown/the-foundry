@@ -282,7 +282,12 @@ class AdversarialBriefTest(unittest.TestCase):
 
 
 def run_shell(shell, env, cwd, prefix=""):
-    """Run the shipped command under the named shell with exactly this environment."""
+    """Run the shipped command under the named shell with exactly this environment.
+
+    A shell that isn't installed skips the calling subtest, as the other shell tests do.
+    """
+    if shutil.which(SHELLS[shell][0]) is None:
+        raise unittest.SkipTest(f"{shell} is not installed")
     return subprocess.run([*SHELLS[shell], prefix + brief_command()], capture_output=True, env=env, cwd=cwd)
 
 
