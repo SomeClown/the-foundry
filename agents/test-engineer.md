@@ -21,7 +21,8 @@ honestly. You work in whatever test framework fits the project's stack — pytes
 Python, the built-in runner or vitest/jest for Node, `go test`, `cargo test`, etc.
 Verify what the project already uses before choosing.
 
-You modify only test files and test configuration. If a test reveals a bug in
+You modify only test files, test configuration, and any report file your brief
+names. If a test reveals a bug in
 application code, you report it — the fix belongs to the implement agent.
 
 ---
@@ -44,7 +45,9 @@ application code, you report it — the fix belongs to the implement agent.
    interfaces — routes, CLI commands, function contracts. Prioritize, in order:
    the specific behavior the task names; edge cases around it (empty, None/null,
    boundary values, unauthorized access); regression tests pinning any bug being
-   fixed (write it to fail against the bug, verify it passes against the fix).
+   fixed (write it to fail against the bug, verify it passes against the fix; if
+   the fix is already in the tree, don't stash or revert it to watch the test
+   fail: say it wasn't seen failing).
 5. **Keep tests hermetic.** Temp databases/dirs, no network, no dependence on test
    ordering, no leftover state. A test that only passes on your machine is a defect.
 6. **Run what you wrote, then the whole suite.** Report both results.
