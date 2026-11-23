@@ -61,9 +61,13 @@ phone, send every question at once and start on whatever doesn't need the
 answers.
 
 **Production.** The user runs every production command. Give them the exact
-commands to paste (read-only ones first: logs, `ps`, status), one per block,
-and say what you're looking for in the output. Anything that opens an editor
-uses `vi`. Never change production state to investigate it.
+commands to paste (read-only ones first: logs, `ps`, status), one command per
+block, never two commands joined with `;` or `&&` (a `cd` into the right
+folder on its own line above the command is fine). Under each block, say what you're looking for in its output.
+Read-only means nothing is written on the server either: no redirect into a
+file, no `tee`. The user pastes the output back, or the part around the time
+in question. Anything that opens an editor uses `vi`. Never change production
+state to investigate it.
 
 ## 2. Reproduce it on demand
 
@@ -213,30 +217,34 @@ One line for each time the hunt needed correcting, and only what the loop
 didn't catch by itself:
 
 - a fix that didn't hold
-- a step skipped and caught (a fix before the pin, a suspect named before the
-  check)
+- a step of the method skipped and caught (a fix before the pin, a suspect
+  named before the check), not a first attempt that needed redoing
 - a dispatched agent's work redone
 - anything the user corrected
 
-A fix that took one go is the loop working: leave it out. Each line names the
-agent or skill, a kind word, what it did, what it should have done, and where
-it came from:
+A fix that took one go, or anything tried once and corrected on the spot, is
+the loop working: leave it out.
+Each line names who did the work: the agent, if one was dispatched, and
+`debug` for work the session did itself. Never name an agent that wasn't
+dispatched. Each line gives a kind word, what it did, what it should have
+done, and where it came from:
 
 ```
 - <agent or skill> [<kind>]: what it did; what it should have done (where it came from)
 ```
 
-The kind is one of these six words, shown with an example line each. When two
-fit, use the one listed first, so the same mistake gets the same word each
-time:
+The kind is one of these six words, shown with an example line each. The
+examples show the shape, not lines to reuse: write what happened in this run.
+When two fit, use the one listed first, so the same mistake gets the same word
+each time:
 
 ```
 - debug [user]: started on the fix before the pin; the user asked for the failing test first (step 5)
 - implement [blocked]: came back BLOCKED for want of the failing test's path; should have asked for it first (fix dispatch 1)
-- test-engineer [fix-rounds]: its pin passed on the unfixed code and was rewritten twice; should have run it unfixed first (the pin, rounds 1 and 2)
+- implement [fix-rounds]: its first two fixes each left a second caller of the changed function alone; should have searched for callers before reporting (fix dispatch, rounds 1 and 2)
 - debug [misread]: read "slow since Friday" as a code change; the user meant a runner upgrade (step 1, the user's answer)
 - debug [missed]: named the cache as the suspect before measuring it; should have measured first (step 4, hypothesis 1)
-- implement [didnt-hold]: the first fix moved the leak to a second test; should have fixed the shared state (fix 1 of 2)
+- implement [didnt-hold]: the first fix moved the leak to a second test; should have fixed the shared state (fix 1, found when the gate ran after it)
 ```
 
 Write what happened, not theories, and no code, file contents, or secrets.

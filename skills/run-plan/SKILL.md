@@ -311,17 +311,21 @@ didn't catch by itself counts:
 - a fix that didn't hold
 - anything the user corrected
 
-One fix round, or a builder's NEEDS_CONTEXT question, is the loop working:
-leave it out. Each line names the agent or skill, a kind word, what it did,
-what it should have done, and where in the log it came from:
+One fix round, a builder's NEEDS_CONTEXT question, or anything tried once and
+corrected on the spot, is the loop working: leave it out.
+Each line names who did the work: the agent, if one was dispatched, and
+`run-plan` for work the session did itself. Never name an agent that wasn't
+dispatched. Each line gives a kind word, what it did, what it should have
+done, and where it came from:
 
 ```
 - <agent or skill> [<kind>]: what it did; what it should have done (where it came from)
 ```
 
-The kind is one of these six words, shown with an example line each. When two
-fit, use the one listed first, so the same mistake gets the same word each
-time:
+The kind is one of these six words, shown with an example line each. The
+examples show the shape, not lines to reuse: write what happened in this run.
+When two fit, use the one listed first, so the same mistake gets the same word
+each time:
 
 ```
 - run-plan [user]: committed before the user's gate had run; the user said to wait for the exit code (Task 6)

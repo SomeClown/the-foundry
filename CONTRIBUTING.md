@@ -50,9 +50,10 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    text, JSON, YAML, or an image, and agent and skill front matter takes only
    the keys the plugin directory accepts; the structural tests fail otherwise.
 3. If you changed what a skill does, run its behavior cases:
-   `FOUNDRY_RETRO_FILE="$(mktemp)" claude plugin eval . --tag <skill> --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
-   The `FOUNDRY_RETRO_FILE` prefix keeps the `debug` and `run-plan` cases'
-   retro step off your real `~/.foundry/retro.md`.
+   `claude plugin eval . --tag <skill> --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
+   The `debug` and `run-plan` cases reach the retro step, but the harness gives
+   each case its own home, so the entry never lands in your
+   `~/.foundry/retro.md`.
    A new behavior worth keeping gets a case of its own. See
    [evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) for how to read a failure and how a
    case is built.

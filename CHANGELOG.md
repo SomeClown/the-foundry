@@ -7,6 +7,12 @@ All notable changes to The Foundry. Format loosely follows
 ## [Unreleased]
 
 ### Fixed
+- `debug`'s first message on a production report handed the user a log
+  command that wrote a file on the server (`> ~/newsbot-12h.log; wc -l ...`),
+  joined two commands in one block (`cd ... &&`), and listed what to look for
+  once at the end. The Production paragraph now says one command per block,
+  never joined, nothing written on the server (no redirect, no `tee`), and
+  what to look for under each block.
 - Sentences an earlier round left behind, now matching the text next to
   them: `test-engineer`'s description, the README's agents table and its
   "touches only tests" bullet now allow the report file its body already
@@ -106,10 +112,13 @@ All notable changes to The Foundry. Format loosely follows
   mistake with the same kind word as an earlier line, the report quotes both
   and offers to work out a fix through `brainstorm`. The session never edits
   an agent or skill file itself. The README and PRIVACY.md say what the file
-  holds and where, the README's uninstall note says how to remove it,
-  the eval commands in `evals/README.md` and CONTRIBUTING point
-  `FOUNDRY_RETRO_FILE` at a scratch file, and structural tests hold the docs
-  to it.
+  holds and where, the README's uninstall note says how to remove it, and
+  structural tests hold the docs to it. A line names the agent that did the
+  work, or `run-plan` or `debug` for work the session did itself, never an
+  agent that wasn't dispatched, and anything tried once and corrected on the
+  spot isn't one. The eval harness gives each case its own home, so a case's
+  retro never reaches the real file; `evals/README.md` and CONTRIBUTING say
+  so.
 
 ## [2.1.1] — 2026-11-10
 

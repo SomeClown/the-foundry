@@ -600,7 +600,10 @@ class RetroTest(unittest.TestCase):
         "Never edit an agent or skill file yourself, here or in the plugin's install folder: a fix goes through the user and the repo's own review.",
         "Write what happened, not theories, and no code, file contents, or secrets.",
         "The kind is one of these six words, shown with an example line each",
-        "Each line names the agent or skill, a kind word, what it did, what it should have done, and where",
+        "Each line names who did the work: the agent, if one was dispatched, and",
+        "for work the session did itself. Never name an agent that wasn't dispatched.",
+        "Each line gives a kind word, what it did, what it should have done, and where it came from:",
+        "The examples show the shape, not lines to reuse: write what happened in this run.",
         SHAPE,
     ]
     SPECIFIC = {
@@ -612,7 +615,8 @@ class RetroTest(unittest.TestCase):
             "a qa finding the builder or test-engineer should have caught",
             "a fix that didn't hold",
             "anything the user corrected",
-            "One fix round, or a builder's NEEDS_CONTEXT question, is the loop working: leave it out.",
+            "One fix round, a builder's NEEDS_CONTEXT question, or anything tried once and corrected on the spot, is the loop working: leave it out.",
+            "`run-plan` for work the session did itself.",
             # One run of sentences: the clean-run rule, directly followed by "nothing goes to the file".
             "Nothing needed correcting: write `- none` in the build log, so the log shows the step ran, and stop there. Nothing goes to the cross-project file.",
             "A `### Retro` section already in the log (from an early stop) gets the new lines added to it, not a second section. If it holds `- none` and there are now lines, the lines replace it.",
@@ -622,10 +626,11 @@ class RetroTest(unittest.TestCase):
             "The heading is `## <date> | <project> | debug <slug>`.",
             "The slug is the working file's name when the hunt has one (`debug-<slug>.md`), otherwise a short name for the bug, two or three words joined by hyphens; a resumed hunt uses the name already in the file for it.",
             "a fix that didn't hold",
-            "a step skipped and caught (a fix before the pin, a suspect named before the check)",
+            "a step of the method skipped and caught (a fix before the pin, a suspect named before the check), not a first attempt that needed redoing",
             "a dispatched agent's work redone",
             "anything the user corrected",
-            "A fix that took one go is the loop working: leave it out.",
+            "A fix that took one go, or anything tried once and corrected on the spot, is the loop working: leave it out.",
+            "`debug` for work the session did itself.",
             # One run of sentences: the clean-run rule, then the file paragraph's opening, with nothing between.
             "Nothing needed correcting: write nothing, and stop there. When there are lines, they go to one file outside the project, so a repeat shows across projects. There's no build log here, so that file is the only copy.",
         ],
@@ -706,6 +711,49 @@ class RetroTest(unittest.TestCase):
             with self.subTest(skill=name):
                 self.assertEqual(len(re.findall(r"^- [\w-]+ \[([\w-]+)\]:", block, re.M)), 1)
                 self.assertIn(re.findall(r"\[([\w-]+)\]", block)[0], self.KINDS)
+
+    EXAMPLE_LINE = re.compile(r"^- (?P<who>[\w-]+) \[(?P<kind>[\w-]+)\]: (?P<did>[^;\n]+); (?P<should>[^(\n]+) \((?P<where>[^()\n]+)\)$")
+
+    def example_lines(self, name):
+        raw = self.raw(name)
+        block = raw[raw.index("shown with an example line each"):]
+        block = block[block.index("```\n") + 4:]
+        block = block[: block.index("```")]
+        return [l for l in block.splitlines() if l.strip()]
+
+    def test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape(self):
+        real = set(agents()) | set(skills())
+        self.assertEqual(len(real), 14)
+        for name in ("run-plan", "debug"):
+            lines = self.example_lines(name)
+            with self.subTest(skill=name, count=len(lines)):
+                self.assertEqual(len(lines), 6, lines)
+            for line in lines:
+                with self.subTest(skill=name, line=line[:50]):
+                    m = self.EXAMPLE_LINE.match(line)
+                    self.assertIsNotNone(m, "the line doesn't match the shape")
+                    self.assertIn(m.group("who"), real)
+                    self.assertIn(m.group("kind"), self.KINDS)
+                    self.assertEqual(len(re.findall(r"\[[\w-]+\]", line)), 1, "exactly one kind word")
+
+    def test_no_example_line_models_a_one_retry_line(self):
+        # One go, or "once", is the loop working; an example that says so gets copied.
+        for name in ("run-plan", "debug"):
+            for line in self.example_lines(name):
+                with self.subTest(skill=name, line=line[:50]):
+                    self.assertNotRegex(line, r"(?i)\bonce\b|\bone retry\b|\bfirst retry\b")
+
+    def test_the_append_commands_example_entry_names_a_real_agent_too(self):
+        real = set(agents()) | set(skills())
+        for name in ("run-plan", "debug"):
+            raw = self.raw(name)
+            block = raw[raw.index("<<'FOUNDRY_RETRO_END'"): raw.index("\nFOUNDRY_RETRO_END\n")]
+            line = next(l for l in block.splitlines() if l.startswith("- "))
+            with self.subTest(skill=name):
+                m = self.EXAMPLE_LINE.match(line)
+                self.assertIsNotNone(m, line)
+                self.assertIn(m.group("who"), real)
+                self.assertIn(m.group("kind"), self.KINDS)
 
     def test_debug_lines_end_with_where_they_came_from_not_the_evidence(self):
         body = self.skill("debug")
@@ -796,7 +844,7 @@ class RetroTest(unittest.TestCase):
         self.assertIn("The Foundry doesn't collect or send any data. The one thing it stores is a file on your own machine", body)
         self.assertIn("nothing sends it anywhere", body)
 
-    # Eval commands that run debug or run-plan point the retro at a scratch file.
+    # The eval harness gives each case its own home, so no command carries the retro variable.
     def eval_commands_with_prefix(self, text):
         found = []
         for m in re.finditer(r"claude plugin eval \.", text):
@@ -806,21 +854,72 @@ class RetroTest(unittest.TestCase):
                 found.append((before, command))
         return found
 
-    def test_the_eval_commands_that_run_skills_set_the_retro_file_to_a_scratch_path(self):
-        for name, at_least in (("evals/README.md", 1), ("CONTRIBUTING.md", 1)):
-            commands = [c for c in self.eval_commands_with_prefix((ROOT / name).read_text(encoding="utf-8"))
-                        if "evals-expensive" not in c[1]]
+    def test_no_documented_eval_command_carries_the_retro_file_variable(self):
+        for name, at_least in (("evals/README.md", 4), ("CONTRIBUTING.md", 1)):
+            commands = self.eval_commands_with_prefix((ROOT / name).read_text(encoding="utf-8"))
             with self.subTest(doc=name):
                 self.assertGreaterEqual(len(commands), at_least)
                 for before, command in commands:
-                    self.assertRegex(before, r"FOUNDRY_RETRO_FILE=\S+ $", command)
+                    self.assertNotIn("FOUNDRY_RETRO_FILE", before + command)
 
-    def test_the_eval_docs_say_why(self):
-        for name in ("evals/README.md", "CONTRIBUTING.md"):
-            with self.subTest(doc=name):
-                body = self.text(ROOT / name)
-                self.assertIn("FOUNDRY_RETRO_FILE", body)
-                self.assertIn("~/.foundry/retro.md", body)
+    def test_the_eval_docs_say_the_harness_gives_each_case_its_own_home(self):
+        said = {
+            "evals/README.md": [
+                "The harness gives each case its own home folder, so the entry lands in that home's `.foundry/retro.md` and never in yours",
+                "a `FOUNDRY_RETRO_FILE` set in your shell doesn't reach the session",
+                "`--keep-temp` keeps that folder if you want to read what the session wrote.",
+            ],
+            "CONTRIBUTING.md": [
+                "the harness gives each case its own home, so the entry never lands in your `~/.foundry/retro.md`",
+            ],
+        }
+        for name, phrases in said.items():
+            body = self.text(ROOT / name)
+            for phrase in phrases:
+                with self.subTest(doc=name, phrase=phrase[:50]):
+                    self.assertIn(phrase, body)
+            with self.subTest(doc=name, check="no stale reason"):
+                self.assertNotIn("prefix", body.lower().replace("prefix.", "prefix"), "the prefix is gone; so is its reason")
+
+
+class ProductionParagraphTest(unittest.TestCase):
+    """debug's Production paragraph (section 1) stayed loose through three failing eval runs: pin each
+    clause. The paragraph is read with whitespace folded."""
+
+    def paragraph(self):
+        text = " ".join((SKILLS / "debug" / "SKILL.md").read_text(encoding="utf-8").split())
+        start = text.index("**Production.**")
+        return text[start: text.index("## 2. Reproduce it on demand", start)]
+
+    CLAUSES = [
+        "The user runs every production command.",
+        "Give them the exact commands to paste (read-only ones first: logs, `ps`, status), one command per block, never two commands joined with `;` or `&&`",
+        "(a `cd` into the right folder on its own line above the command is fine)",
+        "Under each block, say what you're looking for in its output.",
+        "Read-only means nothing is written on the server either: no redirect into a file, no `tee`.",
+        "The user pastes the output back, or the part around the time in question.",
+        "Anything that opens an editor uses `vi`.",
+        "Never change production state to investigate it.",
+    ]
+
+    def test_the_paragraph_carries_each_clause(self):
+        body = self.paragraph()
+        for clause in self.CLAUSES:
+            with self.subTest(clause=clause[:60]):
+                self.assertIn(clause, body)
+
+    def test_the_old_loose_sentence_is_gone(self):
+        self.assertNotIn("one per block, and say what you're looking for in the output", self.paragraph())
+
+    def test_the_clauses_come_in_order(self):
+        body = self.paragraph()
+        positions = [body.index(c) for c in self.CLAUSES]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_the_paragraph_is_before_section_2_and_after_the_numbered_questions(self):
+        text = " ".join((SKILLS / "debug" / "SKILL.md").read_text(encoding="utf-8").split())
+        self.assertLess(text.index("## 1. Ask what they saw"), text.index("**Production.**"))
+        self.assertIn("with options where the answer is likely one of a few", text)
 
 
 class DocsAgreeTest(unittest.TestCase):

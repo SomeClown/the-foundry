@@ -201,11 +201,11 @@ class RetroPinMutationTest(unittest.TestCase):
                             "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
     def test_run_plan_counts_needs_context_again(self):
-        self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, "One fix round, or a builder's NEEDS_CONTEXT question, is the loop working: leave it out."),
+        self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, "One fix round, a builder's NEEDS_CONTEXT question, or anything tried once and corrected on the spot, is the loop working: leave it out."),
                             "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
     def test_debug_counts_a_one_go_fix_again(self):
-        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "A fix that took one go is the loop working: leave it out."),
+        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "A fix that took one go, or anything tried once and corrected on the spot, is the loop working: leave it out."),
                             "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
     def test_a_correction_kind_is_dropped_from_the_list(self):
@@ -607,23 +607,115 @@ class RetroPinMutationTest(unittest.TestCase):
         self.assertCaughtBy("PRIVACY.md", lambda t: flat_sub(t, "and nothing sends it anywhere"),
                             "test_privacy_no_longer_says_it_stores_nothing")
 
-    # Eval commands
-    def test_the_eval_commands_lose_the_retro_prefix(self):
+    # Eval commands: the harness gives each case its own home, so no command carries the variable
+    def test_the_retro_prefix_is_put_back_on_a_command(self):
         for rel in ("evals/README.md", "CONTRIBUTING.md"):
             with self.subTest(doc=rel):
-                self.assertCaughtBy(rel, lambda t: re.sub(r'FOUNDRY_RETRO_FILE="\$\(mktemp\)" (?=claude plugin eval \. --tag)', "", t, count=1),
-                                    "test_the_eval_commands_that_run_skills_set_the_retro_file_to_a_scratch_path")
+                self.assertCaughtBy(rel, lambda t: t.replace("claude plugin eval . --tag", 'FOUNDRY_RETRO_FILE="$(mktemp)" claude plugin eval . --tag', 1),
+                                    "test_no_documented_eval_command_carries_the_retro_file_variable")
 
-    def test_the_eval_commands_point_the_retro_at_the_real_file(self):
-        for rel in ("evals/README.md", "CONTRIBUTING.md"):
-            with self.subTest(doc=rel):
-                self.assertCaughtBy(rel, lambda t: t.replace('FOUNDRY_RETRO_FILE="$(mktemp)" claude plugin eval .', 'claude plugin eval .', 1),
-                                    "test_the_eval_commands_that_run_skills_set_the_retro_file_to_a_scratch_path")
+    def test_the_retro_prefix_is_put_back_on_an_expensive_command(self):
+        self.assertCaughtBy("evals/README.md", lambda t: t.replace("claude plugin eval . --eval-dir", "FOUNDRY_RETRO_FILE=/tmp/x claude plugin eval . --eval-dir", 1),
+                            "test_no_documented_eval_command_carries_the_retro_file_variable")
 
-    def test_the_eval_docs_lose_the_reason(self):
+    def test_the_own_home_sentence_is_dropped(self):
+        self.assertCaughtBy("evals/README.md", lambda t: flat_sub(t, "The harness gives each case its own home folder, so the entry lands in that home's `.foundry/retro.md` and never in yours", "The entry lands in the retro file"),
+                            "test_the_eval_docs_say_the_harness_gives_each_case_its_own_home")
+        self.assertCaughtBy("CONTRIBUTING.md", lambda t: flat_sub(t, "the harness gives each case its own home, so the entry never lands in your `~/.foundry/retro.md`", "the entry lands in the retro file"),
+                            "test_the_eval_docs_say_the_harness_gives_each_case_its_own_home")
+
+    def test_the_shell_variable_note_or_keep_temp_note_is_dropped(self):
+        self.assertCaughtBy("evals/README.md", lambda t: flat_sub(t, "(a `FOUNDRY_RETRO_FILE` set in your shell doesn't reach the session)"),
+                            "test_the_eval_docs_say_the_harness_gives_each_case_its_own_home")
+        self.assertCaughtBy("evals/README.md", lambda t: flat_sub(t, "`--keep-temp` keeps that folder if you want to read what the session wrote."),
+                            "test_the_eval_docs_say_the_harness_gives_each_case_its_own_home")
+
+    def test_the_old_reason_comes_back(self):
         for rel in ("evals/README.md", "CONTRIBUTING.md"):
             with self.subTest(doc=rel):
-                self.assertCaughtBy(rel, lambda t: t.replace("~/.foundry/retro.md", "the real file"), "test_the_eval_docs_say_why")
+                self.assertCaughtBy(rel, lambda t: t.rstrip("\n") + "\n\nThe prefix keeps the retro step off your real file.\n",
+                                    "test_the_eval_docs_say_the_harness_gives_each_case_its_own_home")
+
+    # Who a line names, tried once and corrected on the spot, examples show the shape
+    def test_the_who_a_line_names_rule_is_dropped_from_either_skill(self):
+        for rel, phrase in ((self.RUN, "Each line names who did the work: the agent, if one was dispatched, and `run-plan` for work the session did itself."),
+                            (self.DEBUG, "Each line names who did the work: the agent, if one was dispatched, and `debug` for work the session did itself.")):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, lambda t: flat_sub(t, phrase), "test_both_skills_carry_the_shared_retro_text")
+
+    def test_the_session_own_name_is_dropped_or_swapped(self):
+        for rel, own in ((self.RUN, "`run-plan` for work the session did itself"), (self.DEBUG, "`debug` for work the session did itself")):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, lambda t: flat_sub(t, own, "`test-engineer` for work the session did itself"),
+                                    "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_never_an_agent_that_wasnt_dispatched_is_dropped(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, lambda t: flat_sub(t, "Never name an agent that wasn't dispatched."),
+                                    "test_both_skills_carry_the_shared_retro_text")
+
+    def test_the_tried_once_rule_is_dropped_from_either_skill(self):
+        self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, "a builder's NEEDS_CONTEXT question, or anything tried once and corrected on the spot, is", "or a builder's NEEDS_CONTEXT question, is"),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "A fix that took one go, or anything tried once and corrected on the spot, is", "A fix that took one go is"),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_debug_step_skipped_goes_back_to_any_first_attempt(self):
+        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "a step of the method skipped and caught (a fix before the pin, a suspect named before the check), not a first attempt that needed redoing",
+                                                           "a step skipped and caught (a fix before the pin, a suspect named before the check)"),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_the_examples_show_the_shape_sentence_is_dropped(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, lambda t: flat_sub(t, "The examples show the shape, not lines to reuse: write what happened in this run."),
+                                    "test_both_skills_carry_the_shared_retro_text")
+
+    # The example lines themselves
+    EX = r"^- \S+ \[{kind}\]:.*$"
+
+    def test_an_example_names_an_agent_that_does_not_exist(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, lambda t: re.sub(r"^- (\S+) \[misread\]:", "- reviewer [misread]:", t, count=1, flags=re.M),
+                                    "test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape")
+
+    def test_an_example_carries_two_kind_words_or_none(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel, kind="two"):
+                self.assertCaughtBy(rel, lambda t: re.sub(r"^(- \S+ \[missed\]:.*)$", r"\1 [user]", t, count=1, flags=re.M),
+                                    "test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape")
+            with self.subTest(skill=rel, kind="none"):
+                self.assertCaughtBy(rel, lambda t: re.sub(r"^(- \S+) \[missed\]:", r"\1:", t, count=1, flags=re.M),
+                                    "test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape")
+
+    def test_an_example_breaks_the_shape(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel, kind="no source"):
+                self.assertCaughtBy(rel, lambda t: re.sub(r"^(- \S+ \[didnt-hold\]:[^\n]*) \([^()\n]+\)$", r"\1", t, count=1, flags=re.M),
+                                    "test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape")
+            with self.subTest(skill=rel, kind="no semicolon"):
+                self.assertCaughtBy(rel, lambda t: re.sub(r"^(- \S+ \[missed\]:[^;\n]*); ", r"\1, ", t, count=1, flags=re.M),
+                                    "test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape")
+
+    def test_an_example_models_a_one_retry_line(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, lambda t: re.sub(r"^(- \S+ \[missed\]:[^;\n]*); ", r"\1, and was rewritten once; ", t, count=1, flags=re.M),
+                                    "test_no_example_line_models_a_one_retry_line")
+
+    def test_an_example_goes_back_to_the_copied_dispatch_line(self):
+        self.assertCaughtBy(self.DEBUG, lambda t: re.sub(r"^- implement \[fix-rounds\]:.*$", "- test-engineer [fix-rounds]: its pin passed on the unfixed code and was rewritten once; should have run it unfixed first (the pin, round 1)", t, count=1, flags=re.M),
+                            "test_no_example_line_models_a_one_retry_line")
+
+    def test_the_append_commands_example_entry_names_a_missing_agent(self):
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                def edit(t):
+                    head, sep, rest = t.partition("<<'FOUNDRY_RETRO_END'")
+                    return head + sep + re.sub(r"^- \S+ \[", "- ghost [", rest, count=1, flags=re.M)
+                self.assertCaughtBy(rel, edit, "test_the_append_commands_example_entry_names_a_real_agent_too")
 
 
 if __name__ == "__main__":
