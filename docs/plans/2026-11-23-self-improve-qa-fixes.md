@@ -47,6 +47,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
   - The harness runs each case with its own throwaway home (`/private/tmp/e-.../home`), and the caller's `FOUNDRY_RETRO_FILE` did not reach the session: both writes resolved to that home's `.foundry/retro.md`. The real file's checksum was the same before and after. So the prefix on the documented commands does nothing, and the real file was never at risk from these cases.
 - Batch 4: complete (from c629b21; gate: Ran 857, OK on both Pythons (1 and 5 skips), validates 0/0/0; the eval prefix removed and the docs corrected, who a retro line names, debug's Production paragraph; adversarial: no bugs, no fix rounds; one phrase sent back by me, the ban on a leading `cd`)
 - Re-run after Batch 4, on 8a73e2d: debug-production-report x 4: exit 0, $0.76, 105 s. 1.00 in all four runs; `asks-and-hands-over` PASS PASS PASS each time (12 of 12 votes, against 0 of 6 before the fix). Paid spend so far: $5.35 of the $15 cap.
+- The retro's first repeat (`run-plan [missed]`, twice) went to the owner through `brainstorm` on 2026-11-23. Owner decisions: 1A (an unchecked finding is checked in run-plan's fix-batch step), 2A (qa labels each finding as run or read), 3A (design calls the session adds mid-run get brainstorm's cold read before they're briefed), 4A (a finding only a paid run can check is parked and reported with its cost). Batch 5 builds it; the brief is `fix-5-brief.md` in the work dir, with the calls I made.
 
 ### Decisions made during the build
 
