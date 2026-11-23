@@ -139,7 +139,7 @@ brainstorm → investigate → architect → run-plan: [ implement / frontend (u
 - **New or unfamiliar project:** `investigate` before the architect.
 - **Small fix:** `implement` → `qa` is often enough.
 - **UI work:** `uiux` decides, `frontend` executes — spec first, then build.
-- **Bug fix:** `debug` finds the cause, `implement` fixes it, `test-engineer` pins it with a regression test.
+- **Bug fix:** `debug` finds the cause and pins it with a failing test, then `implement` fixes it.
 - **After anything lands:** `docs`, so the next session isn't lied to.
 - **Releasing:** `ship`, with `devops` for the runbooks, CI, and migrations
   it leans on.
