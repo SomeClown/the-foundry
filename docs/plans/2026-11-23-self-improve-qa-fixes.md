@@ -54,6 +54,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Batch 6: complete (from 9df8fb2; gate: Ran 950, OK on both Pythons (1 and 5 skips), validates 0/0/0; the cost gates are out of run-plan, CONTRIBUTING and evals/README, and eval situation h expects the check to be run; adversarial: no bugs, no fix rounds)
 - Check of Batch 6, on bd7fe14: run-plan-decisions x 4: exit 0, 186 s, case score 0.97. Item h PASS PASS PASS in all four runs: every answer batched the finding qa had run, ran a real model session to check the one qa had only read, and didn't stop to ask. Item c failed run 2 on FAIL FAIL FAIL, though that answer says what the three passing ones say (cap hit, no round 4, the retro first, stop and ask with two or three ways forward): a judge miss, not a change in behavior. All four answers to c wrote the retro before stopping, which is the early-stop rule (5A) seen in a model's hands for run-plan. Two of them gave one event two kind words (`fix-rounds` and `didnt-hold`), where the text says the first that fits.
 - `investigate`'s stop above 500 files: the owner said to remove it (2026-11-23), then chose 1A (a big sweep is read in parts, without asking) and 2A (the orchestrator updates the global CLAUDE.md line at ship). Not built on this branch. My draft amendment got the cold read Batch 5 now requires, twice: the first found the stop also hides a report-size limit, the second found four calls missing before a builder could start. The decisions, the draft and both reads are in `docs/plans/2026-11-23-investigate-in-parts.md`; it's a project of its own.
+- Release 2.2.0: the docs agent turned Unreleased into the 2.2.0 entry (what changed since 2.1.1, not the branch's history) and did a last truth pass; `plugin.json` bumped to 2.2.0.
 
 ### Decisions made during the build
 
@@ -83,7 +84,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Batch 1: a victim that prints its own `FAIL: test_y (...)` or `Ran 3 tests` line at the start of a line fools the grep. Left: it takes a test that prints unittest's own summary lines. Pinned as accepted.
 - Batch 1: a unittest victim that's an unexpected success, skipped, or an expected failure shows no failure header, so the four readings call it "didn't fail". Left: a pollution search's victim is a plain failing test, and the victim's own line still shows.
 - The retro file has no size limit (design §3, left open).
-- No model has run the retro step. A real run, or the paid cases, has to show it before the branch merges. That's a spend the owner approves.
+- (Settled: the retro step has since run for real, here and in two debug eval hunts; see Progress.)
 
 ### Retro
 

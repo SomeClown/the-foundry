@@ -247,6 +247,11 @@ six months with no memory of the decision is the bad outcome:
   revisit if one ever has fifty.
 ```
 
+**Retro.** Before docs, the session adds a `### Retro` section to the build
+log: one line for each time the team needed correcting that the loop hadn't
+caught by itself, or `- none`. Any lines also go to `~/.foundry/retro.md`,
+where a repeat of an earlier mistake shows up across projects.
+
 **Docs.** `docs` gets §14, the plan, and the build log. It updates CLAUDE.md
 and the README, and adds an `### As built (2026-10-23)` subsection to §14 (the
 one place it may touch the design): the notice came in with fix batch 1, and

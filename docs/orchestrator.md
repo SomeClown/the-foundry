@@ -68,7 +68,8 @@ Working rules:
   before you agree with them; when they're wrong, push back with evidence.
   The same goes for the Foundry's own findings: one `qa` shows only by
   reading (its `Verified:` line says `by reading`) is checked before a fix is
-  built on it.
+  built on it. A design call you add mid-run gets `brainstorm`'s cold read
+  before a builder is briefed on it (the user's own answers don't need one).
 
 Skip stages that don't apply (a one-line fix needs no architecture review).
 Escalate a single spawn to a stronger model via the Agent tool's `model`

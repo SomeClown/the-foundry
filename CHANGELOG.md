@@ -4,140 +4,152 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [2.2.0] — 2026-11-23
+
+A minor version, and a self-improvement pass: I had `qa` review the Foundry
+itself, built the fixes with the Foundry's own `run-plan`, and ran its behavior
+cases on real sessions to check them. The team is the same ten agents and four
+skills. What's new is a retro that `run-plan` and `debug` write at the end of a
+run, a rule that a finding `qa` only read gets checked before a fix is built on
+it, and a round of fixes to `debug`, `run-plan` and five agents.
+`investigate`'s stop above 500 files is unchanged in this release. Reading big
+repos in parts is written up as a project of its own in `docs/plans/` and isn't
+built.
+
+### Added
+- A retro at the end of `run-plan` and `debug` (design §3). The session
+  writes one line for each time the team needed correcting that the loop
+  didn't catch by itself. For `run-plan` that's a task with two or more fix
+  rounds or a BLOCKED, a test that misread the brief, a qa finding the builder
+  or `test-engineer` should have caught, a fix that didn't hold, or anything
+  the user corrected. `debug` counts a fix that didn't hold, a step of the
+  method skipped and caught, a dispatched agent's work redone, and anything
+  the user corrected. One fix round, a builder's question, or anything tried
+  once and corrected on the spot isn't one. Each line is
+  `- <agent or skill> [<kind>]: what it did; what it should have done (where
+  it came from)`. It names the agent that did the work, or `run-plan` or
+  `debug` for work the session did itself, never an agent that wasn't
+  dispatched. The kind is one of `user`, `blocked`, `fix-rounds`, `misread`,
+  `missed`, `didnt-hold`; when two fit, the first listed wins, so `user` comes
+  first. The lines go under a heading with the date, the repo's top folder's
+  name, and the run, appended to `~/.foundry/retro.md` (or the file named by
+  `FOUNDRY_RETRO_FILE`), so a repeat shows across projects. A run with nothing
+  to correct writes nothing to that file (`run-plan` logs `- none` in its
+  build log). Lines already in the file for the run aren't written twice, so a
+  run that stopped early and went on still adds its later lines. `run-plan`
+  keeps a copy in its build log, and a run that stops early (a fix cap, three
+  failed fixes, can't reproduce) writes its retro first. When the same agent
+  or skill makes a mistake with the same kind word as an earlier line, the
+  report quotes both and offers to work out a fix through `brainstorm`. The
+  session never edits an agent or skill file itself. The README and PRIVACY.md
+  say what the file holds and where, the README's uninstall note says how to
+  remove it, and structural tests hold the docs to it. The eval harness gives
+  each case its own home, so a case's retro never reaches the real file;
+  `evals/README.md` and CONTRIBUTING say so.
+- `qa` puts a `Verified:` line in each finding: `ran ...` or `by reading`.
+  `evals/run-plan-decisions` has a new situation (h) and grader for what
+  `run-plan` does with each.
+
+### Changed
+- Nothing told the session to check a claim before building on it, and the
+  retro's first repeat showed it: a qa finding marked "by reading; not run"
+  led to an eval prefix and docs that were wrong, and a design call of the
+  session's own lost a stopped run's later lines. `run-plan`'s fix-batch step
+  now takes a finding shown by running as it is, and checks one shown only by
+  reading with the quickest check that could prove it wrong (a real model
+  session if that's what settles it) before a fix is briefed. What the check
+  costs to run is not a reason to skip it. The build log says which of the two
+  each accepted finding was. Calls the session adds to a design mid-run get
+  `brainstorm`'s builder check before a builder is briefed (the user's own
+  answers don't), and the orchestrator notes say the same of the Foundry's own
+  findings.
+- The Foundry doesn't gate work on what it costs to run. `CONTRIBUTING.md` no
+  longer asks for the owner's OK before the `investigate` head-to-head, and
+  `evals/README.md` no longer warns that running the cases costs real money.
+  Measured figures stay as facts.
+- run-plan no longer keeps the base commit in a `BASE` shell variable, which
+  didn't survive from one Bash call to the next. The build log names the sha
+  noted at step 1, and step 4 checks that `HEAD` is still that sha before it
+  packages a task's diff: a builder that committed would have left its work
+  out of the package. It packages against the noted sha, written in as a
+  literal.
+- run-plan hands `test-engineer` the plan's Testing Strategy section by
+  heading, since the brief holds only the task's own section. Its rules file
+  carries the gate and the failures it's expected to show, marked as not the
+  task's to fix, so a builder doesn't chase failures that were already there.
+- `test-engineer` may write the report file its brief names, and no longer
+  stashes or reverts a fix already in the tree just to watch a regression
+  test fail; it says the test wasn't seen failing. Its description and the
+  README's agents table say so.
+- `devops` stops and reports before a command it can't undo, and goes on
+  only when resumed with the user's yes. A subagent can't wait for an answer.
+- `frontend` was told to load a project's theme or design-system skill but
+  had no `Skill` tool. It has one now, and a structural test fails any agent
+  whose instructions load a skill without it. `frontend` and `uiux` load only
+  a project's design skill (frontend) or their two design skills (uiux), never
+  the Foundry's own `brainstorm`, `debug`, `run-plan`, or `ship`, and
+  run-plan's builder report contract says the same.
+- `uiux` falls back to its own design knowledge, and says so in its report,
+  when its design skills aren't installed, as the README says. It had called
+  them "not optional".
+- The README's bug-fix line has `debug` pin the bug with a failing test, then
+  `implement` fix it, as the skill does. It had `test-engineer` pin it after.
+  The README also says `investigate` runs alone whether scoped or full, as the
+  orchestrator's rule, rather than listing it among the rules the agents hold
+  themselves to; it names the `debug` skill's working file among what the
+  plugin writes; and it describes `tests/` as checking debug's polluter
+  procedure too.
+- The routine behavior-case command in `evals/README.md` and CONTRIBUTING.md
+  passes `--ablation none`. Without it the harness adds a no-plugin baseline
+  arm whose prompts can't load the plugin's skills, which only adds cost.
 
 ### Fixed
 - `debug`'s first message on a production report handed the user a log
   command that wrote a file on the server (`> ~/newsbot-12h.log; wc -l ...`),
   joined two commands in one block (`cd ... &&`), and listed what to look for
   once at the end. The Production paragraph now says one command per block,
-  never joined, nothing written on the server (no redirect, no `tee`), and
-  what to look for under each block.
-- Sentences an earlier round left behind, now matching the text next to
-  them: `test-engineer`'s description, the README's agents table and its
-  "touches only tests" bullet now allow the report file its body already
-  allows; `uiux`'s direction-brief and dataviz sections now fall back to its
-  own design knowledge when a skill isn't installed, as its skills section
-  does; `devops` and `test-engineer` each have a report line for what their
-  bodies tell them to say (stopped before a command it can't undo; a
-  regression test not seen failing); the README's "rules the agents enforce
-  on themselves" list no longer holds the orchestrator's `investigate` rule.
-- `frontend` and `uiux` hold the `Skill` tool with no limit on which skills.
-  Each now says it loads only a project's design skill (frontend) or its two
-  design skills (uiux), never the Foundry's own `brainstorm`, `debug`,
-  `run-plan`, or `ship`, and run-plan's builder report contract says the same.
+  never joined (a `cd` on its own line above is fine), nothing written on the
+  server (no redirect, no `tee`), and what to look for under each block.
+- debug's measuring line hid the seed a random-order search needs: `-q` drops
+  the header that prints it, so a session that counted "fails 6 in 20" held
+  no seed from any failing run. It now gives each run its own
+  (`--randomly-seed=$i`), so the loop's number is the failing seed. The
+  measuring grep also lacked the name boundary its techniques file has, so
+  `test_y` counted `test_y_other` too. The polluter search only looked at
+  tests that run before the victim in the default order, so it couldn't find a
+  polluter that bites only in random order (the walkthrough's own example); it
+  now takes the order from a failing run's seed when the failure is
+  random-order only, and its halving steps say they may end on one test id,
+  not only a file.
+- debug's unittest check printed nothing before Python 3.11, whose `-v` line
+  ends in the class, not the full test id, and lost the result when the test
+  has a docstring, prints while it runs, or fails a subtest. A victim whose
+  `setUpClass` or `setUpModule` failed read as "the id didn't match", since
+  the victim never gets a line. The check is now one grep that shows the
+  victim's line, its `FAIL:` or `ERROR:` header (a `setUpClass` or
+  `setUpModule` one included) and the `Ran` footer, and the text says how to
+  read them: a header means it failed, no header with a `Ran` line means it
+  didn't, no victim line means the id didn't match, and no `Ran` line means
+  the run stopped.
 - run-plan's qa-pass command left `MB` empty if a session ran its two lines in
   separate Bash calls, packaging the wrong diff with no error. It now stops
   with a message when there's no merge-base, and says to run both in one call.
-  Step 4 never checked that `HEAD` was still the sha noted at step 1, so a
-  builder that committed left its work out of the task's package. It now
-  packages against the noted sha, written in as a literal.
-- debug's unittest check read a victim whose `setUpClass` or `setUpModule`
-  failed as "the id didn't match", since the victim never gets a line. The
-  grep now shows that `ERROR: setUpClass` or `setUpModule` line, and the
-  reading says the victim failed.
-- `frontend` was told to load a project's theme or design-system skill but
-  had no `Skill` tool. It has one now, and a structural test fails any agent
-  whose instructions load a skill without it.
-- `uiux` called its two design skills "not optional", where the README says
-  it falls back to its own design knowledge when they aren't installed. It
-  now says so in its report and carries on.
-- `run-plan` asked builders for the gate's exit code but never gave them the
-  gate: the brief starts at the task's heading. The rules file now carries
-  the gate and the failures it's expected to show, marked as not the task's
-  to fix, so a builder doesn't chase failures that were already there.
-- The README's bug-fix line had `test-engineer` pin the bug after the fix.
-  It now matches the `debug` skill: pinned by a failing test, then fixed.
-- The brief-command tests crashed with 30 errors (as a non-root user) on a machine without zsh.
-  They now skip zsh there, as the other shell tests already did.
-- debug's polluter search only looked at tests that run before the victim in
-  the default order, so it couldn't find a polluter that bites only in
-  random order (the walkthrough's own example). It now takes the order from
-  a failing run's seed when the failure is random-order only.
-- debug's measuring grep in SKILL.md lacked the name boundary its techniques
-  file has, so `test_y` also counted `test_y_other`. A structural test now
-  checks it.
-- debug's measuring line hid the seed a random-order search needs: `-q` drops
-  the header that prints it, so a session that counted "fails 6 in 20" held
-  no seed from any failing run. SKILL.md now gives each run its own
-  (`--randomly-seed=$i`), so the loop's number is the failing seed. The
-  halving steps also now say they may end on one test id, not only a file.
-- debug's unittest check printed nothing before Python 3.11, whose `-v` line
-  ends in the class, not the full test id, and lost the result when the test
-  has a docstring, which moves the result to the next line. A test that
-  prints while it runs or fails a subtest hides its verdict the same way. The
-  check is now one grep that shows the victim's line, its `FAIL:` or
-  `ERROR:` header and the `Ran` footer, and the text says how to read them:
-  a header means it failed, no header with a `Ran` line means it didn't, no
-  victim line means the id didn't match, and no `Ran` line means the run
-  stopped.
-- The routine eval command in `evals/README.md` and CONTRIBUTING.md now
-  passes `--ablation none`. Without it the harness adds a no-plugin baseline
-  arm whose prompts can't load the plugin's skills, which only adds cost.
+- `devops` and `test-engineer` each have a report line for what their bodies
+  tell them to say (stopped before a command it can't undo; a regression test
+  not seen failing).
+- The brief-command tests crashed with 30 errors (as a non-root user) on a
+  machine without zsh. They now skip zsh there, as the other shell tests
+  already did.
 
-### Changed
-- run-plan no longer keeps the base commit in a `BASE` shell variable, which
-  didn't survive from one Bash call to the next. The diff package compares
-  the staged task with `HEAD`, which is still the base, and the build log
-  names the sha noted at step 1.
-- run-plan hands `test-engineer` the plan's Testing Strategy section by
-  heading, since the brief holds only the task's own section.
-- `test-engineer` may write the report file its brief names, and no longer
-  stashes or reverts a fix already in the tree just to watch a regression
-  test fail; it says the test wasn't seen failing.
-- `devops` stops and reports before a command it can't undo, and goes on
-  only when resumed with the user's yes. A subagent can't wait for an answer.
-- README: `investigate` runs alone whether scoped or full, and that's the
-  orchestrator's rule; it stops above 500 files so the session can ask; the
-  `debug` skill's working file is in the list of what the plugin writes; and
-  `tests/` is described as checking debug's polluter procedure too.
-- Nothing told the session to check a claim before building on it, and the
-  retro's first repeat showed it: a qa finding marked "by reading; not run"
-  became an eval prefix and docs that were wrong, and a design call of the
-  session's own lost a stopped run's later lines. Now `qa` puts a `Verified:`
-  line in each finding (`ran ...` or `by reading`); `run-plan`'s fix-batch
-  step takes a finding shown by running as it is, and checks one shown only
-  by reading with the quickest check that could prove it wrong (a real model
-  session if that's what settles it) before a fix is briefed; the build log
-  says which of the two each accepted finding was. Calls the session adds to
-  the design mid-run get `brainstorm`'s builder check before a builder is
-  briefed (the user's own answers don't), and the orchestrator notes say the
-  same of the Foundry's own findings. `evals/run-plan-decisions` has a new
-  situation (h) and grader for it.
-- The Foundry no longer gates work on what it costs to run. `run-plan`
-  doesn't park a finding for want of a paid check, `CONTRIBUTING.md` no
-  longer asks for the owner's OK before the `investigate` head-to-head, and
-  `evals/README.md` no longer warns that running the cases costs real money.
-  Measured figures stay as facts. Asks that aren't about cost (pushes,
-  production, secrets, `investigate`'s 500-file stop) are unchanged.
-
-### Added
-- A retro at the end of `run-plan` and `debug` (design §3). The session
-  writes one line for each time the team needed correcting that the loop
-  didn't catch by itself (a task with two or more fix rounds or a BLOCKED, a
-  test that misread the brief, a qa finding the builder or `test-engineer`
-  should have caught, a fix that didn't hold, anything the user corrected).
-  One fix round or a builder's question isn't one. Each line is
-  `- <agent or skill> [<kind>]: what it did; what it should have done (where
-  it came from)`, with the kind one of `user`, `blocked`, `fix-rounds`, `misread`,
-  `missed`, `didnt-hold` (the first that fits wins). The lines go under a heading with the date,
-  the repo's top folder's name, and the run, appended to `~/.foundry/retro.md`
-  (or the file named by `FOUNDRY_RETRO_FILE`), so a repeat shows across
-  projects; a run with nothing to correct writes nothing there, and lines
-  already in the file for the run aren't written twice, so a run that stopped
-  early and went on still adds its later lines. `run-plan` keeps a copy in its
-  build log. A run that stops early (a fix cap, three failed fixes, can't
-  reproduce) writes its retro first. When the same agent or skill makes a
-  mistake with the same kind word as an earlier line, the report quotes both
-  and offers to work out a fix through `brainstorm`. The session never edits
-  an agent or skill file itself. The README and PRIVACY.md say what the file
-  holds and where, the README's uninstall note says how to remove it, and
-  structural tests hold the docs to it. A line names the agent that did the
-  work, or `run-plan` or `debug` for work the session did itself, never an
-  agent that wasn't dispatched, and anything tried once and corrected on the
-  spot isn't one. The eval harness gives each case its own home, so a case's
-  retro never reaches the real file; `evals/README.md` and CONTRIBUTING say
-  so.
+### Measured
+Real sessions, 4 runs each, after the fix batch that changed the text.
+`debug-production-report`: $0.76 and 105 seconds, 1.00 in all four runs, and
+`asks-and-hands-over` passed 12 of 12 votes, against 0 of 6 before the fix.
+`run-plan-decisions`: 186 seconds, 0.97; the new item h passed in all four
+runs, each answer running a real model session to check the finding `qa` had
+only read, without stopping to ask. Item c failed in one run on a judge miss:
+that answer said what the three passing ones said. A model has written a retro
+in two debug runs, on an earlier commit; I haven't re-run that on this one.
 
 ## [2.1.1] — 2026-11-10
 
