@@ -21,12 +21,16 @@ From the repo root. Run the cases for the skill you changed, before releasing
 it; running everything costs real money (see below).
 
 ```bash
-claude plugin eval . --tag ship --scaffold --trust-plugin --allow-tools Bash Write Edit \
+claude plugin eval . --tag ship --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit \
   --judge-model sonnet --threshold 0.8 --no-publish
 ```
 
 - `--tag brainstorm | run-plan | debug | ship | agents` picks a skill's cases;
   `--case 'debug-*'` works too.
+- `--ablation none` skips the no-plugin baseline arm the harness otherwise
+  adds whenever it finds the plugin at the target path. These cases tell the
+  session to load the plugin's own skills, which a session without the plugin
+  can't do, so that arm only adds cost.
 - `--scaffold` lets a case run its `scaffold.sh` to build its fixture repo.
   Those scripts are ours; read one before you trust it.
 - `--allow-tools Bash Write Edit` is needed by the cases that work in a repo

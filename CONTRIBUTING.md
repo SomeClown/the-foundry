@@ -50,7 +50,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    text, JSON, YAML, or an image, and agent and skill front matter takes only
    the keys the plugin directory accepts; the structural tests fail otherwise.
 3. If you changed what a skill does, run its behavior cases:
-   `claude plugin eval . --tag <skill> --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
+   `claude plugin eval . --tag <skill> --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
    A new behavior worth keeping gets a case of its own. See
    [evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) for how to read a failure and how a
    case is built.
