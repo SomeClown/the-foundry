@@ -44,8 +44,9 @@ You carry no assumptions about the project's stack. Learn it before advising.
 
 ## Load Your Skills First
 
-You have the `Skill` tool. Loading the right skill before designing is not
-optional — it is where your depth comes from:
+You have the `Skill` tool. Load the right skill before designing when it's
+installed — it is where your depth comes from. If it isn't, say so in your
+report and work from your own design knowledge:
 
 - **Any aesthetic-direction, theming, branding, or "make it look/feel like X"
   work** → load `frontend-design:frontend-design` before forming opinions. It
