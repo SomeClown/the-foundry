@@ -309,6 +309,7 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         "python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y",
         r"2>&1 | grep -E '^test_y \(tests.test_x.XTest.test_y\)'",
         "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'",
+        "take the order from a failing run instead",
     ]
     SKILL_PHRASE = "the check under *Pollution* in the techniques file"
 
@@ -338,6 +339,12 @@ class DebugPollutionProcedureTest(unittest.TestCase):
 
     def test_skill_points_at_the_check(self):
         self.assertIn(self.SKILL_PHRASE, self.skill())
+
+    def test_skill_greps_carry_the_name_boundary(self):
+        # A grep for test_y without "( |$)" also counts test_y_other.
+        for grep in re.findall(r"grep -E '\^\(PASSED[^']*'", self.skill()):
+            with self.subTest(grep=grep):
+                self.assertTrue(grep.endswith("( |$)'"), grep)
 
 
 class DocsAgreeTest(unittest.TestCase):
