@@ -656,3 +656,397 @@ text is `skills/run-plan/SKILL.md` ("Retro" in section 4) and
   resolves against the Bash call's folder. The no-repo fallback names no
   command, and a resumed debug hunt's "name already in the file" doesn't say
   which file. The file still has no size limit.
+
+## 4. A big sweep read in parts (approved 2026-11-23)
+
+§1 has `investigate` stop above 500 files, quote a rough cost, and wait while
+the session asks the user. The owner took cost gates out of the Foundry on
+2026-11-23, and this stop is one. Taking it out isn't one deleted paragraph,
+though, because the stop also hid a limit that has nothing to do with cost: a
+report carries every inventory whole (§1 Part 7), and one reply can only be so
+long. So above a certain size `investigate` now reads a sweep in parts. Each
+part is whole for what it read and names what it didn't, and the session sends
+it straight back until nothing is left. Nobody asks the user anything.
+
+This section replaces §1 Part 6 and the rulings about the stop in §1's "As
+built". The rest of §1 stands.
+
+**Owner decisions (2026-11-23):**
+
+- The stop goes. "Remove investigate's stop above 500 files too?" "Yes, remove
+  it." The direction behind it: "The time used (cost) is a consequence of
+  whatever the team is building. I don't need that constraint present in the
+  team."
+- First round, 1A: a sweep too big for one report is read in parts, without
+  asking.
+- First round, 2A: the orchestrator updates the `STOPPED BEFORE READING` line
+  in the owner's global `~/.claude/CLAUDE.md` when this ships.
+- Second round, 1A: the brief for the next part carries every area still
+  unread, copied from the report as given. `investigate` reads the first
+  part's worth, never re-splits them, and names the rest again.
+- Second round, 2A: a continuing brief starts with the fixed line `CONTINUE
+  SWEEP`, checked before anything else the way `AREA LEAD` is, and it wins
+  over the mode rules. The run repeats orientation, reads the named areas as a
+  full sweep, and writes the full-sweep mode line. Untracked files and
+  whole-repo skips are reported in part 1 only.
+- Second round, 3A: a fixed line at the top of the report, `SWEEP IN PARTS:
+  <n> areas not read`, with the areas listed right under it, before section 1.
+  It is line 1, or line 2 under `NOT A PER-FILE READ`. The last part says `0
+  areas not read`. The session copies the block into the next brief. This is a
+  second fixed line at the top, which the owner OK'd with this answer.
+- Second round, 4A: an area is written down folders first: a set of folder
+  prefixes, or the files directly in a folder, and only a folder too big and
+  flat to divide by subfolder is cut into ranges of its sorted file list.
+  Every area carries its file count, and a run whose rebuilt count differs
+  says so in Coverage.
+
+Not chosen: letting `investigate` write area reports to files (it never writes
+files), and accepting cut inventories on very large repos (it never trims).
+
+**Goals**
+
+- `investigate` never stops before reading, never quotes a cost, and never has
+  the session ask first, at any size.
+- A sweep too big for one report gets read in full over several runs, with
+  nothing trimmed, and every report says exactly which areas are still unread.
+- A session that has nothing but the latest report can carry the sweep on.
+
+**Non-goals**
+
+- Changing `file-reader`, the 150-file area, the batches of 10, the big-file
+  split, or the gap check inside a run.
+- Running parts side by side. One run at a time, as §1 Part 5 says of sweeps.
+- Merging the parts into one report. The session keeps them as they came.
+- Checking claims across parts. A part's Coupling Map covers what that run
+  read. A reference into an area not yet read is listed as a reference, not
+  checked.
+
+**Anti-goals** (a failure even if it technically works)
+
+- A file no part covers and no report mentions.
+- One part taken for the whole codebase.
+- An inventory trimmed so a part fits.
+- A report that comes back cut off with nothing to show it.
+- Anything that asks the user before reading or between parts.
+
+**Constraints**
+
+- One reply can only be so long, and a long agent result can reach its caller
+  as a preview with the full text saved to a file. The one measured report was
+  53.7KB for 191 files, and in that eval run the saved file couldn't be read
+  (§1, As built). Nothing above 191 files has been run.
+- Every run starts cold. A continuing run knows only what its brief says.
+- `investigate` can't write files and can't ask the user.
+- Session, `investigate`, area lead, reader is already the three-layer limit.
+  Parts add runs, not layers.
+
+### Part 1: The stop is gone
+
+There is no `STOPPED BEFORE READING` reply, no rough cost, and no brief that
+has to say the user approved a size. `NOT A PER-FILE READ` is the only
+first-line flag left. The orchestrator never asks the user before a sweep,
+whatever its size.
+
+### Part 2: When a sweep goes in parts
+
+**The part size** is about 300 files until Part 7 measures it. A list at or
+under the part size is one report, built as it is today, and nothing in this
+section shows in it except the last line (Part 4).
+
+Above the part size, `investigate` doesn't hold the whole list. It counts
+tracked files by folder, drops whole folders that are skipped by rule
+(vendored code, build output, data), counting them by reason, and builds
+areas of at most about 150 files from the counts, as §1 Part 5 says. Those
+areas, in a fixed order, are the sweep. A part is the first areas in that
+order that still fit under the part size, whole areas only, and never fewer
+than one. `investigate` lists the paths of those areas only, reads each area
+behind an area lead, one at a time, and reports them whole.
+
+"Above the part size" is judged on tracked files after the whole-folder
+skips. File-by-file skips (a lock file, a binary, a generated file) are made
+by the run that reads the area, and counted there.
+
+Outside a git repo, "tracked files" means what the bounded `find` prints,
+sorted in byte order. The block's `Environment:` line (Part 4) carries that
+exact command, so every run lists the same way.
+
+A sweep is of the repo as part 1 found it. If files change between parts, a
+count will differ and Coverage says so (Part 3), but a file added to an area
+already read isn't seen.
+
+### Part 3: How an area is written down
+
+One line per area: a short name, a definition, and a count.
+
+```
+- api: `src/api/` + `src/auth/` (141 files)
+- top: `src/` (direct) + (root) (38 files)
+- web: `web/` except `web/vendor/` (96 files)
+- data-1: `data/` from `data/a001.py` to `data/k220.py` (150 files)
+```
+
+A definition is one or more pieces joined by ` + `:
+
+- `dir/` is every tracked file under that folder.
+- `dir/` (direct) is the tracked files directly in that folder, not in its
+  subfolders. (root) is the files at the root.
+- `dir/` except `dir/sub/` leaves a folder out. It's how an area steps
+  around a folder that part 1 skipped whole; no area may hold one.
+- A piece followed by from `first` to `last` is every file of that piece
+  whose path sorts at or after `first` and at or before `last`, in byte
+  order, which is the order `git ls-files` prints. It's a comparison, not a
+  search for those two lines, so a range still selects the right files when
+  an end path has since been renamed. It's used only for a folder, or a
+  folder's direct files, with more than about 150 files that subfolders
+  can't divide.
+
+This is the Foundry's own notation, not a git pathspec: `git ls-files --
+'docs/*'` matches everything under `docs/`, not its direct files. The agent
+file gives the command for each piece, without an extra `sort` and with
+git's path quoting off.
+
+The count is the number of tracked files the definition matches, with no
+file-by-file skips applied, so any run can rebuild it and get the same
+number. Before it reads anything, the first run checks by command that every
+tracked file left after the whole-folder skips is in exactly one area. It
+doesn't read while that fails; it fixes the areas and checks again.
+
+A later run rebuilds each area it reads from its definition. If the count
+differs from the one in its brief, it reads what it found and gives both
+numbers in Coverage. Two exceptions: a rebuilt area of more than about 150
+files isn't read, since something is wrong with the definition, and an area
+that matches nothing has nothing to read. Each is named in Coverage as
+unread, with both numbers, and left out of the block.
+
+### Part 4: What a part's report looks like
+
+- **The block at the top.** `SWEEP IN PARTS: <n> areas not read` is line 1,
+  or line 2 when `NOT A PER-FILE READ` is line 1. The block under it is the
+  whole of the next brief:
+
+  ```
+  SWEEP IN PARTS: 3 areas not read
+  To read the rest, dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first line, then every line from `Project:` to `END OF BLOCK`, copied as it stands.
+  Project: <a sentence or two>
+  Focus: <the task's focus, or "none">
+  Environment: <anything the brief said about the environment, such as a git wrapper>
+  Areas not read:
+  - <one line per area, as in Part 3, in order>
+  END OF BLOCK
+  ```
+
+  Then the report's sections as usual.
+- **Every part carries the block,** and the last one says `SWEEP IN PARTS: 0
+  areas not read`, with no lines under it. A sweep that fits in one report
+  never carries it.
+- **Whole for what it read:** every inventory untrimmed, the gap check and
+  re-reads done, Coverage complete for the files in the areas this run read.
+- **Coverage.** The mode line is `Mode: full sweep, <N> area leads`, with N
+  the leads this run started. Unread areas appear as one line, their number
+  and their files' total, pointing at the block. That is the one exception to
+  "every file left unread, by path", and it covers only areas this run never
+  started. Within a run, files listed = read + skipped + unread by path +
+  failed, for the areas it read. Part 1 also gives the whole-repo figures:
+  tracked files, whole-folder skips by reason, and untracked files. A later
+  part says those were given in part 1 and doesn't repeat them.
+- **The last line of every report** is `INVESTIGATE REPORT ENDS`, in every
+  mode, and an area lead's return ends with `AREA REPORT ENDS`. A report
+  without its last line was cut off. The tokens differ from the
+  `END-OF-REPORT` the eval prompts ask the session for, so the head-to-head
+  still measures what it measured.
+
+### Part 5: The continuing brief
+
+```
+CONTINUE SWEEP
+Project: <copied from the block>
+Focus: <copied from the block>
+Environment: <copied from the block>
+Areas not read:
+<the block's area lines, copied as given>
+END OF BLOCK
+```
+
+`investigate` checks for `CONTINUE SWEEP` on the first line before it picks
+a mode, and the marker wins: the run is a full sweep of the named areas,
+whatever else the brief says and whether or not the codebase is called known.
+It does orientation again, since it knows nothing. It doesn't build areas or
+re-split the ones it was given. It takes them in the order given, reads the
+first ones that fit under the part size (never fewer than one), each behind
+an area lead, and puts the rest back in the block. It doesn't list untracked
+files or redo the whole-folder skips.
+
+### Part 6: The session's side, and what goes wrong
+
+**The loop.** When a report's block says one or more areas aren't read, the
+session dispatches `investigate` again with the brief in Part 5, one run at a
+time and nothing else that starts agents alongside, until a report says `0
+areas not read`. It doesn't ask the user. When the sweep ends, it tells the
+user it was read in parts, how many, and anything a part named as unread.
+
+**Keeping the parts.** The session keeps a line per part saying which areas
+it covers, and hands later agents the parts that cover what they need. It
+may save the reports to files outside the tracked tree and hand over paths,
+since ten parts held in one conversation would crowd out everything else.
+
+**A report that arrives as a preview.** The block starts at the top, so the
+preview shows that the report is a part. The session reads the saved output
+for the full text, the block included. A preview is not a failure. If the
+saved output can't be read, the session stops the sweep and tells the user
+that reports this size can't be handed back in this environment. It doesn't
+send the same brief again, since the same report would come back, and it
+doesn't pass the preview off as the report.
+
+**A part that fails.** A run that fails, whose full text lacks its last
+line, that carries no `SWEEP IN PARTS` line when its brief was a continuing
+one, or that names the same areas unread that its brief gave it, gets the
+same brief once more. If that fails too, the session stops the sweep and
+tells the user which areas are unread. That's a failure report, not a
+request for permission.
+
+**A refused spawn mid-part.** The top level starts leads, so after a second
+refusal an area whose lead never started goes back in the block, along with
+every later area of this part, and the next run reads them. Inside an area,
+a lead whose reader spawns are refused lists its unstarted files unread by
+path, as today. A run that read no area names the same areas its brief gave
+it, which the rule above already treats as a failed part.
+
+**A lead that fails twice.** Its files are listed unread by path, as today,
+and the top level doesn't send its own readers for them. The failed-lead rule
+wins over the path check, in every sweep, or one bad lead would pull about
+150 reader reports into the top level.
+
+**No `Agent`.** On a first run, no parts. `investigate` does the flagged
+single-agent read it always did below 500 files, with unread files as counts
+per folder, and never writes a `SWEEP IN PARTS` line. A continuing run
+without `Agent` does the same flagged read, but only inside the first part's
+worth of the areas it was given, and it still writes the block with the
+rest, so the sweep goes on and every part says how it was read. A lead
+without `Agent` inside a part is handled as today, and its flag takes line 1.
+
+**A scoped read above the part size.** A scoped set isn't made of folders,
+so it has no areas to name. The run reads the first part's worth, lists the
+rest unread by path in Coverage as it would today, and puts `SWEEP IN PARTS:
+<n> files not read` at the top, with one fixed sentence under it: send the
+original brief again with "Read only these files:" and the unread paths from
+Coverage. That follow-up is an ordinary scoped brief, so the loop ends when
+a report comes back without the line. The same rules apply as for areas: a
+preview means reading the saved output, and a run that fails or leaves the
+same paths unread gets one more try before the session stops and says so.
+`CONTINUE SWEEP` is for full sweeps only.
+
+### Part 7: Setting the part size, and proving it works
+
+The build makes a test repo of several hundred files, big enough to need at
+least three parts at 300. It has planted facts in every part (the last one
+included), a flat folder too big to divide by subfolder, files at the root, a
+folder skipped whole, and a few untracked files. It lives in
+`evals-expensive/`, beside the head-to-head.
+
+Two things get measured before the agent's wording is final:
+
+- **What reaches the caller.** For reports of several sizes: the bytes, and
+  whether the dispatching session got the whole text in the agent's result or
+  a preview. Measured in a live session and in the eval harness, since they
+  differed once already.
+- **The loop.** A session given the fixture and a plain onboarding brief
+  reads all of it, part after part, without asking, and the parts together
+  hold every planted fact and name every tracked file as read, skipped or
+  unread.
+
+The part size is then the largest whole number of areas whose report reaches
+the session whole, with room to spare. If that comes out far from 300, or
+under one area's worth, the number goes back to the owner before it's built
+in, since §1 doesn't let the sizes move without them.
+
+The nesting smoke and the head-to-head run too, as they do for any change to
+`investigate`. They use a repo under 200 files, so they show the one-report
+case still works, not that parts do.
+
+### Part 8: What else has to change
+
+- **`agents/investigate.md`:** every place that depends on the stop (listed
+  at the end of `docs/plans/2026-11-23-investigate-in-parts.md`), the new
+  parts text, and one sentence in its description, since the description is
+  the only thing a session without the CLAUDE.md block sees: on a repo too
+  big for one report it returns one part with a `SWEEP IN PARTS` line, and
+  the session sends it back with `CONTINUE SWEEP` until that line says 0.
+- **`docs/orchestrator.md`:** the routing line loses the stop and gains the
+  loop, and the notes say to read the saved output when a report arrives as
+  a preview.
+- **`skills/brainstorm/SKILL.md`:** one sentence on the recon line, that a
+  sweep can come back in parts. `debug` and `run-plan` need nothing.
+- **README, CHANGELOG, `evals/README.md`:** the stop sentence and its cost
+  figures go; the parts and the new case are described.
+- **Tests:** the pins that hold the stop in place turn into pins that keep it
+  out (`tests/test_structure.py`, `NoCostGatesPinsTest` included,
+  `tests/test_check_before_building_pin_mutations.py`,
+  `tests/test_investigate_batch1.py`), and the fixed tokens (`SWEEP IN
+  PARTS`, `CONTINUE SWEEP`, `END OF BLOCK`, `INVESTIGATE REPORT ENDS`, `AREA
+  REPORT ENDS`) get pins of their own. The commands that build an area from
+  each kind of piece get run against a small repo, the way run-plan's brief
+  command is.
+- **Outside the repo:** the `STOPPED BEFORE READING` line in the owner's
+  `~/.claude/CLAUDE.md`, by the orchestrator, when this ships.
+
+**Calls I made**
+
+- The count is of tracked files, with no skips. I told the owner counts would
+  apply "only the skips a path can show"; a count that depends on a judgment
+  can't be rebuilt, and then the check means nothing. Whole-folder skips
+  happen once, in part 1, and those folders are in no area.
+- "Above the part size" is judged on tracked files after whole-folder skips,
+  not on the list after every skip, because above it the list is never held
+  whole. A repo just over the line with many skipped files goes in two parts
+  where one report might have fit.
+- In a sweep that goes in parts, every area gets a lead, even a last part of
+  one small area. One rule is easier to follow than two.
+- The block is the whole next brief: it carries the project, focus and
+  environment lines and says how to continue, so a session that never saw
+  `docs/orchestrator.md`, or has only the latest report, can still go on.
+- The notation in Part 3, including "except" for stepping around a folder
+  skipped whole, and a range as a comparison in byte order.
+- A rebuilt area of more than about 150 files isn't read (Part 3).
+- A fixed last line on every report, and on every lead's return. Without it
+  a cut-off report looks like a short one.
+- A part that fails twice stops the sweep and the user is told. A sweep that
+  retried forever would be worse than one that says where it stopped.
+- A preview whose saved output can't be read stops the sweep at once, with
+  no retry (Part 6).
+- The session may save the parts to files outside the tracked tree. The
+  owner turned down `investigate` writing files; this is the session, which
+  already writes.
+- A scoped read above the part size uses paths, not areas (Part 6).
+- With no `Agent`: no parts on a first run, and a flagged read of the named
+  areas on a continuing one (Part 6).
+- Outside git, the same areas over a sorted `find` (Part 2).
+- A sweep is of the repo as part 1 found it (Part 2).
+- The failed-lead rule applies to every sweep, small ones included. §1 left
+  it unclear whether the path check re-read a failed lead's files.
+- A continuing run's Coverage counts only its own areas, and part 1 carries
+  the whole-repo figures.
+- The fixture's size and what's planted in it (Part 7).
+
+**Left to the builder (architect)**
+
+- The wording in `agents/investigate.md`, including the commands that count
+  by folder and rebuild an area from its definition.
+- The fixture's design, the eval case and its graders, and how what reaches
+  the caller gets measured.
+- The order of tasks, with the measurement before the final wording.
+
+**Open items**
+
+- The part size. 300 is a guess from one report.
+- A part is sized in files, and a report's length depends on what's in them.
+  A repo dense with routes could overflow a part the fixture says is safe.
+  The last line and the preview rule catch that; nothing prevents it. A
+  brief line that asks for a smaller part would be the fix, if a real sweep
+  needs one.
+- The block grows with the repo, since every unread area is in every report
+  and every brief. At about 65 bytes a line it's about 9KB on a 20,000-file
+  repo, which is fine, and about 35KB at 80,000 files, where it would crowd
+  the report and no longer fit a preview. The sweep still runs at that size,
+  through the saved output, but nothing has been tried anywhere near it.
+- Nobody checks coupling across parts (non-goals). If a real sweep shows that
+  losing something, it comes back as its own change.
