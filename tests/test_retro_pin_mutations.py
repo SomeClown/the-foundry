@@ -476,7 +476,14 @@ class RetroPinMutationTest(unittest.TestCase):
     def test_readme_and_privacy_lose_what_an_entry_holds(self):
         for rel in ("README.md", "PRIVACY.md"):
             with self.subTest(doc=rel):
-                self.assertCaughtBy(rel, lambda t: flat_sub(t, "the date, the project folder's name, the plan file's name or the bug's short name, and one line per correction", "some notes"),
+                self.assertCaughtBy(rel, lambda t: flat_sub(t, "the date, the repo's top folder's name, the plan file's name or the bug's short name, and one line per correction", "some notes"),
+                                    "test_readme_and_privacy_say_where_and_what")
+
+    def test_readme_and_privacy_go_back_to_the_project_folders_name(self):
+        # The skills name the repo's top folder; the docs must say the same, not the old words.
+        for rel in ("README.md", "PRIVACY.md"):
+            with self.subTest(doc=rel):
+                self.assertCaughtBy(rel, lambda t: flat_sub(t, "the repo's top folder's name", "the project folder's name"),
                                     "test_readme_and_privacy_say_where_and_what")
 
     def test_readme_and_privacy_lose_the_clean_run_sentence(self):

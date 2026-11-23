@@ -37,6 +37,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Batch 1: complete (from eb3cc78; gate: Ran 612, OK on python3 3.14.7 (1 skip, the seeded-loop run test, no pytest-randomly) and on /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: 2 bugs in the first unittest line fixed in round 1, the line replaced by one grep in round 2 on a ruling; 2 of 3 rounds used)
 - Batch 2: complete (from d357f25; gate: Ran 695, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: no bugs, no fix rounds; every fix qa found unpinned now has a pin with a mutation that proves it)
 - Batch 3: complete (from ccc350d; gate: Ran 815, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: no bugs; 2 of 3 fix rounds used, one for a gap in my own design call and one for the heredoc marker and five prose findings; no real retro file was created)
+- Docs: complete (design §3 As built; CHANGELOG, README and PRIVACY brought in line with the skills; one phrase re-pinned by test-engineer; a new PR description drafted in the work dir, not posted)
 
 ### Decisions made during the build
 
@@ -61,3 +62,10 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Batch 1: a unittest victim that's an unexpected success, skipped, or an expected failure shows no failure header, so the four readings call it "didn't fail". Left: a pollution search's victim is a plain failing test, and the victim's own line still shows.
 - The retro file has no size limit (design §3, left open).
 - No model has run the retro step. A real run, or the paid cases, has to show it before the branch merges. That's a spend the owner approves.
+
+### Retro
+
+- implement [fix-rounds]: read the unittest verdict from the verbose line, which a printing test or a failing subTest hides, then grew the fix into a 600-character awk program; should have read the end-of-run failure headers with one grep from the start (Batch 1, fix rounds 1 and 2)
+- run-plan [missed]: my design call skipped the retro append whenever the run's heading was already in the file, which loses a stopped run's later lines; should have keyed the check on lines, which the builder pointed out (Batch 3, fix round 1)
+
+Not appended to `~/.foundry/retro.md`: the step is unreleased, and its first real write waits for the owner's OK.

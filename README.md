@@ -316,7 +316,7 @@ version, so you don't have to take my word for it:
   working files in `.git/foundry-run/`, inside the git directory where nothing
   gets tracked. At the end, a run that needed correcting also appends a retro
   to `~/.foundry/retro.md` (or the file named by `FOUNDRY_RETRO_FILE`, if you
-  set it): the date, the project folder's name, the plan file's name or the
+  set it): the date, the repo's top folder's name, the plan file's name or the
   bug's short name, and one line per correction. A run with nothing to correct
   writes nothing. The instructions tell the session to keep code, file
   contents and secrets out of it. The file stays on your machine, and it's the

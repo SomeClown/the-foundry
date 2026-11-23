@@ -17,7 +17,7 @@ permissions you've set:
   with one exception: `run-plan` and `debug` append a retro to
   `~/.foundry/retro.md` on your own machine (or to the file named by the
   `FOUNDRY_RETRO_FILE` environment variable, if you set it). For each run that
-  needed correcting, it holds the date, the project folder's name, the plan
+  needed correcting, it holds the date, the repo's top folder's name, the plan
   file's name or the bug's short name, and one line per correction. A run with
   nothing to correct writes nothing. The instructions tell the session to keep
   code, file contents and secrets out of it. `run-plan` also puts a copy of its

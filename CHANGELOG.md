@@ -42,7 +42,7 @@ All notable changes to The Foundry. Format loosely follows
   to fix, so a builder doesn't chase failures that were already there.
 - The README's bug-fix line had `test-engineer` pin the bug after the fix.
   It now matches the `debug` skill: pinned by a failing test, then fixed.
-- The brief-command tests crashed with 29 errors on a machine without zsh.
+- The brief-command tests crashed with 30 errors (as a non-root user) on a machine without zsh.
   They now skip zsh there, as the other shell tests already did.
 - debug's polluter search only looked at tests that run before the victim in
   the default order, so it couldn't find a polluter that bites only in
@@ -96,7 +96,7 @@ All notable changes to The Foundry. Format loosely follows
   `- <agent or skill> [<kind>]: what it did; what it should have done (where
   it came from)`, with the kind one of `blocked`, `fix-rounds`, `misread`,
   `missed`, `didnt-hold`, `user`. The lines go under a heading with the date,
-  the project folder's name, and the run, appended to `~/.foundry/retro.md`
+  the repo's top folder's name, and the run, appended to `~/.foundry/retro.md`
   (or the file named by `FOUNDRY_RETRO_FILE`), so a repeat shows across
   projects; a run with nothing to correct writes nothing there, and lines
   already in the file for the run aren't written twice, so a run that stopped
@@ -106,9 +106,10 @@ All notable changes to The Foundry. Format loosely follows
   mistake with the same kind word as an earlier line, the report quotes both
   and offers to work out a fix through `brainstorm`. The session never edits
   an agent or skill file itself. The README and PRIVACY.md say what the file
-  holds and where, the eval commands in `evals/README.md` and CONTRIBUTING
-  point `FOUNDRY_RETRO_FILE` at a scratch file, and structural tests hold the
-  docs to it.
+  holds and where, the README's uninstall note says how to remove it,
+  the eval commands in `evals/README.md` and CONTRIBUTING point
+  `FOUNDRY_RETRO_FILE` at a scratch file, and structural tests hold the docs
+  to it.
 
 ## [2.1.1] — 2026-11-10
 

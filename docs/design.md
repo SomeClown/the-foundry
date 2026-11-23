@@ -564,3 +564,80 @@ where they differ:**
   the same mistake gets the same word each time. Lines are copied as first
   written, not reworded, so the check for lines already there holds.
 - Left open: the file has no size limit. It can wait until a real file grows.
+
+### As built (2026-11-23)
+
+What changed from the design above during the build, and from the amendment.
+The approved text and the amendment stay as they are; the figures are from the
+build log in `docs/plans/2026-11-23-self-improve-qa-fixes.md`. The skills'
+text is `skills/run-plan/SKILL.md` ("Retro" in section 4) and
+`skills/debug/SKILL.md` ("The retro").
+
+- **The heading is `## <date> | <project> | <run>`.** The run is `run-plan
+  <plan file's name>` or `debug <slug>`. The date is today's, from `date +%F`,
+  so every entry has the same shape. The project is the name of the repo's top
+  folder (`basename "$(git rev-parse --show-toplevel)"`), not the subfolder the
+  session is in, and outside a git repo it's the working folder's name. The
+  amendment says "the project folder's name"; the skills are exact about it,
+  and the README and PRIVACY.md now say "the repo's top folder's name".
+- **Debug's run name is defined.** It has no plan file, so the slug is the
+  working file's name when the hunt has one (`debug-<slug>.md`), otherwise two
+  or three hyphenated words for the bug. A resumed hunt reuses the name
+  already in the file, so its heading matches the first block's.
+- **Two Bash calls, each complete on its own.** The first resolves the path:
+  `FOUNDRY_RETRO_FILE` if set, else `$HOME/.foundry/retro.md`, with a relative
+  value made absolute against the Bash call's folder. The session reads the
+  file at the printed path (a missing one is empty). The second appends, and
+  repeats the resolve line, since a shell variable doesn't survive from one
+  Bash call to the next. It makes the folder, appends with a heredoc, and echoes
+  `retro exit=$?`; a non-zero exit goes in the report and the run goes on.
+- **The heredoc marker is `FOUNDRY_RETRO_END`.** The first build used `RETRO`,
+  and the adversarial round showed a line that read exactly `RETRO` ended the
+  heredoc, so the lines after it ran as shell commands. The new marker is one
+  a retro line can't plausibly equal, and the skills tell the session no line
+  may be it. Nothing enforces that; see the parked items.
+- **The check for lines already written is by project and run, not date.**
+  My call in the amendment skipped the append when this run's heading was
+  already in the file. That lost the later lines of a run that stopped early,
+  wrote its retro (5A), and went on. It now drops the lines already under a
+  heading with the same project and run, whatever the date (a run that crosses
+  midnight no longer writes twice), and appends the rest, under a second block
+  with the same heading if need be. Lines are copied as first written, never
+  reworded, or the check can't see them.
+- **The tie between kind words goes to the first listed**, in the order
+  `blocked`, `fix-rounds`, `misread`, `missed`, `didnt-hold`, `user`, so the
+  same mistake gets the same word each time. Each skill shows one example line
+  per word.
+- **Early stops point at the retro.** `run-plan`'s stop paragraph says to write
+  the retro first (build log section, then the append) and put any repeat in
+  the message; its list of reasons to stop names the append as the one write
+  outside the branch that doesn't stop the run. `debug` points its fix cap,
+  three-failed-fixes and can't-reproduce stops at "The retro" the same way.
+  When the run later finishes, `run-plan` adds the new lines to the `### Retro`
+  section it already wrote (a `- none` there is replaced), not a second one.
+- **A clean `run-plan` writes `- none` to the build log only**, so the log
+  shows the step ran; nothing goes to the cross-project file. A clean `debug`
+  writes nothing, since it has no log.
+- **The evals.** `evals/README.md` and CONTRIBUTING.md put
+  `FOUNDRY_RETRO_FILE="$(mktemp)"` before the routine eval command. The three
+  `evals-expensive/` head-to-head commands don't carry it: they run
+  `investigate`, which has no retro step.
+- **Tests.** `RetroTest` in `tests/test_structure.py` holds the skills, README,
+  PRIVACY.md and the eval commands to this section. `tests/test_retro_commands.py`
+  runs the two shell lines from the skills. `tests/test_retro_pin_mutations.py`
+  and `tests/test_self_consistency_pin_mutations.py` change the docs one pin at
+  a time and check a test fails.
+- **No model has run the retro step.** The shell lines are tested; the session
+  reading the skill, picking kind words and spotting a repeat is not. No eval
+  case exists, as the non-goals say. The paid `--tag debug` and `--tag
+  run-plan` cases would run it, and nobody has confirmed that `claude plugin
+  eval .` hands the caller's `FOUNDRY_RETRO_FILE` to the case's session.
+- **Parked.** A tie goes to `missed` over `user`, so a user correction that
+  also fits `missed` is recorded as `missed`. A line exactly `FOUNDRY_RETRO_END`
+  still ends the entry. With matching by project and run, a later separate run
+  of the same plan that records an identical line has it dropped as already
+  written. In a git worktree the project's name is the worktree's folder, so
+  one project can show under two names. A relative `FOUNDRY_RETRO_FILE`
+  resolves against the Bash call's folder. The no-repo fallback names no
+  command, and a resumed debug hunt's "name already in the file" doesn't say
+  which file. The file still has no size limit.

@@ -768,7 +768,7 @@ class RetroTest(unittest.TestCase):
             body = self.text(path)
             for phrase in (
                 self.PATH, self.VAR,
-                "the date, the project folder's name, the plan file's name or the bug's short name, and one line per correction",
+                "the date, the repo's top folder's name, the plan file's name or the bug's short name, and one line per correction",
                 "A run with nothing to correct writes nothing",
                 "The instructions tell the session to keep code, file contents and secrets out of it",
                 "which is committed with the plan",
