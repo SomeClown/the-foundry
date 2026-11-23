@@ -44,7 +44,10 @@ The brief command in step 2 of the loop copies Task N out of the plan into
    worktree gets its own. Write its path into the build log header.
 6. **Make the rules file.** Copy the plan's global rules verbatim (hard rules,
    tripwires, "no new dependencies", voice rules, files nobody may read) into
-   `<work dir>/rules.md`. Every dispatch points at it.
+   `<work dir>/rules.md`, then the gate from step 4 with any failures it's
+   expected to show, marked as not this task's to fix. The brief starts at
+   the task's heading, so this file is the only place a builder sees the
+   gate. Every dispatch points at it.
 7. **Check task sizes once.** Every task should be one implement or frontend
    dispatch that leaves the gate green. Split a task that isn't; merge a run
    of tiny same-shape tasks (section 3). Record either as a ruling.
@@ -58,7 +61,9 @@ plan to run, so run it. Section 5 lists the only reasons to stop.
 
 ### Step 1: Record the base
 
-`BASE=$(git rev-parse HEAD)`. Check `git status` is clean first (apart from
+Note `git rev-parse --short HEAD`: it's the base the build log names at step 8,
+and `HEAD` stays the base until then, since builders don't commit. Check
+`git status` is clean first (apart from
 the plan file's build log). Stray changes the build log doesn't explain mean
 the last task wasn't committed, or the user is editing too; ask which before
 going on. Changes the build log does explain are a task in progress: see
@@ -124,7 +129,8 @@ dispatch, where they'll drift.
 - the report contract: "Write your full report to `<work dir>/task-N-report.md`.
   Reply with only: status (DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, or
   BLOCKED), files changed, the gate's exit code, and any concerns. Don't
-  commit, and don't dispatch other agents."
+  commit, don't dispatch other agents, and don't load the Foundry's own
+  skills (a project's own design skill is fine)."
 
 Keep the agent's id from the result; fix rounds resume it.
 
@@ -143,7 +149,7 @@ Package the task's diff every time; the adversarial round uses it too:
 
 ```
 git add -A
-{ git diff --cached --stat $BASE; git diff --cached -U10 $BASE; } > <work dir>/task-N-diff.txt
+{ git diff --cached --stat; git diff --cached -U10; } > <work dir>/task-N-diff.txt
 ```
 
 Staging first matters: builders don't commit, and a plain `git diff` leaves
@@ -152,6 +158,17 @@ task's, but look at `git status --short` before `git add -A`: caches, build
 output, or anything the plan's rules say never to commit get staged by name
 instead (`git add <paths>`), and the build log notes that the project needs a
 `.gitignore` line. Rebuild the package after each fix round.
+
+Before packaging, check that `git rev-parse --short HEAD` is the sha noted at
+step 1. If it isn't, a builder committed against its contract, and
+`git diff --cached` would leave that work out of the package. Note it in the
+build log, and package against the noted sha, written into the command as a
+literal (`abc1234` here):
+
+```
+git add -A
+{ git diff --cached --stat abc1234; git diff --cached -U10 abc1234; } > <work dir>/task-N-diff.txt
+```
 
 For a task that later tasks build on, or one with exact contracts (a schema, a
 public API, a message format), dispatch `the-foundry:qa` in **spec-check
@@ -165,7 +182,8 @@ check happens in the final qa review of the whole branch.
 ### Step 5: Adversarial round
 
 Dispatch `the-foundry:test-engineer` with the brief, the builder's report, the
-diff package, and the rules file. Its job is to break this task's behavior,
+diff package, the rules file, and the plan's Testing Strategy section by
+heading (the brief holds only the task's own section). Its job is to break this task's behavior,
 not to admire it: the brief's edge cases, error paths, boundary values, and
 every exact value the brief specifies. It writes tests only, reports failing
 tests as bugs with the test name and what the code did, writes its report to
@@ -249,9 +267,13 @@ commits only: pushing waits for the user.
 Package the whole branch:
 
 ```
-MB=$(git merge-base <default branch> HEAD)
-{ git log --oneline $MB..HEAD; git diff --stat $MB HEAD; git diff -U10 $MB HEAD; } > <work dir>/branch-diff.txt
+MB=$(git merge-base <default branch> HEAD) && [ -n "$MB" ] || { echo "no merge-base with <default branch>" >&2; exit 2; }
+{ git log --oneline "$MB..HEAD"; git diff --stat "$MB" HEAD; git diff -U10 "$MB" HEAD; } > <work dir>/branch-diff.txt
 ```
+
+Run both lines in the same Bash call: `MB` doesn't carry to the next one, and
+an empty `MB` would package the wrong diff without an error. The first line
+stops with a message when there's no merge-base.
 
 Then dispatch `the-foundry:qa` with the
 package, the design section, the plan, and the build log's parked items to
@@ -267,7 +289,22 @@ package and its own lens line.
 ### Fix batches
 
 You decide which findings get fixed; declining one deliberately is fine, as
-long as it goes in the build log with the reason. Group the accepted findings
+long as it goes in the build log with the reason.
+
+**Know how each finding was shown before you build on it.** qa's report says,
+on a `Verified:` line in each finding, whether it ran something or only read.
+A finding qa showed by running goes into a batch; it needs no second check.
+A finding shown only by reading gets the quickest check that could prove it
+wrong, run by you before any fix is briefed: a command, a read of the code or
+of the tool's own help, a read-only agent, or a real model session if that's
+what settles it. What the check costs to run is not a reason to skip it. If it
+shows the finding is wrong, decline it with the reason. The one check you
+can't just run is one that would be a stop under section 5: the finding waits
+on the user there, and no fix is built on it meanwhile. A `Verified:` line
+that's missing counts as by reading. Each accepted finding's line in the build
+log says which it was: shown by running (by qa), or checked by you (and how).
+
+Group the accepted findings
 by area into batches. Each batch is one builder dispatch, then its own
 adversarial round, then the gate, then a commit with its log line, exactly as
 a task. Findings that live only in test files go to test-engineer, folded into
@@ -276,6 +313,102 @@ test-engineer owns tests. When the original builder of the affected code is
 still reachable, resume it for the fix (it knows the code). Record "From the
 qa pass (fix batch K)" in the build log. Anything qa says only the user can
 decide goes into the final report as a question, not into a fix batch.
+
+### Retro
+
+Add a `### Retro` section to the build log: one line for each time the team
+needed correcting during the run, drawn from the log. Only what the loop
+didn't catch by itself counts:
+
+- a task that took two or more fix rounds, or came back BLOCKED
+- a test that misread the brief
+- a qa finding the builder or test-engineer should have caught
+- a fix that didn't hold
+- anything the user corrected
+
+One fix round, a builder's NEEDS_CONTEXT question, or anything tried once and
+corrected on the spot, is the loop working: leave it out.
+Each line names who did the work: the agent, if one was dispatched, and
+`run-plan` for work the session did itself. Never name an agent that wasn't
+dispatched. Each line gives a kind word, what it did, what it should have
+done, and where it came from:
+
+```
+- <agent or skill> [<kind>]: what it did; what it should have done (where it came from)
+```
+
+The kind is one of these six words, shown with an example line each. The
+examples show the shape, not lines to reuse: write what happened in this run.
+When two fit, use the one listed first, so the same mistake gets the same word
+each time:
+
+```
+- run-plan [user]: committed before the user's gate had run; the user said to wait for the exit code (Task 6)
+- implement [blocked]: came back BLOCKED for want of the schema file; should have named the file in its first report (Task 4)
+- implement [fix-rounds]: edited the victim test, not the polluter, and needed three rounds; should have fixed the polluter (Task 3, fix rounds 1 to 3)
+- test-engineer [misread]: wrote a test that expected an empty reward to raise; the brief says it reads "reward unknown" (Task 2, ruling)
+- implement [missed]: left a second caller of the old signature; should have searched for callers (qa pass, finding 2)
+- implement [didnt-hold]: the fix for the expiry bug broke on a daylight-saving date; should have tested a date across the change (Task 5, fix batch 1)
+```
+
+Write what happened, not theories, and no code, file contents, or secrets.
+Nothing needed correcting: write `- none` in the build log, so the log shows
+the step ran, and stop there. Nothing goes to the cross-project file.
+
+A `### Retro` section already in the log (from an early stop) gets the new
+lines added to it, not a second section. If it holds `- none` and there are
+now lines, the lines replace it.
+
+When there are lines, they also go to one file outside the project, so a
+repeat shows across projects. It's `~/.foundry/retro.md`, or the file named by
+`FOUNDRY_RETRO_FILE` when that's set. The Read and Write tools don't expand a
+shell expression, so resolve the path first, with one Bash call:
+
+```
+F="${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}"; case "$F" in /*) ;; *) F="$PWD/$F" ;; esac; printf '%s\n' "$F"
+```
+
+Read the file at the path it prints (a missing file is fine: treat it as
+empty; a long one, read to the end). Find any heading with the same project
+and run as the one you're about to write, whatever its date, and the lines
+under it: those are already written (a resumed session, a run that stopped early and
+went on, or a session that finished first). Drop them from your lines. None
+left: skip the append. Otherwise append the heading and the lines that are
+left; a second block under the same heading text is fine, since the file is
+only ever appended to. Copy lines as first written, never reworded, or the
+check can't tell they're there (copy them from the build log's Retro section).
+
+The heading is `## <date> | <project> | run-plan <plan file's name>`. The date is today's, from
+`date +%F`, as `YYYY-MM-DD`. The project is the name of the repo's top folder
+(what `basename "$(git rev-parse --show-toplevel)"` prints), not the subfolder
+you're in; outside a git repo, the working folder's name.
+
+Then append, with one Bash call that doesn't lean on the earlier one. Put the
+heading and the lines between the `FOUNDRY_RETRO_END` markers, a blank line
+first. No line of the entry may be that marker, or the shell would run the
+lines after it:
+
+```
+F="${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}"; case "$F" in /*) ;; *) F="$PWD/$F" ;; esac
+mkdir -p "$(dirname "$F")" && cat >> "$F" <<'FOUNDRY_RETRO_END'
+
+## 2026-11-23 | my-project | run-plan 2026-11-23-my-feature.md
+- implement [fix-rounds]: edited the victim test, not the polluter, and needed three rounds; should have fixed the polluter (Task 3, fix rounds 1 to 3)
+FOUNDRY_RETRO_END
+echo "retro exit=$?"
+```
+
+Append, never rewrite: two sessions can finish together, and a rewrite loses
+one's lines. The folder and the file are created if they're missing. If the
+exit isn't 0, say in the report that the retro wasn't written, and go on.
+
+A repeat is the same agent or skill with the same kind word as an earlier line
+in that file (a line this same run wrote before an early stop isn't a repeat
+of itself). When a new line is one, the report quotes both lines and offers
+to work out a fix with the user through `brainstorm`.
+
+Never edit an agent or skill file yourself, here or in the plugin's install
+folder: a fix goes through the user and the repo's own review.
 
 ### Docs
 
@@ -296,6 +429,7 @@ One message:
 - **Decisions I made**: every ruling from the build log, each with what it
   costs if it's wrong, so the user can check them
 - parked findings and declined qa findings, with reasons
+- the retro's line count, and any repeat it found, quoted
 - questions only the user can answer, numbered, with options and a
   recommendation
 - the next step (push, PR, release) as a question. Shipping waits for their
@@ -308,17 +442,24 @@ Only these stop the run:
 - **A fix cap was hit** (three rounds on one task or batch). Bring the failing
   tests, what was tried, and two or three ways forward with a recommendation.
 - **The plan is wrong in a way that changes what gets built**, and the design
-  doesn't settle it.
+  doesn't settle it. When the user's answers leave gaps and you fill them
+  with calls of your own, write those into the design as yours ("Calls I
+  made"), and give them `brainstorm`'s builder check (a cold read by a fresh
+  read-only agent) before any builder is briefed on them. The user's own
+  answers don't need it.
 - **Anything irreversible or outside the branch**: production, a migration on
   real data, deleting anything that isn't the run's scratch, a push, a merge,
-  a tag, a release.
+  a tag, a release. The one write outside the branch that doesn't stop the run
+  is the retro's append to `~/.foundry/retro.md` (or `FOUNDRY_RETRO_FILE`).
 - **A secret or credential** would have to be read, written, or created.
 
 Everything else (an ambiguous brief, a misread test, a task to split, a qa
 finding to decline) you decide, log as a ruling, and keep going. A ruling the
 user can see and reverse costs less than a run parked on a question. When you
-do stop, ask everything that's open in one numbered message, with options,
-and log the stop in the build log. The run waits for the answer; don't start
+do stop, write the retro first (see "Retro" in section 4: the build log's
+section, then the append), put any repeat in the message, ask everything
+that's open in one numbered message, with options, and log the stop in the
+build log. The run waits for the answer; don't start
 other tasks around it unless the user says to.
 
 ## 6. The build log
@@ -346,14 +487,29 @@ Work dir: <path>
 - Task 3: <finding>, parked because <reason>.
 
 ### From the qa pass (fix batch 1)
+- Finding 1 (MEDIUM): fix. Shown by running (by qa: the failing request).
+- Finding 2 (LOW): fix. Checked by me: read the helper's own docs; it does
+  reject an empty value.
+- Finding 3 (HIGH): fix. Checked by me: ran a real model session against the
+  claim; it reproduced.
+- Finding 4 (LOW): declined. <reason>
+
+### Retro
 - ...
 ```
 
 **Resuming.** After compaction, a restart, or a new session: read the build
 log and `git log`, and trust them over your memory. A task with a `complete`
 line is done; don't redo it (its commit is the one whose subject starts
-`Task N:`). For the task in progress, BASE is `HEAD`, since its commit hasn't
-happened yet.
+`Task N:`). For the task in progress, the base is `HEAD`, since its commit
+hasn't happened yet.
+
+**The retro picks up where it stopped.** A `### Retro` section in the build
+log means the step ran up to that point (an early stop wrote it). When the run
+finishes, write what happened since: add the new lines to that section, not a
+second section, and if it holds `- none`, the new lines replace it. Then do
+the file append from "Retro": it drops the lines the file already has, so
+nothing is written twice.
 
 **Check for a dispatch still running first.** A background agent sent before
 compaction may still be working, and its result will arrive on its own.
@@ -390,4 +546,5 @@ Then:
 | "I'll paste the plan so the agent has context" | Brief path, rules path, cited sections. Not the plan. |
 | "test-engineer and implement can run together to save time" | One writer at a time. |
 | "That qa finding is wrong; I'll skip it" | Decline it in the build log, with the reason. |
+| "qa said so, so I'll brief the fix" | Look at its `Verified:` line. Only read? Check it first, whatever the check takes. |
 | "I'll push so CI can check it" | Pushing waits for the user. |

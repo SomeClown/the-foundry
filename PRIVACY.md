@@ -1,6 +1,7 @@
 # Privacy
 
-The Foundry doesn't collect, store, or send any data. There's no server, no
+The Foundry doesn't collect or send any data. The one thing it stores is a
+file on your own machine, described below. There's no server, no
 account, no analytics, and no telemetry; nothing in the plugin reports back to
 me or to anyone else. It's Markdown instructions for Claude Code. The repository's `main` branch also
 holds its tests and eval cases, which run only when you run them.
@@ -12,7 +13,17 @@ permissions you've set:
   files there, each in its own lane (application code, UI code, tests, config,
   docs). `investigate` starts read-only reader agents inside your session, and
   they go nowhere new. On a large repo it also starts copies of itself as area
-  leads, which hold Bash like it does. Nothing is copied anywhere else by the plugin.
+  leads, which hold Bash like it does. Nothing is copied anywhere else by the plugin,
+  with one exception: `run-plan` and `debug` append a retro to
+  `~/.foundry/retro.md` on your own machine (or to the file named by the
+  `FOUNDRY_RETRO_FILE` environment variable, if you set it). For each run that
+  needed correcting, it holds the date, the repo's top folder's name, the plan
+  file's name or the bug's short name, and one line per correction. A run with
+  nothing to correct writes nothing. The instructions tell the session to keep
+  code, file contents and secrets out of it. `run-plan` also puts a copy of its
+  lines in the build log at the end of the plan file, which is committed with
+  the plan. Nothing reads the retro file but you and your sessions, and nothing
+  sends it anywhere.
 - **The web:** two agents (`qa` and `uiux`) can use Claude Code's own web search
   and page fetching, and two (`frontend` and `uiux`) can drive the Claude
   desktop app's built-in browser, mostly against your own dev server.

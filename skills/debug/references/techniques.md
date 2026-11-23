@@ -28,28 +28,52 @@ victim failed, so nothing gets run twice.
 
 1. **Confirm the shape.** The victim passes alone and fails after the full
    set, both in a fixed order. If it fails alone too, it isn't pollution.
-   Turn random ordering off for every run below (`-p no:randomly` if
-   pytest-randomly is installed), or the halves mean nothing.
+   If it fails only in random order, the polluter may run after the victim
+   in the default order: take the order from a failing run instead
+   (a failing run of the seeded loop in skill section 2 names its seed, and
+   `pytest --collect-only -q --randomly-seed=<seed>` lists that order), and
+   confirm the victim fails when that order is run as a list. Turn random
+   ordering off for every run below (`-p no:randomly` if pytest-randomly is
+   installed), or the halves mean nothing.
 2. **List the candidates:** the test files that run before the victim's
    file, in the order the suite runs them (`pytest --collect-only -q`, or the
-   sorted `tests/test_*.py` that `unittest discover` uses).
+   sorted `tests/test_*.py` that `unittest discover` uses). For a random-order
+   failure, the candidates are the test ids above the victim in the failing
+   run's list, in that order.
 3. **Run one half, then the victim, in one process,** in that order, and
    read the victim's own result, not the run's exit code (a candidate can
    fail by itself without touching the victim):
 
    ```
    pytest -q -p no:randomly -p no:cacheprovider -rA <half> tests/test_x.py::test_y 2>&1 | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'
-   python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y 2>&1 | grep -E '^test_y \(tests.test_x.XTest.test_y\)'
+   python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y 2>&1 | grep -E '^(test_y \(tests\.test_x\.XTest(\.test_y)?\)|(FAIL|ERROR): test_y \(tests\.test_x\.XTest(\.test_y)?\)|ERROR: setUp(Class|Module) \(tests\.test_x(\.XTest)?\)|Ran [0-9]+ test)'
    ```
 
    `tests/test_x.py::test_y` and `tests.test_x.XTest.test_y` stand for the
    victim's full id, with its class included when it has one.
 
+   The unittest line works whichever way Python prints the id (`XTest.test_y`
+   from 3.11, `XTest` before). It shows up to three kinds of line, and this
+   is how to read them:
+   - a `FAIL:` or `ERROR:` line for the victim: it failed (a failing subtest
+     adds a suffix after the id, and a test that prints while it runs can hide
+     its verdict on its own line, so only these lines count). So is an
+     `ERROR: setUpClass` or `ERROR: setUpModule` line naming the victim's
+     class or module: the victim never ran because its setup failed, and
+     `Ran` may say 0 tests;
+   - the victim's own line and the `Ran` line, and no such header: it didn't
+     fail;
+   - no victim line, and no `setUpClass` or `setUpModule` line either: the id
+     or class didn't match, so fix it before you trust
+     the run;
+   - no `Ran` line: the run stopped before it finished, so there's no result.
+
    Both runners keep the order you give them. For another runner, use its
    way of running a list of tests in a given order in one process.
 4. **Keep the half that breaks it.** If the victim fails after the first
    half, keep that half. If not, run the second half the same way, and keep
-   it if the victim fails. Repeat until one file is left. What's left is a
+   it if the victim fails. Repeat until one file is left (one test id, if
+   the candidates were ids from a random-order run). What's left is a
    suspect, not the polluter: until step 6 holds, call it the suspect, in
    your notes and to the user.
    - Neither half breaks it: it takes tests from both halves together, or
@@ -61,7 +85,8 @@ victim failed, so nothing gets run twice.
 5. **Then inside that file,** the same way, with its tests as the
    candidates (`pytest --collect-only -q <file>`, or its `Class.test_name`
    ids for unittest). If the polluter is in the victim's own file, the
-   candidates are only the tests that run before the victim.
+   candidates are only the tests that run before the victim. If step 4
+   already ended on one test id, there is nothing to open: go to step 6.
 6. **The check (required).** Before you name a polluter, run these two
    as commands of their own, not inside a loop or alongside other runs,
    and show both commands and their results:

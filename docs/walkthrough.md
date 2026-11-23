@@ -160,10 +160,10 @@ A plan with three or more tasks goes to `run-plan`, which replaces the separate
 implement and test-engineer stages. The session stays on `feat/blackout-dates`
 (never `main`), makes a work directory inside the git directory
 (`.git/foundry-run/2026-10-23-blackout-dates/`, so it's never tracked and
-survives a compaction), copies the plan's rules into a `rules.md` there, and
+survives a compaction), copies the plan's rules and its gate into a `rules.md` there, and
 starts the build log as the plan's last section. Then, per task, using Task 2:
 
-1. *Brief and build.* Record `BASE=$(git rev-parse HEAD)`; run-plan's brief
+1. *Brief and build.* Note the base (`git rev-parse --short HEAD`); run-plan's brief
    command copies Task 2 into `<work dir>/task-2-brief.md`, where its exact
    values live and nowhere else. `implement` gets a short dispatch: where the
    task fits, the brief and rules paths, the Task 1 interfaces it needs, and
@@ -234,7 +234,8 @@ The plan dropped something the design said, and it would have belonged to Task
 design disagree, the design wins. Then the ranked findings. One MEDIUM: the delete route fetched the
 blackout by ID without checking it belonged to the given season (an IDOR,
 minor here but free to fix). Two LOWs: the form accepts an end date before the
-start, and the blackout list isn't paginated. The session fixes the gap, the
+start, and the blackout list isn't paginated. Each finding carries a `Verified:` line, and the MEDIUM's
+says qa ran the request, so it needs no second check. The session fixes the gap, the
 MEDIUM, and the first LOW as fix batch 1, resuming the original `implement`
 (it knows the code), with its own adversarial round, gate, and commit. It
 declines the other LOW, on the record, because discovering a finding again in
@@ -245,6 +246,11 @@ six months with no memory of the decision is the bad outcome:
 - Declined: blackout list isn't paginated (LOW). A season has a handful;
   revisit if one ever has fifty.
 ```
+
+**Retro.** Before docs, the session adds a `### Retro` section to the build
+log: one line for each time the team needed correcting that the loop hadn't
+caught by itself, or `- none`. Any lines also go to `~/.foundry/retro.md`,
+where a repeat of an earlier mistake shows up across projects.
 
 **Docs.** `docs` gets §14, the plan, and the build log. It updates CLAUDE.md
 and the README, and adds an `### As built (2026-10-23)` subsection to §14 (the

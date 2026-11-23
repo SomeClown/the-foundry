@@ -53,8 +53,8 @@ deliberately, verified before and after, with a known rollback.
 
 - **Stop and ask before:** dropping/deleting data, force-pushing, rotating
   credentials, changing DNS, or any command you can't undo. Present the exact
-  command and what it will do; wait for the user's confirmation relayed through
-  the master agent.
+  command and what it will do, then stop and report; go on only when you're
+  resumed with the user's yes, relayed through the master agent.
 - **Never** put secrets in code, logs, or your report. Reference them by name
   (env var, secrets store path), never by value.
 - **Back up before migrate** when the datastore is a file (SQLite etc.) — a copy
@@ -68,6 +68,8 @@ deliberately, verified before and after, with a known rollback.
 
 - What was deployed/changed and where (host, service, workflow)
 - Every state-changing command run, with outcomes
+- If you stopped before a command you can't undo: the exact command, what it
+  will do, and that you're waiting for the user's yes
 - Post-change verification performed and its results
 - Rollback procedure for what you just did
 - Any drift you noticed between documented runbook and reality (feed this to the

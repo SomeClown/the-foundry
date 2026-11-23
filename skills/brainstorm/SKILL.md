@@ -205,6 +205,10 @@ for it.
 
 ## 8. The builder check
 
+The check also runs on a change to an approved design that adds calls of your
+own (for example after the user answers a qa pass and you fill the gaps), not
+just on a new section. The user's own answers don't need it.
+
 Before handing the design over, have someone read it cold. Tell the user you're
 writing it up, that a reviewer will read it first, and that you may come back
 once with a few questions.

@@ -68,8 +68,8 @@ Design principles that came out of that experience:
 | `uiux` | Design advisor — aesthetic/creative direction, visual critique in a browser, dataviz, greenfield design systems | No | opus |
 | `implement` | General implementer — backend, business logic, APIs, data models | Yes (app code) | sonnet |
 | `frontend` | Front-end implementer — templates, components, CSS, client JS; verifies visually in a browser | Yes (UI code) | sonnet |
-| `test-engineer` | Writes and runs tests; bootstraps a suite where none exists | Yes (tests only) | sonnet |
-| `qa` | Independent review — security, logic bugs, quality; ranked findings; runs builds/tests to verify | No | opus |
+| `test-engineer` | Writes and runs tests; bootstraps a suite where none exists | Yes (tests, and a report file the brief names) | sonnet |
+| `qa` | Independent review — security, logic bugs, quality; ranked findings, each marked as run or only read; runs builds/tests to verify | No | opus |
 | `devops` | Build, CI/CD, migrations, deploys, service config; treats production as hot | Yes (config/infra) | sonnet |
 | `docs` | Keeps CLAUDE.md / README / runbooks truthful after changes land | Yes (docs only) | sonnet |
 
@@ -116,9 +116,9 @@ the orchestrating session itself:
 
 | Skill | What it does |
 |---|---|
-| `brainstorm` | Talks a new feature through with you before the architect sees it. Numbered questions with a recommended option (answer "1A, 2B" and move on), the design played back in numbered parts for approval, a cold read by a fresh subagent to catch what the design left out, and a written section in `docs/design.md`. Nothing gets built until you approve it. Say you're on your phone and it batches every question into one message. |
-| `run-plan` | Runs an architect plan task by task: the builder builds, `test-engineer` tries to break it, failures go back for at most three fix rounds, and the project's gate has to pass with a real exit code before the task is committed. Then a `qa` pass over the whole branch, fix batches, and `docs`. It keeps a build log in the plan file, so a session that loses its memory halfway through a twelve-task plan picks up where it left off instead of building task 3 twice. |
-| `debug` | No fix without a root cause. It starts by asking what you saw (where, how often, since when), makes the failure happen on demand (a hang gets a watchdog so it fails with stack traces instead of just sitting there), tests one hypothesis at a time, and pins the cause with a test that fails every time before `implement` touches the code. It knows the usual suspects: a test that leaves state behind (found by halving the suite until one test is left, then proved by running it right before the victim), a race that only loses under load, a fixed sleep a slow CI runner outlasts, and the test that was the bug all along. Three failed fixes and it stops to question the design with you. |
+| `brainstorm` | Talks a new feature through with you before the architect sees it. Numbered questions with a recommended option (answer "1A, 2B" and move on), the design played back in numbered parts for approval, a cold read by a fresh subagent to catch what the design left out (also for any calls the session adds to an approved design mid-run), and a written section in `docs/design.md`. Nothing gets built until you approve it. Say you're on your phone and it batches every question into one message. |
+| `run-plan` | Runs an architect plan task by task: the builder builds, `test-engineer` tries to break it, failures go back for at most three fix rounds, and the project's gate has to pass with a real exit code before the task is committed. Then a `qa` pass over the whole branch, fix batches (a finding `qa` only read by eye gets checked before a fix is built on it), and `docs`. It keeps a build log in the plan file, so a session that loses its memory halfway through a twelve-task plan picks up where it left off instead of building task 3 twice. At the end it writes a short retro of every time the team needed correcting (in the build log, and in `~/.foundry/retro.md`), and tells you when a mistake repeats one from an earlier run. |
+| `debug` | No fix without a root cause. It starts by asking what you saw (where, how often, since when), makes the failure happen on demand (a hang gets a watchdog so it fails with stack traces instead of just sitting there), tests one hypothesis at a time, and pins the cause with a test that fails every time before `implement` touches the code. It knows the usual suspects: a test that leaves state behind (found by halving the suite until one test is left, then proved by running it right before the victim), a race that only loses under load, a fixed sleep a slow CI runner outlasts, and the test that was the bug all along. Three failed fixes and it stops to question the design with you. On a production report it hands you read-only commands, one per block, with what to look for under each, and never runs one itself. It ends by adding any corrections the hunt needed to `~/.foundry/retro.md`, in the same line shape as `run-plan`. |
 | `ship` | Takes finished work from a branch to production: the gate, push, PR, CI (including the check GitHub leaves "in progress" after its run passed), merge, a local image check, the tag, and a wait for the tag's own build before it hands you the deploy commands, so nobody pulls an image that doesn't exist yet. It learns each project's habits from its runbook and history (PRs or straight to `main`, annotated or lightweight tags), asks once with every step listed, and never runs a production command itself. You do the deploy; it updates the status docs afterwards and asks before pushing them. |
 
 All four came from watching how features actually got built, bugs got
@@ -139,7 +139,7 @@ brainstorm → investigate → architect → run-plan: [ implement / frontend (u
 - **New or unfamiliar project:** `investigate` before the architect.
 - **Small fix:** `implement` → `qa` is often enough.
 - **UI work:** `uiux` decides, `frontend` executes — spec first, then build.
-- **Bug fix:** `debug` finds the cause, `implement` fixes it, `test-engineer` pins it with a regression test.
+- **Bug fix:** `debug` finds the cause and pins it with a failing test, then `implement` fixes it.
 - **After anything lands:** `docs`, so the next session isn't lied to.
 - **Releasing:** `ship`, with `devops` for the runbooks, CI, and migrations
   it leans on.
@@ -147,8 +147,7 @@ brainstorm → investigate → architect → run-plan: [ implement / frontend (u
 Division-of-labor rules the agents enforce on themselves:
 
 - Read-only agents (investigate, file-reader, architect, uiux, qa) never write files.
-- One full sweep at a time: nothing else that spawns readers runs alongside it.
-- test-engineer touches only tests; docs only documentation; devops only
+- test-engineer touches only tests (and a report file its brief names); docs only documentation; devops only
   config/infra. Application-code fixes always route back through
   implement/frontend.
 - qa findings go to the orchestrator, which decides what implement fixes —
@@ -156,6 +155,10 @@ Division-of-labor rules the agents enforce on themselves:
   The orchestrator. That's the whole org chart.)
 - Project-specific implementers can exist per-repo (in that project's
   `.claude/agents/`) and take precedence over the generic ones for their niche.
+
+One rule is the orchestrator's, since only it can see both sides: `investigate`
+runs alone, scoped or full, and nothing else that starts agents runs alongside
+it.
 
 Want to see the whole thing run end to end? There's a
 [worked example](docs/walkthrough.md) tracing one real-shaped feature through
@@ -187,7 +190,9 @@ project (the skills as `/the-foundry:brainstorm`, `/the-foundry:run-plan`,
 `/the-foundry:debug` and `/the-foundry:ship`, though your session will
 usually reach for them on its own), they update
 when you ask the plugin manager to update, and uninstalling is one command
-instead of an archaeology expedition through your home directory.
+instead of an archaeology expedition through your home directory. (The one
+thing it leaves behind is the retro file, if your runs have written one:
+`rm -r ~/.foundry` takes it away.)
 
 ### Manually (the artisanal method)
 
@@ -293,7 +298,7 @@ version, so you don't have to take my word for it:
   leads, and the one-level bound on leads holds at Claude Code's default nesting
   depth; a raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, `claude --agent`, or
   running `investigate` as an agent-team teammate leaves only the instructions.
-  It stops above 500 files and asks instead. That costs more than
+  It stops above 500 files so your session can ask you first. That costs more than
   one agent reading everything: on one test repo of 191 files, one full sweep
   with the readers on Haiku cost about $2.31 and about 710 seconds a run (the
   mean of three eval runs, judge cost included), against about $0.47 and 109
@@ -307,8 +312,16 @@ version, so you don't have to take my word for it:
 - **Files in your project.** `implement`, `frontend`, `test-engineer`,
   `devops`, and `docs` write files, each in its own lane (application code,
   UI code, tests, config and infrastructure, documentation). The skills write
-  design and plan files into `docs/`, and `run-plan` keeps its working files
-  in `.git/foundry-run/`, inside the git directory where nothing gets tracked.
+  design and plan files into `docs/`, and `run-plan` and `debug` keep their
+  working files in `.git/foundry-run/`, inside the git directory where nothing
+  gets tracked. At the end, a run that needed correcting also appends a retro
+  to `~/.foundry/retro.md` (or the file named by `FOUNDRY_RETRO_FILE`, if you
+  set it): the date, the repo's top folder's name, the plan file's name or the
+  bug's short name, and one line per correction. A run with nothing to correct
+  writes nothing. The instructions tell the session to keep code, file
+  contents and secrets out of it. The file stays on your machine, and it's the
+  one file the plugin writes outside your project. `run-plan` also keeps a
+  copy of its lines in the build log, which is committed with the plan.
 - **The web.** `qa` and `uiux` can use web search and fetch pages (to check
   a library's docs or an accessibility guideline). `frontend` and `uiux` drive
   the Claude desktop app's built-in browser when it's there, mostly against
@@ -373,7 +386,7 @@ If you improve an agent in a way that isn't specific to your setup, send it
 back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 [CHANGELOG](CHANGELOG.md).
 
-The Foundry tests itself, too, in two layers. `tests/` checks run-plan's brief command and holds the repo to its own README (a read-only agent that grows a
+The Foundry tests itself, too, in two layers. `tests/` checks run-plan's brief command and debug's polluter procedure, and holds the repo to its own README (a read-only agent that grows a
 Write tool, or a skill count that goes stale, fails the suite). `evals/` is a
 library of behavior cases for `claude plugin eval .`, each one a situation that
 once caught a skill doing the wrong thing; the second run of it caught the

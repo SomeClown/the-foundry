@@ -36,8 +36,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    claude plugin validate --profile directory .
    ```
    A change to `investigate` or `file-reader` also gets the nesting smoke
-   case, and the head-to-head in `evals-expensive/` with the owner's OK,
-   since it costs real money.
+   case, and the head-to-head in `evals-expensive/`.
    `tests/test_debug_pollution_procedure.py` runs debug's procedure against its
    fixture under pytest as well as unittest. It looks for an interpreter with
    pytest in `FOUNDRY_PYTEST_PYTHON`, then the one running the tests, then the
@@ -50,7 +49,10 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    text, JSON, YAML, or an image, and agent and skill front matter takes only
    the keys the plugin directory accepts; the structural tests fail otherwise.
 3. If you changed what a skill does, run its behavior cases:
-   `claude plugin eval . --tag <skill> --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
+   `claude plugin eval . --tag <skill> --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit --judge-model sonnet --threshold 0.8 --no-publish`.
+   The `debug` and `run-plan` cases reach the retro step, but the harness gives
+   each case its own home, so the entry never lands in your
+   `~/.foundry/retro.md`.
    A new behavior worth keeping gets a case of its own. See
    [evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) for how to read a failure and how a
    case is built.
