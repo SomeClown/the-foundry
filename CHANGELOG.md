@@ -4,6 +4,24 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+### Fixed
+- `frontend` was told to load a project's theme or design-system skill but
+  had no `Skill` tool. It has one now, and a structural test fails any agent
+  whose instructions load a skill without it.
+- `uiux` called its two design skills "not optional", where the README says
+  it falls back to its own design knowledge when they aren't installed. It
+  now says so in its report and carries on.
+- `run-plan` asked builders for the gate's exit code but never gave them the
+  gate: the brief starts at the task's heading. The rules file now carries
+  the gate and the failures it's expected to show, marked as not the task's
+  to fix, so a builder doesn't chase failures that were already there.
+- The README's bug-fix line had `test-engineer` pin the bug after the fix.
+  It now matches the `debug` skill: pinned by a failing test, then fixed.
+- The brief-command tests crashed with 29 errors on a machine without zsh.
+  They now skip zsh there, as the other shell tests already did.
+
 ## [2.1.1] — 2026-11-10
 
 A docs-only patch. The README's credits now say who built the team: I wrote
