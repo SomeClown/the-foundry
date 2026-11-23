@@ -1,0 +1,283 @@
+{
+ "facts": [
+  {
+   "id": "f01",
+   "kind": "gotcha",
+   "path": "api/accounts/booth.py",
+   "line": 6,
+   "token": "ticket 1192"
+  },
+  {
+   "id": "f02",
+   "kind": "route",
+   "path": "api/accounts/plaza.py",
+   "line": 27,
+   "token": "/v3/accounts/fleets/unlock"
+  },
+  {
+   "id": "f03",
+   "kind": "route",
+   "path": "api/app.py",
+   "line": 37,
+   "token": "/v3/gateway/tows/assign"
+  },
+  {
+   "id": "f04",
+   "kind": "gotcha",
+   "path": "api/billing/entry.py",
+   "line": 26,
+   "token": "CHG6901825"
+  },
+  {
+   "id": "f05",
+   "kind": "route",
+   "path": "api/billing/fine.py",
+   "line": 7,
+   "token": "/v3/billing/syncs/stage"
+  },
+  {
+   "id": "f06",
+   "kind": "gotcha",
+   "path": "api/plazas/account.py",
+   "line": 6,
+   "token": "#10854"
+  },
+  {
+   "id": "f07",
+   "kind": "route",
+   "path": "api/plazas/speed.py",
+   "line": 19,
+   "token": "/v3/plazas/tiers/assign"
+  },
+  {
+   "id": "f08",
+   "kind": "gotcha",
+   "path": "api/trips/deposit.py",
+   "line": 6,
+   "token": "runbook section 8.2"
+  },
+  {
+   "id": "f09",
+   "kind": "route",
+   "path": "api/trips/fine.py",
+   "line": 27,
+   "token": "/v3/trips/vaults/recalc"
+  },
+  {
+   "id": "f10",
+   "kind": "command",
+   "path": "cli/cmd_fleet.py",
+   "line": 7,
+   "token": "twctl preview-lane"
+  },
+  {
+   "id": "f11",
+   "kind": "command",
+   "path": "cli/cmd_trailer.py",
+   "line": 13,
+   "token": "twctl sweep-booth"
+  },
+  {
+   "id": "f12",
+   "kind": "gotcha",
+   "path": "jobs/nightly/notice_close.py",
+   "line": 6,
+   "token": "TWY-1718"
+  },
+  {
+   "id": "f13",
+   "kind": "command",
+   "path": "jobs/runner.py",
+   "line": 19,
+   "token": "twctl redact-plate"
+  },
+  {
+   "id": "f14",
+   "kind": "gotcha",
+   "path": "main.py",
+   "line": 6,
+   "token": "TWY-8667"
+  },
+  {
+   "id": "f15",
+   "kind": "gotcha",
+   "path": "rules/r0001_vehicle.py",
+   "line": 26,
+   "token": "ticket 3533"
+  },
+  {
+   "id": "f16",
+   "kind": "route",
+   "path": "rules/r0029_span.py",
+   "line": 27,
+   "token": "/v3/rules/incidents/rollup"
+  },
+  {
+   "id": "f17",
+   "kind": "command",
+   "path": "rules/r0057_tag.py",
+   "line": 7,
+   "token": "twctl recalc-commuter"
+  },
+  {
+   "id": "f18",
+   "kind": "gotcha",
+   "path": "rules/r0085_tow.py",
+   "line": 12,
+   "token": "CHG5378130"
+  },
+  {
+   "id": "f19",
+   "kind": "route",
+   "path": "rules/r0113_incident.py",
+   "line": 19,
+   "token": "/v3/rules/lanes/rollup"
+  },
+  {
+   "id": "f20",
+   "kind": "command",
+   "path": "rules/r0141_queue.py",
+   "line": 7,
+   "token": "twctl escalate-span"
+  },
+  {
+   "id": "f21",
+   "kind": "gotcha",
+   "path": "rules/r0170_tag.py",
+   "line": 18,
+   "token": "#43906"
+  },
+  {
+   "id": "f22",
+   "kind": "route",
+   "path": "rules/r0198_class.py",
+   "line": 37,
+   "token": "/v3/rules/transponders/reopen"
+  },
+  {
+   "id": "f23",
+   "kind": "command",
+   "path": "rules/r0226_axle.py",
+   "line": 13,
+   "token": "twctl export-export"
+  },
+  {
+   "id": "f24",
+   "kind": "gotcha",
+   "path": "rules/r0254_lien.py",
+   "line": 36,
+   "token": "runbook section 2.5"
+  },
+  {
+   "id": "f25",
+   "kind": "route",
+   "path": "rules/r0282_account.py",
+   "line": 27,
+   "token": "/v3/rules/transponders/reconcile"
+  },
+  {
+   "id": "f26",
+   "kind": "command",
+   "path": "rules/r0310_transponder.py",
+   "line": 13,
+   "token": "twctl notify-bridge"
+  },
+  {
+   "id": "f27",
+   "kind": "command",
+   "path": "scripts/export_ledger.py",
+   "line": 27,
+   "token": "twctl defer-bridge"
+  },
+  {
+   "id": "f28",
+   "kind": "gotcha",
+   "path": "tests/test_invoice.py",
+   "line": 36,
+   "token": "TWY-5116"
+  },
+  {
+   "id": "f29",
+   "kind": "gotcha",
+   "path": "web/session.py",
+   "line": 6,
+   "token": "ticket 8341"
+  },
+  {
+   "id": "f30",
+   "kind": "route",
+   "path": "web/views/invoice.py",
+   "line": 7,
+   "token": "/v3/web/transponders/confirm"
+  },
+  {
+   "id": "f31",
+   "kind": "route",
+   "path": "zones/z04_batch.py",
+   "line": 7,
+   "token": "/v3/zones/plates/archive"
+  },
+  {
+   "id": "f32",
+   "kind": "command",
+   "path": "zones/z11_deposit.py",
+   "line": 13,
+   "token": "twctl void-commuter"
+  },
+  {
+   "id": "f33",
+   "kind": "gotcha",
+   "path": "zones/z20_discount.py",
+   "line": 18,
+   "token": "CHG7011438"
+  }
+ ],
+ "decoys": [
+  {
+   "id": "d1",
+   "why": "untracked",
+   "path": "notes/scratch.md",
+   "token": "runbook section 4.3"
+  },
+  {
+   "id": "d2",
+   "why": "untracked",
+   "path": "rules/r9999_draft.py",
+   "token": "/v3/drafts/payments/lock"
+  },
+  {
+   "id": "d3",
+   "why": "vendored",
+   "path": "web/vendor/plazalib.py",
+   "token": "#68345"
+  },
+  {
+   "id": "d4",
+   "why": "vendored",
+   "path": "web/vendor/towlib.py",
+   "token": "/v3/legacy/speeds/recalc"
+  },
+  {
+   "id": "d5",
+   "why": "untracked",
+   "path": "zones/zz_todo.txt",
+   "token": "twctl hold-trailer"
+  }
+ ],
+ "layout": {
+  "tracked": 690,
+  "after_whole_folder_skips": 650,
+  "skipped_whole": {
+   "web/vendor/": 40
+  },
+  "file_skips": {
+   "lock": 1,
+   "binary": 4
+  },
+  "untracked": [
+   "notes/scratch.md",
+   "rules/r9999_draft.py",
+   "zones/zz_todo.txt"
+  ]
+ }
+}

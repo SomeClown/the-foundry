@@ -674,3 +674,26 @@ None. There's no database. The new data is `evals-expensive/big-sweep-key.json`,
 - Reworking the head-to-head fixture or `compare.py`, unless Risk 6 applies and the owner asks.
 - A brief line asking for a smaller part (design open item).
 - Repos near 80,000 files, where the block itself gets large.
+
+## Build log
+
+Gate: the five commands in this plan's header (expect: `OK` and exit 0 on all five at every commit; the one known red state is inside Task 5, Rules item 1)
+Branch: claude/sweet-chandrasekhar-04277e, from 9e48675 (`main`, release 2.2.0); the design is 3f2fefa and this plan 1f4c8dc
+Work dir: `/Users/someclown/dev/claude/the-foundry/.git/worktrees/sweet-chandrasekhar-04277e/foundry-run/2026-11-23-big-sweep-in-parts/`
+
+Baseline on 1f4c8dc, after the rebase (2026-11-23): Ran 950, OK on `python3` 3.14.7 (1 skip), exit 0; Ran 950, OK on `/usr/bin/python3` 3.9.6 (5 skips), exit 0; validates 0/0/0.
+
+### Progress
+- Task 1: complete (from eb787f4; gate: Ran 1038, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; spec-check: matches, 4 low; adversarial: 88 tests, no bugs, no fix rounds)
+
+### Decisions made during the build
+- Ruling (before Task 1): the branch was cut from `main` at 2.1.1, not from `foundry-self-improve` as the task said, so it was fast-forwarded to `foundry-self-improve` (5b8148b) before anything was written, then rebased onto `main` at 9e48675 once 2.2.0 shipped. Why: the notes file and the tests this work changes weren't on `main` at 2.1.1. If wrong: nothing; the branch holds only this project's commits on top of `main`.
+- Ruling (before Task 1): the architect's own calls (Risk 3: `Areas read:`, the `Files listed:` line, `Whole repo:`, areas ordered by first path, `awk` filters, the default `find`, the scoped sentence, the lead-preview sentence) get no separate cold read. Why: §4 leaves the wording to the architect, the design had its cold read, and Task 5 has a qa spec-check against §4. If wrong: a gap in one of those lines shows up in Task 5's spec-check or Task 7's runs, one fix round later than it could have.
+- Ruling (before Task 1): the brief command is run from the skill file on disk (`skills/run-plan/SKILL.md` lines 80 to 99, copied to `brief-cmd.sh` in the work dir), not from the text the skill loaded with. Why: loading the skill with the plan's path as its argument replaced every `$0` in the `awk` block with that path, so the loaded command was broken. If wrong: nothing; the file on disk is what the tests run.
+- A first measurement, before any fixture (2026-11-23, this live session): the architect's reply with this plan was 56KB and reached the session as a preview of the first 2KB, with the notice "Output too large (56KB). Full output saved to: <a file under ~/.claude/projects/.../tool-results/>". The session read that file whole with the Read tool. The cold read's report (about 9KB) arrived whole. So in a live session a reply over some size under 56KB comes back as a preview, and its saved output can be read. Task 3 measures where the line is.
+- Owner decision (2026-11-23, before Task 3), on Risk 1: A. A report that arrives as a preview with a saved file the session can read counts as reaching the session. Recorded in design §4, "Amended (2026-11-23)". Task 3's rule now reads: k is the largest whole number for which a report of at least k × 200 files had its full text reach the live session with its last line, either in the result or through a saved output the session could read. k = 2 keeps `300 files` and the run carries on; any other k is still a stop.
+- Not run: an earlier try at measuring reply size, by having a Sonnet agent echo a 90KB and a 150KB file, was stopped by the model's safeguards before it produced anything. Not retried.
+
+### Parked
+- Task 1, from the spec check, all left: `scaffold.sh --subset N` with N above 645 ends in a Python traceback (nothing in the plan asks for one; ran by qa); `sync_big_sweep.py --check` doesn't notice a stray extra grader file, which the next write would delete (by reading). Not covered by any test: the `llm` grader's behaviour and the harness loading `case.yaml`, which need a model run (Task 7).
+- `run-plan`'s brief command breaks when the skill is loaded with an argument: `$0` in the `awk` block is replaced by the argument's text. Found here, not fixed here; it's a follow-up of its own.
