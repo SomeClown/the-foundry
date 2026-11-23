@@ -1048,5 +1048,25 @@ case still works, not that parts do.
   repo, which is fine, and about 35KB at 80,000 files, where it would crowd
   the report and no longer fit a preview. The sweep still runs at that size,
   through the saved output, but nothing has been tried anywhere near it.
+
+### Amended (2026-11-23): what "reaches the session" means
+
+Part 7 sets the part size from the largest report that "reaches the session
+whole". The first real measurement came before any fixture: the architect's
+56KB reply with the plan reached the live session as a 2KB preview, with the
+full text in a saved file the session read without trouble. A 150-file
+area's report is about 42KB by the one earlier figure, so read strictly,
+"whole" would have ruled out even one area a part.
+
+**Owner decision (2026-11-23), third round, 1A:** a report that arrives as a
+preview with a saved file the session can read counts as reaching the
+session. The part size is set by where a reply actually gets cut off (its
+last line goes missing), with room to spare, not by where previews start.
+
+What follows from it: a preview costs the session about 2KB where an inline
+part would cost 40KB or more, and the saved file is a path it can hand on.
+The eval sandbox couldn't read a saved file the one time it was tried, so
+the loop is proved in headless live sessions, and the harness run is
+recorded beside them for what it shows.
 - Nobody checks coupling across parts (non-goals). If a real sweep shows that
   losing something, it comes back as its own change.
