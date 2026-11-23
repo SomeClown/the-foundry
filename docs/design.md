@@ -542,8 +542,10 @@ where they differ:**
 
 **Calls I made**
 
-- The kind words: `blocked`, `fix-rounds`, `misread`, `missed`, `didnt-hold`,
-  `user`. A line reads `- <agent or skill> [<kind>]: what it did; what it
+- The kind words: `user`, `blocked`, `fix-rounds`, `misread`, `missed`,
+  `didnt-hold`. (`user` first, on the owner's word after the build: when two
+  fit, the first listed wins, and the user's own corrections are the
+  strongest signal.) A line reads `- <agent or skill> [<kind>]: what it did; what it
   should have done (where it came from)`.
 - No double entries: before appending, the session drops any line that's
   already in the file under a heading for this run (the same project and

@@ -38,6 +38,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - Batch 2: complete (from d357f25; gate: Ran 695, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: no bugs, no fix rounds; every fix qa found unpinned now has a pin with a mutation that proves it)
 - Batch 3: complete (from ccc350d; gate: Ran 815, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; adversarial: no bugs; 2 of 3 fix rounds used, one for a gap in my own design call and one for the heredoc marker and five prose findings; no real retro file was created)
 - Docs: complete (design §3 As built; CHANGELOG, README and PRIVACY brought in line with the skills; one phrase re-pinned by test-engineer; a new PR description drafted in the work dir, not posted)
+- After the run: the owner took both open recommendations (`user` first in the tie-break; the first real retro write, done). A small fix dispatch follows for the kind-word order and the misplaced sentence the real run found.
 
 ### Decisions made during the build
 
@@ -68,4 +69,6 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - implement [fix-rounds]: read the unittest verdict from the verbose line, which a printing test or a failing subTest hides, then grew the fix into a 600-character awk program; should have read the end-of-run failure headers with one grep from the start (Batch 1, fix rounds 1 and 2)
 - run-plan [missed]: my design call skipped the retro append whenever the run's heading was already in the file, which loses a stopped run's later lines; should have keyed the check on lines, which the builder pointed out (Batch 3, fix round 1)
 
-Not appended to `~/.foundry/retro.md`: the step is unreleased, and its first real write waits for the owner's OK.
+Appended to `~/.foundry/retro.md` on 2026-11-23 with the owner's OK, following run-plan's Retro text as written: the first real run of the step. The file didn't exist, the folder and file were created, `retro exit=0`, and there were no earlier lines to repeat. The session was in auto mode, so this run doesn't show what the default mode's prompt looks like.
+
+Found while following the text: in run-plan's Retro section, the sentence "Nothing goes to the cross-project file." now sits after the sentence about a `### Retro` section already in the log, so it reads as a rule for every run. It belongs with "write `- none` in the build log ... and stop there". A wording fix for a builder.
