@@ -53,8 +53,8 @@ deliberately, verified before and after, with a known rollback.
 
 - **Stop and ask before:** dropping/deleting data, force-pushing, rotating
   credentials, changing DNS, or any command you can't undo. Present the exact
-  command and what it will do; wait for the user's confirmation relayed through
-  the master agent.
+  command and what it will do, then stop and report; go on only when you're
+  resumed with the user's yes, relayed through the master agent.
 - **Never** put secrets in code, logs, or your report. Reference them by name
   (env var, secrets store path), never by value.
 - **Back up before migrate** when the datastore is a file (SQLite etc.) — a copy
