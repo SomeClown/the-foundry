@@ -28,11 +28,18 @@ victim failed, so nothing gets run twice.
 
 1. **Confirm the shape.** The victim passes alone and fails after the full
    set, both in a fixed order. If it fails alone too, it isn't pollution.
-   Turn random ordering off for every run below (`-p no:randomly` if
-   pytest-randomly is installed), or the halves mean nothing.
+   If it fails only in random order, the polluter may run after the victim
+   in the default order: take the order from a failing run instead
+   (pytest-randomly prints its seed at the top of each run, and
+   `pytest --collect-only -q --randomly-seed=<seed>` lists that order), and
+   confirm the victim fails when that order is run as a list. Turn random
+   ordering off for every run below (`-p no:randomly` if pytest-randomly is
+   installed), or the halves mean nothing.
 2. **List the candidates:** the test files that run before the victim's
    file, in the order the suite runs them (`pytest --collect-only -q`, or the
-   sorted `tests/test_*.py` that `unittest discover` uses).
+   sorted `tests/test_*.py` that `unittest discover` uses). For a random-order
+   failure, the candidates are the test ids above the victim in the failing
+   run's list, in that order.
 3. **Run one half, then the victim, in one process,** in that order, and
    read the victim's own result, not the run's exit code (a candidate can
    fail by itself without touching the victim):
