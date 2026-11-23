@@ -307,11 +307,33 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         "call it the suspect",
         "as commands of their own, not inside a loop or alongside other runs",
         "python3 -m unittest -v <half, as modules> tests.test_x.XTest.test_y",
-        r"2>&1 | grep -E '^test_y \(tests.test_x.XTest.test_y\)'",
+        r"2>&1 | grep -E '^(test_y \(tests\.test_x\.XTest(\.test_y)?\)|(FAIL|ERROR): test_y \(tests\.test_x\.XTest(\.test_y)?\)|Ran [0-9]+ test)'",
         "| grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'",
         "take the order from a failing run instead",
+        # Step 1: where the seed comes from, and how to list that run's order.
+        "(a failing run of the seeded loop in skill section 2 names its seed, and",
+        "`pytest --collect-only -q --randomly-seed=<seed>` lists that order)",
+        "(`-p no:randomly` if pytest-randomly is installed)",
+        # Step 2: the candidates for a random-order failure.
+        "For a random-order failure, the candidates are the test ids above the victim in the failing run's list, in that order.",
+        # Step 3: what the unittest line prints, and what nothing printed means.
+        "The unittest line works whichever way Python prints the id (`XTest.test_y` from 3.11, `XTest` before).",
+        "a `FAIL:` or `ERROR:` line for the victim: it failed",
+        "(a failing subtest adds a suffix after the id, and a test that prints while it runs can hide its verdict on its own line, so only these lines count)",
+        "the victim's own line and the `Ran` line, and no such header: it didn't fail",
+        "no victim line: the id or class didn't match, so fix it before you trust the run",
+        "no `Ran` line: the run stopped before it finished, so there's no result",
+        # Steps 4 and 5: the halving may end on one test id.
+        "Repeat until one file is left (one test id, if the candidates were ids from a random-order run).",
+        "If step 4 already ended on one test id, there is nothing to open: go to step 6.",
     ]
     SKILL_PHRASE = "the check under *Pollution* in the techniques file"
+    SEEDED_LOOP = (
+        "for i in $(seq 20); do pytest -q -rA --randomly-seed=$i 2>&1 | "
+        "grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)' | sed \"s/^/seed $i: /\"; done"
+    )
+    # Any grep that counts a test's own outcome, whatever its flags.
+    MEASURING_GREP = r"grep\s+-\w+\s+'[^']*PASSED[^']*'"
 
     def pollution(self):
         text = (SKILLS / "debug" / "references" / "techniques.md").read_text(encoding="utf-8")
@@ -341,10 +363,43 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         self.assertIn(self.SKILL_PHRASE, self.skill())
 
     def test_skill_greps_carry_the_name_boundary(self):
-        # A grep for test_y without "( |$)" also counts test_y_other.
-        for grep in re.findall(r"grep -E '\^\(PASSED[^']*'", self.skill()):
+        # A grep for test_y without "( |$)" also counts test_y_other. The skill has two measuring
+        # greps (the single run and the seeded loop); finding fewer means one was deleted or reworded
+        # past the regex, and that must fail rather than pass with nothing checked.
+        greps = re.findall(self.MEASURING_GREP, self.skill())
+        self.assertGreaterEqual(len(greps), 2, f"expected the measuring grep and the loop's grep, found {greps}")
+        for grep in greps:
             with self.subTest(grep=grep):
                 self.assertTrue(grep.endswith("( |$)'"), grep)
+                self.assertIn("test_y", grep)
+
+    def test_techniques_greps_carry_the_name_boundary(self):
+        greps = re.findall(self.MEASURING_GREP, self.pollution())
+        self.assertGreaterEqual(len(greps), 1, f"expected the pytest measuring grep, found {greps}")
+        for grep in greps:
+            with self.subTest(grep=grep):
+                self.assertTrue(grep.endswith("( |$)'"), grep)
+
+    def test_skill_carries_the_seeded_loop(self):
+        self.assertIn(self.SEEDED_LOOP, self.skill())
+
+    def test_seeded_loop_gives_every_run_its_own_seed_and_labels_it(self):
+        # The generic "<cmd>" loop above it is not the pytest one.
+        loops = [l for l in re.findall(r"for i in \$\(seq \d+\); do (.*?); done", self.skill()) if "pytest" in l]
+        self.assertEqual(len(loops), 1, loops)
+        loop = loops[0]
+        self.assertIn("--randomly-seed=$i", loop)
+        self.assertRegex(loop, r'sed "s/\^/seed \$i: /"')
+        # The seed option belongs to the pytest run, before the pipe, and the grep after it.
+        self.assertLess(loop.index("--randomly-seed=$i"), loop.index("| grep"))
+        self.assertLess(loop.index("| grep"), loop.index("| sed"))
+
+    def test_seeded_loop_sits_in_section_2_after_the_measuring_line(self):
+        text = self.skill()
+        start, end = text.index("## 2. Reproduce it on demand"), text.index("## 3. Narrow it down")
+        self.assertLess(start, text.index("--randomly-seed=$i"))
+        self.assertLess(text.index("--randomly-seed=$i"), end)
+        self.assertLess(text.index("pytest -q -rA 2>&1 | grep"), text.index("--randomly-seed=$i"))
 
 
 class RetroTest(unittest.TestCase):

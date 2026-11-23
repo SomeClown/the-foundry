@@ -81,6 +81,9 @@ A bug you can't trigger is a bug you can't prove fixed.
   For one test inside the full suite, count that test's own outcome, not the
   suite's exit code (with pytest:
   `pytest -q -rA 2>&1 | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)'`).
+  When the order is random (pytest-randomly), `-q` hides the seed it prints,
+  so give each run its own, and the loop's number is the seed of a failing
+  run (`for i in $(seq 20); do pytest -q -rA --randomly-seed=$i 2>&1 | grep -E '^(PASSED|FAILED|ERROR) tests/test_x.py::test_y( |$)' | sed "s/^/seed $i: /"; done`).
   "Fails 6 in 20" is a baseline you can later prove you've changed. Then
   compare: alone versus the whole suite, your Mac versus CI, fixed order
   versus random order, idle machine versus loaded.

@@ -28,6 +28,20 @@ All notable changes to The Foundry. Format loosely follows
 - debug's measuring grep in SKILL.md lacked the name boundary its techniques
   file has, so `test_y` also counted `test_y_other`. A structural test now
   checks it.
+- debug's measuring line hid the seed a random-order search needs: `-q` drops
+  the header that prints it, so a session that counted "fails 6 in 20" held
+  no seed from any failing run. SKILL.md now gives each run its own
+  (`--randomly-seed=$i`), so the loop's number is the failing seed. The
+  halving steps also now say they may end on one test id, not only a file.
+- debug's unittest check printed nothing before Python 3.11, whose `-v` line
+  ends in the class, not the full test id, and lost the result when the test
+  has a docstring, which moves the result to the next line. A test that
+  prints while it runs or fails a subtest hides its verdict the same way. The
+  check is now one grep that shows the victim's line, its `FAIL:` or
+  `ERROR:` header and the `Ran` footer, and the text says how to read them:
+  a header means it failed, no header with a `Ran` line means it didn't, no
+  victim line means the id didn't match, and no `Ran` line means the run
+  stopped.
 - The routine eval command in `evals/README.md` and CONTRIBUTING.md now
   passes `--ablation none`. Without it the harness adds a no-plugin baseline
   arm whose prompts can't load the plugin's skills, which only adds cost.
