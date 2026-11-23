@@ -347,6 +347,35 @@ class DebugPollutionProcedureTest(unittest.TestCase):
                 self.assertTrue(grep.endswith("( |$)'"), grep)
 
 
+class RetroTest(unittest.TestCase):
+    """run-plan and debug keep a retro outside the project; the README and PRIVACY.md must say so."""
+
+    FILE = "foundry-retro.md"
+
+    def text(self, path):
+        return " ".join(path.read_text(encoding="utf-8").split())
+
+    def test_both_skills_write_the_retro_and_never_edit_agents(self):
+        for name in ("run-plan", "debug"):
+            with self.subTest(skill=name):
+                body = self.text(SKILLS / name / "SKILL.md")
+                self.assertIn("${CLAUDE_CONFIG_DIR:-$HOME/.claude}/" + self.FILE, body)
+                self.assertIn("Never edit an agent or skill file yourself", body)
+                self.assertIn("no code, file contents, or secrets", body)
+                self.assertIn("through `brainstorm`", body)
+
+    def test_readme_and_privacy_name_the_file(self):
+        for path in (README, ROOT / "PRIVACY.md"):
+            with self.subTest(doc=path.name):
+                self.assertIn("~/.claude/" + self.FILE, self.text(path))
+
+    def test_the_other_skills_dont_write_it(self):
+        for name in skills():
+            if name not in ("run-plan", "debug"):
+                with self.subTest(skill=name):
+                    self.assertNotIn(self.FILE, self.text(SKILLS / name / "SKILL.md"))
+
+
 class DocsAgreeTest(unittest.TestCase):
     def test_counts_match(self):
         n_agents, n_skills = NUMBER_WORDS[len(agents())], NUMBER_WORDS[len(skills())]
