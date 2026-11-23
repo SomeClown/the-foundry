@@ -21,6 +21,16 @@ All notable changes to The Foundry. Format loosely follows
   It now matches the `debug` skill: pinned by a failing test, then fixed.
 - The brief-command tests crashed with 29 errors on a machine without zsh.
   They now skip zsh there, as the other shell tests already did.
+- debug's polluter search only looked at tests that run before the victim in
+  the default order, so it couldn't find a polluter that bites only in
+  random order (the walkthrough's own example). It now takes the order from
+  a failing run's seed when the failure is random-order only.
+- debug's measuring grep in SKILL.md lacked the name boundary its techniques
+  file has, so `test_y` also counted `test_y_other`. A structural test now
+  checks it.
+- The routine eval command in `evals/README.md` and CONTRIBUTING.md now
+  passes `--ablation none`. Without it the harness adds a no-plugin baseline
+  arm whose prompts can't load the plugin's skills, which only adds cost.
 
 ## [2.1.1] — 2026-11-10
 
