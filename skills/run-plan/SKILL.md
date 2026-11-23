@@ -294,15 +294,15 @@ long as it goes in the build log with the reason.
 **Know how each finding was shown before you build on it.** qa's report says,
 on a `Verified:` line in each finding, whether it ran something or only read.
 A finding qa showed by running goes into a batch; it needs no second check.
-A finding shown only by reading gets the cheapest check that could prove it
+A finding shown only by reading gets the quickest check that could prove it
 wrong, run by you before any fix is briefed: a command, a read of the code or
-of the tool's own help, or a read-only agent if it's bigger. If the check
-shows it's wrong, decline it with the reason. If only a paid run could check
-it (a real model session, a deploy), park it: no fix is built on it, it goes
-in the final report as a question with its cost, and the run carries on. A
-`Verified:` line that's missing counts as by reading. Each accepted finding's
-line in the build log says which it was: shown by running (by qa), checked by
-you (and how), or parked (needs a paid run, with the cost).
+of the tool's own help, a read-only agent, or a real model session if that's
+what settles it. What the check costs to run is not a reason to skip it. If it
+shows the finding is wrong, decline it with the reason. The one check you
+can't just run is one that would be a stop under section 5: the finding waits
+on the user there, and no fix is built on it meanwhile. A `Verified:` line
+that's missing counts as by reading. Each accepted finding's line in the build
+log says which it was: shown by running (by qa), or checked by you (and how).
 
 Group the accepted findings
 by area into batches. Each batch is one builder dispatch, then its own
@@ -428,9 +428,7 @@ One message:
 - the final gate's command and exit code, quoted
 - **Decisions I made**: every ruling from the build log, each with what it
   costs if it's wrong, so the user can check them
-- parked findings and declined qa findings, with reasons; a finding parked
-  because only a paid run could check it goes in the questions below, with
-  its cost
+- parked findings and declined qa findings, with reasons
 - the retro's line count, and any repeat it found, quoted
 - questions only the user can answer, numbered, with options and a
   recommendation
@@ -492,8 +490,8 @@ Work dir: <path>
 - Finding 1 (MEDIUM): fix. Shown by running (by qa: the failing request).
 - Finding 2 (LOW): fix. Checked by me: read the helper's own docs; it does
   reject an empty value.
-- Finding 3 (HIGH): parked. Only a paid model session could check it (about
-  $3); asked in the final report.
+- Finding 3 (HIGH): fix. Checked by me: ran a real model session against the
+  claim; it reproduced.
 - Finding 4 (LOW): declined. <reason>
 
 ### Retro
@@ -548,5 +546,5 @@ Then:
 | "I'll paste the plan so the agent has context" | Brief path, rules path, cited sections. Not the plan. |
 | "test-engineer and implement can run together to save time" | One writer at a time. |
 | "That qa finding is wrong; I'll skip it" | Decline it in the build log, with the reason. |
-| "qa said so, so I'll brief the fix" | Look at its `Verified:` line. Only read? Check it first, or park it if only a paid run can. |
+| "qa said so, so I'll brief the fix" | Look at its `Verified:` line. Only read? Check it first, whatever the check takes. |
 | "I'll push so CI can check it" | Pushing waits for the user. |

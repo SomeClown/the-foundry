@@ -592,14 +592,15 @@ class CheckBeforeBuildingPinsTest(unittest.TestCase):
         "**Know how each finding was shown before you build on it.**",
         "qa's report says, on a `Verified:` line in each finding, whether it ran something or only read.",
         "A finding qa showed by running goes into a batch; it needs no second check.",
-        "A finding shown only by reading gets the cheapest check that could prove it wrong, run by you before any fix is briefed: a command, a read of the code or of the tool's own help, or a read-only agent if it's bigger.",
-        "If the check shows it's wrong, decline it with the reason.",
-        "If only a paid run could check it (a real model session, a deploy), park it: no fix is built on it, it goes in the final report as a question with its cost, and the run carries on.",
+        "A finding shown only by reading gets the quickest check that could prove it wrong, run by you before any fix is briefed: a command, a read of the code or of the tool's own help, a read-only agent, or a real model session if that's what settles it.",
+        "What the check costs to run is not a reason to skip it.",
+        "If it shows the finding is wrong, decline it with the reason.",
+        "The one check you can't just run is one that would be a stop under section 5: the finding waits on the user there, and no fix is built on it meanwhile.",
         "A `Verified:` line that's missing counts as by reading.",
-        "Each accepted finding's line in the build log says which it was: shown by running (by qa), checked by you (and how), or parked (needs a paid run, with the cost).",
+        "Each accepted finding's line in the build log says which it was: shown by running (by qa), or checked by you (and how).",
     ]
 
-    def test_fix_batches_carry_the_three_outcomes_who_checks_and_the_missing_line_rule(self):
+    def test_fix_batches_carry_the_two_outcomes_who_checks_the_cost_rule_and_the_missing_line_rule(self):
         body = self.fix_batches()
         for clause in self.FIX_BATCH_CLAUSES:
             with self.subTest(clause=clause[:60]):
@@ -615,24 +616,26 @@ class CheckBeforeBuildingPinsTest(unittest.TestCase):
         positions = [body.index(c) for c in self.FIX_BATCH_CLAUSES]
         self.assertEqual(positions, sorted(positions))
 
-    def test_the_final_report_asks_about_a_parked_finding_with_its_cost(self):
+    def test_the_final_report_lists_parked_and_declined_findings_with_reasons_and_asks_nothing_about_cost(self):
         body = self.between(self.run_plan(), "### Report to the user", "## 5. When to stop and ask")
-        self.assertIn("a finding parked because only a paid run could check it goes in the questions below, with its cost", body)
+        self.assertIn("- parked findings and declined qa findings, with reasons - the retro's line count", body.replace("\n", " ").replace("  ", " "))
+        self.assertNotRegex(body, r"(?i)paid run|with its cost")
 
     def test_a_design_call_of_the_sessions_own_gets_the_builder_check_and_the_users_answers_do_not(self):
         body = self.between(self.run_plan(), "## 5. When to stop and ask", "## 6. The build log")
         self.assertIn("When the user's answers leave gaps and you fill them with calls of your own, write those into the design as yours (\"Calls I made\"), and give them `brainstorm`'s builder check (a cold read by a fresh read-only agent) before any builder is briefed on them. The user's own answers don't need it.", body)
         self.assertEqual(self.run_plan().count("The user's own answers don't need it."), 1, "say it once, where a session would look")
 
-    def test_the_build_log_example_shows_the_three_outcomes(self):
+    def test_the_build_log_example_shows_a_finding_shown_by_running_and_two_checked_by_the_session(self):
         body = self.between(self.run_plan(), "### From the qa pass (fix batch 1)", "### Retro")
         self.assertIn("Shown by running (by qa: the failing request).", body)
         self.assertIn("Checked by me: read the helper's own docs", body)
-        self.assertIn("parked. Only a paid model session could check it (about $3); asked in the final report.", body)
+        self.assertIn("Checked by me: ran a real model session against the claim; it reproduced.", body)
+        self.assertNotRegex(body, r"(?i)parked|paid")
 
     def test_the_red_flags_table_has_the_row(self):
         flags = self.run_plan()[self.run_plan().index("## Red flags"):]
-        self.assertIn("| \"qa said so, so I'll brief the fix\" | Look at its `Verified:` line. Only read? Check it first, or park it if only a paid run can. |", flags)
+        self.assertIn("| \"qa said so, so I'll brief the fix\" | Look at its `Verified:` line. Only read? Check it first, whatever the check takes. |", flags)
 
     # qa
     def qa(self):
@@ -711,21 +714,103 @@ class CheckBeforeBuildingPinsTest(unittest.TestCase):
                 self.assertIn(f"item ({letter})", body)
                 self.assertTrue(body.startswith("--- type: llm focus: last_message ---"), body[:60])
 
-    def test_situation_h_gives_two_findings_one_ran_one_read_only_that_only_a_paid_run_can_check(self):
+    def test_situation_h_gives_two_findings_one_ran_one_read_only_that_only_a_real_session_can_check(self):
         h = self.situations()["h"]
-        for phrase in ("two findings", "shown by running a test", "Verified: by reading; not run", "only way to check it is a real model session that costs about $3"):
+        for phrase in ("two findings", "shown by running a test", "Verified: by reading; not run", "the only thing that would is a real model session of a few minutes"):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, h)
 
-    def test_grader_h_wants_batch_one_park_the_other_with_its_cost_and_carry_on(self):
+    def test_situation_h_names_no_price_and_gives_no_reason_to_hold_back(self):
+        h = self.situations()["h"]
+        self.assertNotRegex(h, r"(?i)\$|cost|money|expens|paid")
+
+    def test_grader_h_wants_batch_one_run_the_check_on_the_other_and_never_park_or_ask(self):
         body = " ".join((ROOT / "evals" / "run-plan-decisions" / "graders" / "item-h.md").read_text(encoding="utf-8").split())
         for phrase in (
             "batches the first finding for a fix without checking it further",
-            "does not brief a fix: it parks it, puts it in the final report as a question with the cost (about $3), and carries on rather than stopping the run",
-            "FAIL if it briefs a fix for the second finding, drops it without asking, or stops the run to ask.",
+            "for the second runs the check itself (a real model session) before briefing any fix",
+            "FAIL if it briefs a fix for the second finding without checking it, parks it, drops it, or stops to ask the user whether to run the check.",
         ):
             with self.subTest(phrase=phrase[:60]):
                 self.assertIn(phrase, body)
+        self.assertNotRegex(body, r"(?i)\$|final report as a question")
+
+
+class NoCostGatesPinsTest(unittest.TestCase):
+    """The owner's direction (2026-11-23): the Foundry doesn't gate work on what it costs and doesn't ask
+    before spending. No agent or skill file, no CONTRIBUTING and no evals/README says to get an OK, ask
+    first, park a finding or hold back because something costs money. Measured figures, the model tiers,
+    investigate's 500-file stop, 'when it earns its cost' (fit, not money) and every ask that isn't about
+    cost (pushes, production, secrets) are untouched: the patterns below don't match them."""
+
+    PATTERNS = {
+        "an owner's OK or permission": r"owner'?s (OK|okay|yes|approval|permission)",
+        "costs real money": r"costs? real money",
+        "park for want of money": r"\bpark(ed|s)?\b[^.]{0,120}\b(paid|cost|money|\$)",
+        "a paid run as a reason": r"\bpaid (run|check|model)\b",
+        "ask or check first because of spend": r"\b(ask|check with|get)\b[^.]{0,60}\b(before|first)[^.]{0,60}\b(spend|spending|cost|costs|money|tokens?)\b",
+        "permission to spend": r"(permission|approval|ok|okay) (to|for) (spend|spending|running)",
+        "a question with its cost": r"(question|ask)[^.]{0,40}\bwith (its|the) cost",
+    }
+    REMOVED = [
+        "the head-to-head in `evals-expensive/` with the owner's OK, since it costs real money.",
+        "it; running everything costs real money (see below).",
+        "park it: no fix is built on it, it goes in the final report as a question with its cost, and the run carries on.",
+        "parked (needs a paid run, with the cost).",
+        "a finding parked because only a paid run could check it goes in the questions below, with its cost",
+        "Only a paid model session could check it (about $3); asked in the final report.",
+        "Only read? Check it first, or park it if only a paid run can.",
+        "ask the owner before spending anything on a model run",
+    ]
+    LEFT_ALONE = [
+        "Pushing waits for the user.",
+        "Stop and ask before: dropping/deleting data, force-pushing, rotating credentials, changing DNS.",
+        "STOPPED BEFORE READING (over 500 files): ask the owner.",
+        "Spec-check when it earns its cost.",
+        "Override the model only to downshift a small review: model: \"sonnet\".",
+        "What it cost: the head-to-head took about $4 on 2026-11-20.",
+        "The `--max-cost-usd` flag caps a run's spend.",
+        "The user runs every production command. Never change production state to investigate it.",
+        "A secret or credential would have to be read, written, or created.",
+        "Everything is built for minimal token consumption.",
+    ]
+
+    def files(self):
+        found = sorted(AGENTS.glob("*.md")) + sorted(SKILLS.glob("*/SKILL.md")) + sorted(SKILLS.glob("*/references/*.md"))
+        return found + [ROOT / "CONTRIBUTING.md", ROOT / "evals" / "README.md"]
+
+    def test_no_agent_skill_or_contributor_doc_gates_work_on_cost(self):
+        self.assertGreater(len(self.files()), 15)
+        for path in self.files():
+            body = " ".join(path.read_text(encoding="utf-8").split())
+            for why, pattern in self.PATTERNS.items():
+                with self.subTest(file=str(path.relative_to(ROOT)), gate=why):
+                    m = re.search(pattern, body, re.I)
+                    self.assertIsNone(m, m.group(0) if m else "")
+
+    def test_the_patterns_catch_every_sentence_that_was_taken_out(self):
+        for old in self.REMOVED:
+            with self.subTest(old=old[:50]):
+                self.assertTrue(any(re.search(p, old, re.I) for p in self.PATTERNS.values()), old)
+
+    def test_the_patterns_leave_alone_what_the_owner_did_not_ask_to_change(self):
+        for kept in self.LEFT_ALONE:
+            for why, pattern in self.PATTERNS.items():
+                with self.subTest(kept=kept[:50], gate=why):
+                    self.assertIsNone(re.search(pattern, kept, re.I))
+
+    def test_run_plans_fix_batch_paragraph_does_not_park_anything(self):
+        text = " ".join((SKILLS / "run-plan" / "SKILL.md").read_text(encoding="utf-8").split())
+        body = text[text.index("### Fix batches"): text.index("### Retro")]
+        self.assertNotRegex(body, r"(?i)\bpark")
+        self.assertNotRegex(body, r"(?i)paid|with its cost|asks? the user (whether|if)")
+
+    def test_a_check_that_can_not_just_be_run_points_at_section_5_and_does_not_restate_it(self):
+        text = " ".join((SKILLS / "run-plan" / "SKILL.md").read_text(encoding="utf-8").split())
+        body = text[text.index("### Fix batches"): text.index("### Retro")]
+        self.assertIn("would be a stop under section 5", body)
+        self.assertNotIn("irreversible", body)
+        self.assertNotIn("production", body)
 
 
 class RetroTest(unittest.TestCase):

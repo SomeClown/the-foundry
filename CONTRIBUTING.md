@@ -36,8 +36,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    claude plugin validate --profile directory .
    ```
    A change to `investigate` or `file-reader` also gets the nesting smoke
-   case, and the head-to-head in `evals-expensive/` with the owner's OK,
-   since it costs real money.
+   case, and the head-to-head in `evals-expensive/`.
    `tests/test_debug_pollution_procedure.py` runs debug's procedure against its
    fixture under pytest as well as unittest. It looks for an interpreter with
    pytest in `FOUNDRY_PYTEST_PYTHON`, then the one running the tests, then the

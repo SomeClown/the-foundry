@@ -18,7 +18,7 @@ result.
 ## Running them
 
 From the repo root. Run the cases for the skill you changed, before releasing
-it; running everything costs real money (see below).
+it.
 
 ```bash
 claude plugin eval . --tag ship --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit \
