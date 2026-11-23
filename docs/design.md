@@ -607,9 +607,10 @@ text is `skills/run-plan/SKILL.md` ("Retro" in section 4) and
   with the same heading if need be. Lines are copied as first written, never
   reworded, or the check can't see them.
 - **The tie between kind words goes to the first listed**, in the order
-  `blocked`, `fix-rounds`, `misread`, `missed`, `didnt-hold`, `user`, so the
+  `user`, `blocked`, `fix-rounds`, `misread`, `missed`, `didnt-hold`, so the
   same mistake gets the same word each time. Each skill shows one example line
-  per word.
+  per word. `user` was last as first built; the owner moved it first after
+  the build.
 - **Early stops point at the retro.** `run-plan`'s stop paragraph says to write
   the retro first (build log section, then the append) and put any repeat in
   the message; its list of reasons to stop names the append as the one write
@@ -629,14 +630,16 @@ text is `skills/run-plan/SKILL.md` ("Retro" in section 4) and
   runs the two shell lines from the skills. `tests/test_retro_pin_mutations.py`
   and `tests/test_self_consistency_pin_mutations.py` change the docs one pin at
   a time and check a test fails.
-- **No model has run the retro step.** The shell lines are tested; the session
-  reading the skill, picking kind words and spotting a repeat is not. No eval
+- **One session has run the retro step, once.** After the build, with the
+  owner's OK, the session that ran this branch's fixes followed run-plan's
+  text and wrote its two lines: the file didn't exist, the folder and file
+  were created, and the append exited 0. It found one sentence in the wrong
+  place, since moved. Spotting a repeat, debug's version, and a run in the
+  default permission mode are still unseen. No eval
   case exists, as the non-goals say. The paid `--tag debug` and `--tag
   run-plan` cases would run it, and nobody has confirmed that `claude plugin
   eval .` hands the caller's `FOUNDRY_RETRO_FILE` to the case's session.
-- **Parked.** A tie goes to `missed` over `user`, so a user correction that
-  also fits `missed` is recorded as `missed`. A line exactly `FOUNDRY_RETRO_END`
-  still ends the entry. With matching by project and run, a later separate run
+- **Parked.** A line exactly `FOUNDRY_RETRO_END` still ends the entry. With matching by project and run, a later separate run
   of the same plan that records an identical line has it dropped as already
   written. In a git worktree the project's name is the worktree's folder, so
   one project can show under two names. A relative `FOUNDRY_RETRO_FILE`

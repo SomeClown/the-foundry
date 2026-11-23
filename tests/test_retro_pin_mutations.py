@@ -296,7 +296,7 @@ class RetroPinMutationTest(unittest.TestCase):
                             "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
     def test_debug_writes_none_for_a_clean_hunt(self):
-        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "Nothing needed correcting: write nothing.", "Nothing needed correcting: write `- none`."),
+        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "Nothing needed correcting: write nothing, and stop there.", "Nothing needed correcting: write `- none`."),
                             "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
     def test_run_plan_resuming_loses_the_retro_paragraph(self):
@@ -422,6 +422,79 @@ class RetroPinMutationTest(unittest.TestCase):
         self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, "(copy them from the build log's Retro section)"),
                             "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
+
+    # Kind-word order: user first, so the tie-break gives user corrections their own word
+    USER_LINE = r"^- \S+ \[user\]:.*\n"
+
+    def test_user_moves_back_to_last_in_one_skill(self):
+        def move(t):
+            m = re.search(self.USER_LINE, t, re.M)
+            self.assertIsNotNone(m)
+            t = t.replace(m.group(0), "", 1)
+            last = re.search(r"^- \S+ \[didnt-hold\]:.*\n", t, re.M)
+            return t.replace(last.group(0), last.group(0) + m.group(0), 1)
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, move, "test_both_skills_name_exactly_the_same_six_kind_words")
+
+    def test_the_example_lines_are_reordered_so_user_is_not_first(self):
+        def swap(t):
+            pair = re.search(r"(^- \S+ \[user\]:.*\n)(^- \S+ \[blocked\]:.*\n)", t, re.M)
+            self.assertIsNotNone(pair)
+            return t.replace(pair.group(0), pair.group(2) + pair.group(1), 1)
+        for rel in (self.RUN, self.DEBUG):
+            with self.subTest(skill=rel):
+                self.assertCaughtBy(rel, swap, "test_both_skills_name_exactly_the_same_six_kind_words")
+
+    def test_any_two_neighbouring_kind_words_swapped_are_caught(self):
+        order = ["user", "blocked", "fix-rounds", "misread", "missed", "didnt-hold"]
+        for rel in (self.RUN, self.DEBUG):
+            for a, b in zip(order, order[1:]):
+                with self.subTest(skill=rel, swap=(a, b)):
+                    def swap(t):
+                        pair = re.search(rf"(^- \S+ \[{a}\]:.*\n)(^- \S+ \[{b}\]:.*\n)", t, re.M)
+                        self.assertIsNotNone(pair)
+                        return t.replace(pair.group(0), pair.group(2) + pair.group(1), 1)
+                    self.assertCaughtBy(rel, swap, "test_both_skills_name_exactly_the_same_six_kind_words")
+
+    # Clean-run sentences stay together; the already-in-the-log rule; the file paragraph's opening
+    def test_run_plan_puts_a_sentence_between_none_and_nothing_goes_to_the_file(self):
+        self.assertCaughtBy(self.RUN, lambda t: flat_sub(
+            t, "and stop there. Nothing goes to the cross-project file.",
+            "and stop there. A `### Retro` section already in the log gets the new lines added to it. Nothing goes to the cross-project file."),
+            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_run_plan_drops_nothing_goes_to_the_file(self):
+        self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, "and stop there. Nothing goes to the cross-project file.", "and stop there."),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_run_plan_drops_the_already_in_the_log_rule_or_the_none_replaced_rule(self):
+        for phrase in ("A `### Retro` section already in the log (from an early stop) gets the new lines added to it, not a second section.",
+                       "If it holds `- none` and there are now lines, the lines replace it."):
+            with self.subTest(phrase=phrase[:40]):
+                self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, phrase),
+                                    "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_the_file_paragraph_opening_is_dropped_or_changed(self):
+        self.assertCaughtBy(self.RUN, lambda t: flat_sub(t, "When there are lines, they also go to one file outside the project", "Otherwise the lines also go to one file outside the project"),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+        self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "When there are lines, they go to one file outside the project", "The lines go to one file outside the project"),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def in_retro(self, edit):
+        """Apply edit to debug's retro section only (the phrases also occur earlier in the skill)."""
+        return lambda t: t[:t.index("### The retro")] + edit(t[t.index("### The retro"):])
+
+    def test_debug_puts_a_sentence_between_stop_there_and_the_file_paragraph(self):
+        self.assertCaughtBy(self.DEBUG, self.in_retro(lambda t: flat_sub(
+            t, "write nothing, and stop there.", "write nothing, and stop there. Then tell the user it was clean.")),
+            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+
+    def test_debug_drops_stop_there_or_the_only_copy_note(self):
+        self.assertCaughtBy(self.DEBUG, self.in_retro(lambda t: flat_sub(t, "write nothing, and stop there.", "write nothing.")),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
+        self.assertCaughtBy(self.DEBUG, self.in_retro(lambda t: flat_sub(t, "There's no build log here, so that file is the only copy.")),
+                            "test_each_skill_carries_its_own_retro_text_in_the_retro_section")
 
     # Who may write it
     def test_brainstorm_is_told_to_write_it(self):

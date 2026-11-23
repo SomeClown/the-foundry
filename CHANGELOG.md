@@ -94,8 +94,8 @@ All notable changes to The Foundry. Format loosely follows
   should have caught, a fix that didn't hold, anything the user corrected).
   One fix round or a builder's question isn't one. Each line is
   `- <agent or skill> [<kind>]: what it did; what it should have done (where
-  it came from)`, with the kind one of `blocked`, `fix-rounds`, `misread`,
-  `missed`, `didnt-hold`, `user`. The lines go under a heading with the date,
+  it came from)`, with the kind one of `user`, `blocked`, `fix-rounds`, `misread`,
+  `missed`, `didnt-hold` (the first that fits wins). The lines go under a heading with the date,
   the repo's top folder's name, and the run, appended to `~/.foundry/retro.md`
   (or the file named by `FOUNDRY_RETRO_FILE`), so a repeat shows across
   projects; a run with nothing to correct writes nothing there, and lines

@@ -575,7 +575,7 @@ class RetroTest(unittest.TestCase):
 
     PATH = "~/.foundry/retro.md"
     VAR = "FOUNDRY_RETRO_FILE"
-    KINDS = ["blocked", "fix-rounds", "misread", "missed", "didnt-hold", "user"]
+    KINDS = ["user", "blocked", "fix-rounds", "misread", "missed", "didnt-hold"]
     RESOLVE = ("F=\"${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}\"; case \"$F\" in /*) ;; *) F=\"$PWD/$F\" ;; "
                "esac; printf '%s\\n' \"$F\"")
     SHAPE = "- <agent or skill> [<kind>]: what it did; what it should have done (where it came from)"
@@ -613,9 +613,10 @@ class RetroTest(unittest.TestCase):
             "a fix that didn't hold",
             "anything the user corrected",
             "One fix round, or a builder's NEEDS_CONTEXT question, is the loop working: leave it out.",
-            "Nothing needed correcting: write `- none` in the build log, so the log shows the step ran, and stop there.",
-            "Nothing goes to the cross-project file.",
-            "A `### Retro` section already in the log (from an early stop) gets the new lines added to it, not a second section.",
+            # One run of sentences: the clean-run rule, directly followed by "nothing goes to the file".
+            "Nothing needed correcting: write `- none` in the build log, so the log shows the step ran, and stop there. Nothing goes to the cross-project file.",
+            "A `### Retro` section already in the log (from an early stop) gets the new lines added to it, not a second section. If it holds `- none` and there are now lines, the lines replace it.",
+            "When there are lines, they also go to one file outside the project, so a repeat shows across projects.",
         ],
         "debug": [
             "The heading is `## <date> | <project> | debug <slug>`.",
@@ -625,8 +626,8 @@ class RetroTest(unittest.TestCase):
             "a dispatched agent's work redone",
             "anything the user corrected",
             "A fix that took one go is the loop working: leave it out.",
-            "Nothing needed correcting: write nothing.",
-            "There's no build log here, so the only copy is the cross-project file.",
+            # One run of sentences: the clean-run rule, then the file paragraph's opening, with nothing between.
+            "Nothing needed correcting: write nothing, and stop there. When there are lines, they go to one file outside the project, so a repeat shows across projects. There's no build log here, so that file is the only copy.",
         ],
     }
 

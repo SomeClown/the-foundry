@@ -324,21 +324,24 @@ fit, use the one listed first, so the same mistake gets the same word each
 time:
 
 ```
+- run-plan [user]: committed before the user's gate had run; the user said to wait for the exit code (Task 6)
 - implement [blocked]: came back BLOCKED for want of the schema file; should have named the file in its first report (Task 4)
 - implement [fix-rounds]: edited the victim test, not the polluter, and needed three rounds; should have fixed the polluter (Task 3, fix rounds 1 to 3)
 - test-engineer [misread]: wrote a test that expected an empty reward to raise; the brief says it reads "reward unknown" (Task 2, ruling)
 - implement [missed]: left a second caller of the old signature; should have searched for callers (qa pass, finding 2)
 - implement [didnt-hold]: the fix for the expiry bug broke on a daylight-saving date; should have tested a date across the change (Task 5, fix batch 1)
-- run-plan [user]: committed before the user's gate had run; the user said to wait for the exit code (Task 6)
 ```
 
 Write what happened, not theories, and no code, file contents, or secrets.
 Nothing needed correcting: write `- none` in the build log, so the log shows
-the step ran, and stop there. A `### Retro` section already in the log (from an
-early stop) gets the new lines added to it, not a second section. Nothing goes to the cross-project file.
+the step ran, and stop there. Nothing goes to the cross-project file.
 
-Otherwise the lines also go to one file outside the project, so a repeat
-shows across projects. It's `~/.foundry/retro.md`, or the file named by
+A `### Retro` section already in the log (from an early stop) gets the new
+lines added to it, not a second section. If it holds `- none` and there are
+now lines, the lines replace it.
+
+When there are lines, they also go to one file outside the project, so a
+repeat shows across projects. It's `~/.foundry/retro.md`, or the file named by
 `FOUNDRY_RETRO_FILE` when that's set. The Read and Write tools don't expand a
 shell expression, so resolve the path first, with one Bash call:
 

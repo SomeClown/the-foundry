@@ -231,18 +231,20 @@ fit, use the one listed first, so the same mistake gets the same word each
 time:
 
 ```
+- debug [user]: started on the fix before the pin; the user asked for the failing test first (step 5)
 - implement [blocked]: came back BLOCKED for want of the failing test's path; should have asked for it first (fix dispatch 1)
 - test-engineer [fix-rounds]: its pin passed on the unfixed code and was rewritten twice; should have run it unfixed first (the pin, rounds 1 and 2)
 - debug [misread]: read "slow since Friday" as a code change; the user meant a runner upgrade (step 1, the user's answer)
 - debug [missed]: named the cache as the suspect before measuring it; should have measured first (step 4, hypothesis 1)
 - implement [didnt-hold]: the first fix moved the leak to a second test; should have fixed the shared state (fix 1 of 2)
-- debug [user]: started on the fix before the pin; the user asked for the failing test first (step 5)
 ```
 
 Write what happened, not theories, and no code, file contents, or secrets.
-Nothing needed correcting: write nothing. There's no build log here, so the
-only copy is the cross-project file. It's `~/.foundry/retro.md`, or the file
-named by `FOUNDRY_RETRO_FILE` when that's set. The Read and Write tools don't
+Nothing needed correcting: write nothing, and stop there.
+
+When there are lines, they go to one file outside the project, so a repeat
+shows across projects. There's no build log here, so that file is the only
+copy. It's `~/.foundry/retro.md`, or the file named by `FOUNDRY_RETRO_FILE` when that's set. The Read and Write tools don't
 expand a shell expression, so resolve the path first, with one Bash call:
 
 ```
