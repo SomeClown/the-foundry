@@ -88,14 +88,27 @@ All notable changes to The Foundry. Format loosely follows
 
 ### Added
 - A retro at the end of `run-plan` and `debug` (design §3). The session
-  writes one line for each time the team needed correcting, from what the
-  run already logged, into the build log and into
-  `~/.claude/foundry-retro.md` (or under `CLAUDE_CONFIG_DIR`), so a repeat
-  shows across projects. When a mistake repeats one already in that file,
-  the report quotes both and offers to work out a fix through `brainstorm`.
-  The session never edits an agent or skill file itself. The README and
-  PRIVACY.md name the file, the one the plugin writes outside the project,
-  and structural tests hold all four to it.
+  writes one line for each time the team needed correcting that the loop
+  didn't catch by itself (a task with two or more fix rounds or a BLOCKED, a
+  test that misread the brief, a qa finding the builder or `test-engineer`
+  should have caught, a fix that didn't hold, anything the user corrected).
+  One fix round or a builder's question isn't one. Each line is
+  `- <agent or skill> [<kind>]: what it did; what it should have done (where
+  it came from)`, with the kind one of `blocked`, `fix-rounds`, `misread`,
+  `missed`, `didnt-hold`, `user`. The lines go under a heading with the date,
+  the project folder's name, and the run, appended to `~/.foundry/retro.md`
+  (or the file named by `FOUNDRY_RETRO_FILE`), so a repeat shows across
+  projects; a run with nothing to correct writes nothing there, and lines
+  already in the file for the run aren't written twice, so a run that stopped
+  early and went on still adds its later lines. `run-plan` keeps a copy in its
+  build log. A run that stops early (a fix cap, three failed fixes, can't
+  reproduce) writes its retro first. When the same agent or skill makes a
+  mistake with the same kind word as an earlier line, the report quotes both
+  and offers to work out a fix through `brainstorm`. The session never edits
+  an agent or skill file itself. The README and PRIVACY.md say what the file
+  holds and where, the eval commands in `evals/README.md` and CONTRIBUTING
+  point `FOUNDRY_RETRO_FILE` at a scratch file, and structural tests hold the
+  docs to it.
 
 ## [2.1.1] — 2026-11-10
 

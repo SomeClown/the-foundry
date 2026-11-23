@@ -302,25 +302,89 @@ decide goes into the final report as a question, not into a fix batch.
 ### Retro
 
 Add a `### Retro` section to the build log: one line for each time the team
-needed correcting during the run, drawn from the log. That's a BLOCKED or
-NEEDS_CONTEXT, each fix round and what it fixed, a test that misread the
-brief, a qa finding the builder or test-engineer should have caught, and
-anything the user corrected. Each line names the agent or skill, what it did,
+needed correcting during the run, drawn from the log. Only what the loop
+didn't catch by itself counts:
+
+- a task that took two or more fix rounds, or came back BLOCKED
+- a test that misread the brief
+- a qa finding the builder or test-engineer should have caught
+- a fix that didn't hold
+- anything the user corrected
+
+One fix round, or a builder's NEEDS_CONTEXT question, is the loop working:
+leave it out. Each line names the agent or skill, a kind word, what it did,
 what it should have done, and where in the log it came from:
 
 ```
-- implement: edited the victim test, not the polluter; should have fixed the polluter (Task 3, fix round 1)
+- <agent or skill> [<kind>]: what it did; what it should have done (where it came from)
+```
+
+The kind is one of these six words, shown with an example line each. When two
+fit, use the one listed first, so the same mistake gets the same word each
+time:
+
+```
+- implement [blocked]: came back BLOCKED for want of the schema file; should have named the file in its first report (Task 4)
+- implement [fix-rounds]: edited the victim test, not the polluter, and needed three rounds; should have fixed the polluter (Task 3, fix rounds 1 to 3)
+- test-engineer [misread]: wrote a test that expected an empty reward to raise; the brief says it reads "reward unknown" (Task 2, ruling)
+- implement [missed]: left a second caller of the old signature; should have searched for callers (qa pass, finding 2)
+- implement [didnt-hold]: the fix for the expiry bug broke on a daylight-saving date; should have tested a date across the change (Task 5, fix batch 1)
+- run-plan [user]: committed before the user's gate had run; the user said to wait for the exit code (Task 6)
 ```
 
 Write what happened, not theories, and no code, file contents, or secrets.
-Nothing needed correcting: write `- none`.
+Nothing needed correcting: write `- none` in the build log, so the log shows
+the step ran, and stop there. A `### Retro` section already in the log (from an
+early stop) gets the new lines added to it, not a second section. Nothing goes to the cross-project file.
 
-Then read `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/foundry-retro.md` (it may not
-exist yet) and append the same lines under a heading with the date, the
-project folder's name, and `run-plan <plan file>`. If it can't be written,
-say so in the report and go on. When a new line has the same agent or skill
-making the same kind of mistake as an earlier line in that file, the report
-quotes both and offers to work out a fix with the user through `brainstorm`.
+Otherwise the lines also go to one file outside the project, so a repeat
+shows across projects. It's `~/.foundry/retro.md`, or the file named by
+`FOUNDRY_RETRO_FILE` when that's set. The Read and Write tools don't expand a
+shell expression, so resolve the path first, with one Bash call:
+
+```
+F="${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}"; case "$F" in /*) ;; *) F="$PWD/$F" ;; esac; printf '%s\n' "$F"
+```
+
+Read the file at the path it prints (a missing file is fine: treat it as
+empty; a long one, read to the end). Find any heading with the same project
+and run as the one you're about to write, whatever its date, and the lines
+under it: those are already written (a resumed session, a run that stopped early and
+went on, or a session that finished first). Drop them from your lines. None
+left: skip the append. Otherwise append the heading and the lines that are
+left; a second block under the same heading text is fine, since the file is
+only ever appended to. Copy lines as first written, never reworded, or the
+check can't tell they're there (copy them from the build log's Retro section).
+
+The heading is `## <date> | <project> | run-plan <plan file's name>`. The date is today's, from
+`date +%F`, as `YYYY-MM-DD`. The project is the name of the repo's top folder
+(what `basename "$(git rev-parse --show-toplevel)"` prints), not the subfolder
+you're in; outside a git repo, the working folder's name.
+
+Then append, with one Bash call that doesn't lean on the earlier one. Put the
+heading and the lines between the `FOUNDRY_RETRO_END` markers, a blank line
+first. No line of the entry may be that marker, or the shell would run the
+lines after it:
+
+```
+F="${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}"; case "$F" in /*) ;; *) F="$PWD/$F" ;; esac
+mkdir -p "$(dirname "$F")" && cat >> "$F" <<'FOUNDRY_RETRO_END'
+
+## 2026-11-23 | my-project | run-plan 2026-11-23-my-feature.md
+- implement [fix-rounds]: edited the victim test, not the polluter, and needed three rounds; should have fixed the polluter (Task 3, fix rounds 1 to 3)
+FOUNDRY_RETRO_END
+echo "retro exit=$?"
+```
+
+Append, never rewrite: two sessions can finish together, and a rewrite loses
+one's lines. The folder and the file are created if they're missing. If the
+exit isn't 0, say in the report that the retro wasn't written, and go on.
+
+A repeat is the same agent or skill with the same kind word as an earlier line
+in that file (a line this same run wrote before an early stop isn't a repeat
+of itself). When a new line is one, the report quotes both lines and offers
+to work out a fix with the user through `brainstorm`.
+
 Never edit an agent or skill file yourself, here or in the plugin's install
 folder: a fix goes through the user and the repo's own review.
 
@@ -359,14 +423,17 @@ Only these stop the run:
   doesn't settle it.
 - **Anything irreversible or outside the branch**: production, a migration on
   real data, deleting anything that isn't the run's scratch, a push, a merge,
-  a tag, a release.
+  a tag, a release. The one write outside the branch that doesn't stop the run
+  is the retro's append to `~/.foundry/retro.md` (or `FOUNDRY_RETRO_FILE`).
 - **A secret or credential** would have to be read, written, or created.
 
 Everything else (an ambiguous brief, a misread test, a task to split, a qa
 finding to decline) you decide, log as a ruling, and keep going. A ruling the
 user can see and reverse costs less than a run parked on a question. When you
-do stop, ask everything that's open in one numbered message, with options,
-and log the stop in the build log. The run waits for the answer; don't start
+do stop, write the retro first (see "Retro" in section 4: the build log's
+section, then the append), put any repeat in the message, ask everything
+that's open in one numbered message, with options, and log the stop in the
+build log. The run waits for the answer; don't start
 other tasks around it unless the user says to.
 
 ## 6. The build log
@@ -405,6 +472,13 @@ log and `git log`, and trust them over your memory. A task with a `complete`
 line is done; don't redo it (its commit is the one whose subject starts
 `Task N:`). For the task in progress, the base is `HEAD`, since its commit
 hasn't happened yet.
+
+**The retro picks up where it stopped.** A `### Retro` section in the build
+log means the step ran up to that point (an early stop wrote it). When the run
+finishes, write what happened since: add the new lines to that section, not a
+second section, and if it holds `- none`, the new lines replace it. Then do
+the file append from "Retro": it drops the lines the file already has, so
+nothing is written twice.
 
 **Check for a dispatch still running first.** A background agent sent before
 compaction may still be working, and its result will arrive on its own.

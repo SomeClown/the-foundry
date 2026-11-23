@@ -21,9 +21,16 @@ From the repo root. Run the cases for the skill you changed, before releasing
 it; running everything costs real money (see below).
 
 ```bash
-claude plugin eval . --tag ship --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit \
+FOUNDRY_RETRO_FILE="$(mktemp)" claude plugin eval . --tag ship --ablation none --scaffold --trust-plugin --allow-tools Bash Write Edit \
   --judge-model sonnet --threshold 0.8 --no-publish
 ```
+
+The `FOUNDRY_RETRO_FILE` prefix points the retro at a scratch file. The
+`debug` and `run-plan` cases run their skill to the end, which includes the
+retro step, and without it a planted-bug run would write to your real
+`~/.foundry/retro.md`. Keep the prefix on any `claude plugin eval .` command
+that runs those cases (the `evals-expensive/` head-to-head below runs
+`investigate` only, so it doesn't need it).
 
 - `--tag brainstorm | run-plan | debug | ship | agents` picks a skill's cases;
   `--case 'debug-*'` works too.

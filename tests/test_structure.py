@@ -429,9 +429,10 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         self.assertLess(text.index("pytest -q -rA 2>&1 | grep"), text.index("--randomly-seed=$i"))
 
 
-class Batch2PinsTest(unittest.TestCase):
-    """Sentences the qa pass found nothing pinning: each was restored to its old text in a scratch
-    copy and the suite stayed green. Short phrases, read with whitespace folded, so a re-wrap passes."""
+class SelfConsistencyPinsTest(unittest.TestCase):
+    """Sentences that must agree with their neighbours (a fallback in all its places, a README rule that
+    matches the agent file, a flag every command carries). Short phrases, read with whitespace folded,
+    so a re-wrap passes."""
 
     def text(self, *parts):
         return " ".join((ROOT.joinpath(*parts)).read_text(encoding="utf-8").split())
@@ -568,32 +569,257 @@ class Batch2PinsTest(unittest.TestCase):
 
 
 class RetroTest(unittest.TestCase):
-    """run-plan and debug keep a retro outside the project; the README and PRIVACY.md must say so."""
+    """run-plan and debug keep a retro in one file outside the project (docs/design.md section 3,
+    amended). Both skills carry the same path, command, kinds and rules; nothing else writes it; the
+    README, PRIVACY.md and the eval commands say so. Short phrases, whitespace folded."""
 
-    FILE = "foundry-retro.md"
+    PATH = "~/.foundry/retro.md"
+    VAR = "FOUNDRY_RETRO_FILE"
+    KINDS = ["blocked", "fix-rounds", "misread", "missed", "didnt-hold", "user"]
+    RESOLVE = ("F=\"${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}\"; case \"$F\" in /*) ;; *) F=\"$PWD/$F\" ;; "
+               "esac; printf '%s\\n' \"$F\"")
+    SHAPE = "- <agent or skill> [<kind>]: what it did; what it should have done (where it came from)"
+    # Said once in each skill, word for word.
+    BOTH = [
+        "It's `~/.foundry/retro.md`, or the file named by `FOUNDRY_RETRO_FILE` when that's set.",
+        "The Read and Write tools don't expand a shell expression, so resolve the path first, with one Bash call",
+        "Read the file at the path it prints (a missing file is fine: treat it as empty; a long one, read to the end).",
+        "Find any heading with the same project and run as the one you're about to write, whatever its date, and the lines under it",
+        "Copy lines as first written, never reworded, or the check can't tell they're there",
+        "The date is today's, from `date +%F`, as `YYYY-MM-DD`.",
+        "The project is the name of the repo's top folder (what `basename \"$(git rev-parse --show-toplevel)\"` prints), not the subfolder you're in; outside a git repo, the working folder's name.",
+        "Put the heading and the lines between the `FOUNDRY_RETRO_END` markers, a blank line first. No line of the entry may be that marker, or the shell would run the lines after it:",
+        "When two fit, use the one listed first, so the same mistake gets the same word each time:",
+        "Drop them from your lines. None left: skip the append.",
+        "Then append, with one Bash call that doesn't lean on the earlier one.",
+        "Append, never rewrite: two sessions can finish together, and a rewrite loses one's lines.",
+        "The folder and the file are created if they're missing.",
+        "If the exit isn't 0, say in the report that the retro wasn't written, and go on.",
+        "A repeat is the same agent or skill with the same kind word as an earlier line in that file",
+        "the report quotes both lines and offers to work out a fix with the user through `brainstorm`",
+        "Never edit an agent or skill file yourself, here or in the plugin's install folder: a fix goes through the user and the repo's own review.",
+        "Write what happened, not theories, and no code, file contents, or secrets.",
+        "The kind is one of these six words, shown with an example line each",
+        "Each line names the agent or skill, a kind word, what it did, what it should have done, and where",
+        SHAPE,
+    ]
+    SPECIFIC = {
+        "run-plan": [
+            "The heading is `## <date> | <project> | run-plan <plan file's name>`.",
+            "(copy them from the build log's Retro section)",
+            "a task that took two or more fix rounds, or came back BLOCKED",
+            "a test that misread the brief",
+            "a qa finding the builder or test-engineer should have caught",
+            "a fix that didn't hold",
+            "anything the user corrected",
+            "One fix round, or a builder's NEEDS_CONTEXT question, is the loop working: leave it out.",
+            "Nothing needed correcting: write `- none` in the build log, so the log shows the step ran, and stop there.",
+            "Nothing goes to the cross-project file.",
+            "A `### Retro` section already in the log (from an early stop) gets the new lines added to it, not a second section.",
+        ],
+        "debug": [
+            "The heading is `## <date> | <project> | debug <slug>`.",
+            "The slug is the working file's name when the hunt has one (`debug-<slug>.md`), otherwise a short name for the bug, two or three words joined by hyphens; a resumed hunt uses the name already in the file for it.",
+            "a fix that didn't hold",
+            "a step skipped and caught (a fix before the pin, a suspect named before the check)",
+            "a dispatched agent's work redone",
+            "anything the user corrected",
+            "A fix that took one go is the loop working: leave it out.",
+            "Nothing needed correcting: write nothing.",
+            "There's no build log here, so the only copy is the cross-project file.",
+        ],
+    }
+
+    # Elsewhere in the skill: the stops, resuming, and the close-out bullet.
+    ELSEWHERE = {
+        "run-plan": [
+            "**The retro picks up where it stopped.**",
+            "do stop, write the retro first (see \"Retro\" in section 4: the build log's section, then the append)",
+            "The one write outside the branch that doesn't stop the run is the retro's append to `~/.foundry/retro.md` (or `FOUNDRY_RETRO_FILE`).",
+        ],
+        "debug": [
+            "**Retro.** Write it as set out under \"The retro\" below",
+            "A hunt that needed none writes nothing.",
+        ],
+    }
+    # Where the retro is described, so a phrase that also occurs earlier in the skill can't stand in for it.
+    SECTION = {"run-plan": ("### Retro", "### Docs"), "debug": ("### The retro", "## Red flags")}
 
     def text(self, path):
         return " ".join(path.read_text(encoding="utf-8").split())
 
-    def test_both_skills_write_the_retro_and_never_edit_agents(self):
+    def skill(self, name):
+        return self.text(SKILLS / name / "SKILL.md")
+
+    def section(self, name):
+        body = self.skill(name)
+        start, end = self.SECTION[name]
+        self.assertIn(start, body)
+        return body[body.index(start): body.index(end, body.index(start))]
+
+    def raw(self, name):
+        return (SKILLS / name / "SKILL.md").read_text(encoding="utf-8")
+
+    def test_both_skills_carry_the_shared_retro_text(self):
+        for name in ("run-plan", "debug"):
+            body = self.section(name)
+            for phrase in self.BOTH:
+                with self.subTest(skill=name, phrase=phrase[:60]):
+                    self.assertIn(phrase, body)
+
+    def test_each_skill_carries_its_own_retro_text_in_the_retro_section(self):
+        for name, phrases in self.SPECIFIC.items():
+            body = self.section(name)
+            for phrase in phrases:
+                with self.subTest(skill=name, phrase=phrase[:60]):
+                    self.assertIn(phrase, body)
+
+    def test_each_skill_points_at_the_retro_from_where_it_stops_resumes_and_closes(self):
+        for name, phrases in self.ELSEWHERE.items():
+            body = self.skill(name)
+            for phrase in phrases:
+                with self.subTest(skill=name, phrase=phrase[:60]):
+                    self.assertIn(phrase, body)
+
+    def test_both_skills_carry_the_resolve_command_and_an_append_that_resolves_itself(self):
+        for name in ("run-plan", "debug"):
+            raw = self.raw(name)
+            with self.subTest(skill=name):
+                self.assertIn(self.RESOLVE, raw)
+                # The append block re-resolves, creates the folder, appends with >>, and reports its exit.
+                self.assertIn('mkdir -p "$(dirname "$F")" && cat >> "$F" <<\'FOUNDRY_RETRO_END\'', raw)
+                self.assertIn('echo "retro exit=$?"', raw)
+
+    def test_both_skills_name_exactly_the_same_six_kind_words(self):
+        for name in ("run-plan", "debug"):
+            raw = self.raw(name)
+            example = raw[raw.index("shown with an example line each"):]
+            example = example[: example.index("Write what happened")]
+            with self.subTest(skill=name):
+                self.assertEqual(re.findall(r"^- [\w-]+ \[([\w-]+)\]:", example, re.M), self.KINDS)
+
+    def test_the_example_entry_in_the_append_uses_a_real_kind_word(self):
+        for name in ("run-plan", "debug"):
+            raw = self.raw(name)
+            block = raw[raw.index("<<'FOUNDRY_RETRO_END'"): raw.index("\nFOUNDRY_RETRO_END\n")]
+            with self.subTest(skill=name):
+                self.assertEqual(len(re.findall(r"^- [\w-]+ \[([\w-]+)\]:", block, re.M)), 1)
+                self.assertIn(re.findall(r"\[([\w-]+)\]", block)[0], self.KINDS)
+
+    def test_debug_lines_end_with_where_they_came_from_not_the_evidence(self):
+        body = self.skill("debug")
+        self.assertNotIn("and the evidence, with no code", body)
+        self.assertIn("what it should have done, and where it came from", body)
+
+    def test_debug_stops_write_the_retro_first_at_both_stops(self):
+        body = self.skill("debug")
+        self.assertEqual(body.count('Write the retro before you stop (see "The retro" in section 7)'), 2)
+        self.assertIn("and put any repeat in that message", body)
+        two, three = body.index("Can't reproduce after real effort?"), body.index("## 6. Three failed fixes: stop")
+        self.assertLess(two, body.index('Write the retro before you stop'))
+        self.assertGreater(body.rindex('Write the retro before you stop'), three)
+
+    def test_the_two_stops_point_at_the_retro_text_and_do_not_repeat_it_so_it_is_written_once(self):
+        # A stop names the retro; the command lives in one place per skill.
         for name in ("run-plan", "debug"):
             with self.subTest(skill=name):
-                body = self.text(SKILLS / name / "SKILL.md")
-                self.assertIn("${CLAUDE_CONFIG_DIR:-$HOME/.claude}/" + self.FILE, body)
-                self.assertIn("Never edit an agent or skill file yourself", body)
-                self.assertIn("no code, file contents, or secrets", body)
-                self.assertIn("through `brainstorm`", body)
+                self.assertEqual(self.raw(name).count("<<'FOUNDRY_RETRO_END'"), 1)
+                self.assertEqual(self.raw(name).count("printf '%s\\n' \"$F\""), 1)
 
-    def test_readme_and_privacy_name_the_file(self):
-        for path in (README, ROOT / "PRIVACY.md"):
-            with self.subTest(doc=path.name):
-                self.assertIn("~/.claude/" + self.FILE, self.text(path))
-
-    def test_the_other_skills_dont_write_it(self):
+    def test_no_other_skill_writes_it(self):
         for name in skills():
             if name not in ("run-plan", "debug"):
                 with self.subTest(skill=name):
-                    self.assertNotIn(self.FILE, self.text(SKILLS / name / "SKILL.md"))
+                    body = self.text(SKILLS / name / "SKILL.md")
+                    for needle in ("retro.md", self.VAR, ".foundry"):
+                        self.assertNotIn(needle, body)
+
+    def test_no_agent_and_no_references_file_mentions_the_retro_file(self):
+        files = sorted(AGENTS.glob("*.md")) + sorted(SKILLS.glob("*/references/*.md"))
+        self.assertTrue(files)
+        for path in files:
+            with self.subTest(file=str(path.relative_to(ROOT))):
+                body = self.text(path)
+                for needle in ("retro.md", self.VAR, ".foundry/", "foundry-retro"):
+                    self.assertNotIn(needle, body)
+                self.assertNotIn("the retro", body.lower())
+
+    def test_the_first_designs_path_and_wording_are_gone_from_the_shipped_tree(self):
+        files = [README, ROOT / "PRIVACY.md", ROOT / "CONTRIBUTING.md", ROOT / "evals" / "README.md"]
+        files += sorted(AGENTS.glob("*.md")) + sorted(SKILLS.glob("*/SKILL.md")) + sorted(SKILLS.glob("*/references/*.md"))
+        files += [p for p in sorted((ROOT / "docs").glob("*.md")) if p.name != "design.md"]
+        old = ["foundry-retro", "CLAUDE_CONFIG_DIR", "$HOME/.claude}/", "~/.claude/foundry",
+               "and the evidence, with no code", "same short retro as", "`- none` if nothing did"]
+        for path in files:
+            body = self.text(path)
+            for needle in old:
+                with self.subTest(file=str(path.relative_to(ROOT)), needle=needle):
+                    self.assertNotIn(needle, body)
+
+    def test_a_clean_run_never_sends_none_to_the_cross_project_file(self):
+        # run-plan's "- none" is for the build log only; the appended example holds a real line.
+        raw = self.raw("run-plan")
+        block = raw[raw.index("<<'FOUNDRY_RETRO_END'"): raw.index("\nFOUNDRY_RETRO_END\n")]
+        self.assertNotIn("- none", block)
+        self.assertNotIn("- none", self.raw("debug"))
+
+    def test_readme_and_privacy_say_where_and_what(self):
+        for path in (README, ROOT / "PRIVACY.md"):
+            body = self.text(path)
+            for phrase in (
+                self.PATH, self.VAR,
+                "the date, the project folder's name, the plan file's name or the bug's short name, and one line per correction",
+                "A run with nothing to correct writes nothing",
+                "The instructions tell the session to keep code, file contents and secrets out of it",
+                "which is committed with the plan",
+            ):
+                with self.subTest(doc=path.name, phrase=phrase[:50]):
+                    self.assertIn(phrase, body)
+
+    def test_readme_says_it_is_the_one_file_written_outside_the_project_and_how_to_remove_it(self):
+        body = self.text(README)
+        self.assertIn("it's the one file the plugin writes outside your project", body)
+        self.assertIn("The one thing it leaves behind is the retro file, if your runs have written one: `rm -r ~/.foundry` takes it away.", body)
+
+    def test_readme_skill_rows_say_where_the_retro_goes(self):
+        body = self.text(README)
+        run_plan = next(r for r in body.split("| `") if r.startswith("run-plan`"))
+        debug = next(r for r in body.split("| `") if r.startswith("debug`"))
+        self.assertIn("(in the build log, and in `~/.foundry/retro.md`)", run_plan)
+        self.assertIn("adding any corrections the hunt needed to `~/.foundry/retro.md`", debug)
+        self.assertNotIn("same short retro as run-plan", debug)
+
+    def test_privacy_no_longer_says_it_stores_nothing(self):
+        body = self.text(ROOT / "PRIVACY.md")
+        self.assertNotIn("collect, store, or send", body)
+        self.assertIn("The Foundry doesn't collect or send any data. The one thing it stores is a file on your own machine", body)
+        self.assertIn("nothing sends it anywhere", body)
+
+    # Eval commands that run debug or run-plan point the retro at a scratch file.
+    def eval_commands_with_prefix(self, text):
+        found = []
+        for m in re.finditer(r"claude plugin eval \.", text):
+            before = text[text.rfind("\n", 0, m.start()) + 1: m.start()]
+            command = re.split(r"`|\n(?<!\\\n)", text[m.start():].replace("\\\n", " "), maxsplit=1)[0]
+            if " --" in command:
+                found.append((before, command))
+        return found
+
+    def test_the_eval_commands_that_run_skills_set_the_retro_file_to_a_scratch_path(self):
+        for name, at_least in (("evals/README.md", 1), ("CONTRIBUTING.md", 1)):
+            commands = [c for c in self.eval_commands_with_prefix((ROOT / name).read_text(encoding="utf-8"))
+                        if "evals-expensive" not in c[1]]
+            with self.subTest(doc=name):
+                self.assertGreaterEqual(len(commands), at_least)
+                for before, command in commands:
+                    self.assertRegex(before, r"FOUNDRY_RETRO_FILE=\S+ $", command)
+
+    def test_the_eval_docs_say_why(self):
+        for name in ("evals/README.md", "CONTRIBUTING.md"):
+            with self.subTest(doc=name):
+                body = self.text(ROOT / name)
+                self.assertIn("FOUNDRY_RETRO_FILE", body)
+                self.assertIn("~/.foundry/retro.md", body)
 
 
 class DocsAgreeTest(unittest.TestCase):

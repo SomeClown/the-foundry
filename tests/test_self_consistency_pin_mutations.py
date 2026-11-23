@@ -1,4 +1,8 @@
-"""Prove the batch 2 structural pins in tests/test_structure.py can fail.
+"""Prove the self-consistency pins in tests/test_structure.py can fail.
+
+These pins hold sentences that agree with each other across agents, skills and docs (a fallback
+stated in all its places, a rule in the README that matches the agent file, a flag every command
+carries).
 
 Each case copies the files the pins read into a temp tree, undoes one fix there (restoring the
 pre-branch wording, or removing the sentence), points test_structure at the copy, and runs the pins.
@@ -19,7 +23,7 @@ sys.path.insert(0, str(ROOT / "tests"))
 import test_structure  # noqa: E402
 
 COPIED = ["agents", "skills", "README.md", "CONTRIBUTING.md", "evals/README.md", "docs/walkthrough.md"]
-CLASSES = (test_structure.Batch2PinsTest, test_structure.AgentFilesTest)
+CLASSES = (test_structure.SelfConsistencyPinsTest, test_structure.AgentFilesTest)
 
 
 def flat_sub(text, phrase, new="", count=1):
@@ -50,9 +54,9 @@ def run_pins(root):
     return result
 
 
-class Batch2PinMutationTest(unittest.TestCase):
+class SelfConsistencyPinMutationTest(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="batch2-pins-"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="consistency-pins-"))
         self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
         for rel in COPIED:
             src, dst = ROOT / rel, self.tmp / rel

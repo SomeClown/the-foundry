@@ -92,7 +92,7 @@ A bug you can't trigger is a bug you can't prove fixed.
   the wait that never returned. See *Hangs* in the techniques file.
 - **Can't reproduce after real effort?** Say so, add the logging or
   watchdog that will catch it next time, and stop there. Don't fix what you
-  can't see.
+  can't see. Write the retro before you stop (see "The retro" in section 7).
 
 ## 3. Narrow it down
 
@@ -185,7 +185,8 @@ usually means the design is wrong, not the last line touched. Stop fixing,
 and bring the user one numbered message: what was tried and why each failed,
 what that suggests about the design, and two or three ways forward with a
 recommendation (one of which is often "redesign this piece, here's the
-smallest version").
+smallest version"). Write the retro before you stop (see "The retro" in
+section 7), and put any repeat in that message.
 
 ## 7. Close it out
 
@@ -200,21 +201,98 @@ smallest version").
   pre-existing failure) get named with their evidence and offered as their
   own hunts, one at a time. Fixing them inside this one muddies what this
   fix proved.
-- **Retro.** Append one line for each time the hunt needed correcting to
-  `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/foundry-retro.md`, under a heading
-  with the date, the project folder's name, and `debug <slug>`: a fix that
-  didn't hold, a step skipped and caught (a fix before the pin, a suspect
-  named before the check), a dispatched agent's work redone, anything the
-  user corrected. Each line names the agent or skill, what it did, what it
-  should have done, and the evidence, with no code, file contents, or
-  secrets; `- none` if nothing did. Read the file first: when a new line
-  repeats an earlier one (same agent or skill, same kind of mistake), the
-  report quotes both and offers to work out a fix through `brainstorm`.
-  Never edit an agent or skill file yourself. If the file can't be written,
-  say so and go on.
+- **Retro.** Write it as set out under "The retro" below, one line for each
+  time the hunt needed correcting. A hunt that needed none writes nothing.
 - **Report to the user:** the cause in plain words, the evidence, the fix,
   the proof (the loop count and the gate's exit code), and anything left
   open. Commits and pushes follow the project's usual rules.
+
+### The retro
+
+One line for each time the hunt needed correcting, and only what the loop
+didn't catch by itself:
+
+- a fix that didn't hold
+- a step skipped and caught (a fix before the pin, a suspect named before the
+  check)
+- a dispatched agent's work redone
+- anything the user corrected
+
+A fix that took one go is the loop working: leave it out. Each line names the
+agent or skill, a kind word, what it did, what it should have done, and where
+it came from:
+
+```
+- <agent or skill> [<kind>]: what it did; what it should have done (where it came from)
+```
+
+The kind is one of these six words, shown with an example line each. When two
+fit, use the one listed first, so the same mistake gets the same word each
+time:
+
+```
+- implement [blocked]: came back BLOCKED for want of the failing test's path; should have asked for it first (fix dispatch 1)
+- test-engineer [fix-rounds]: its pin passed on the unfixed code and was rewritten twice; should have run it unfixed first (the pin, rounds 1 and 2)
+- debug [misread]: read "slow since Friday" as a code change; the user meant a runner upgrade (step 1, the user's answer)
+- debug [missed]: named the cache as the suspect before measuring it; should have measured first (step 4, hypothesis 1)
+- implement [didnt-hold]: the first fix moved the leak to a second test; should have fixed the shared state (fix 1 of 2)
+- debug [user]: started on the fix before the pin; the user asked for the failing test first (step 5)
+```
+
+Write what happened, not theories, and no code, file contents, or secrets.
+Nothing needed correcting: write nothing. There's no build log here, so the
+only copy is the cross-project file. It's `~/.foundry/retro.md`, or the file
+named by `FOUNDRY_RETRO_FILE` when that's set. The Read and Write tools don't
+expand a shell expression, so resolve the path first, with one Bash call:
+
+```
+F="${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}"; case "$F" in /*) ;; *) F="$PWD/$F" ;; esac; printf '%s\n' "$F"
+```
+
+Read the file at the path it prints (a missing file is fine: treat it as
+empty; a long one, read to the end). Find any heading with the same project
+and run as the one you're about to write, whatever its date, and the lines
+under it: those are already written (a resumed session, a run that stopped early and
+went on, or a session that finished first). Drop them from your lines. None
+left: skip the append. Otherwise append the heading and the lines that are
+left; a second block under the same heading text is fine, since the file is
+only ever appended to. Copy lines as first written, never reworded, or the
+check can't tell they're there.
+
+The heading is `## <date> | <project> | debug <slug>`. The date is today's, from
+`date +%F`, as `YYYY-MM-DD`. The project is the name of the repo's top folder
+(what `basename "$(git rev-parse --show-toplevel)"` prints), not the subfolder
+you're in; outside a git repo, the working folder's name. The slug is the working
+file's name when the hunt has one (`debug-<slug>.md`), otherwise a short name
+for the bug, two or three words joined by hyphens; a resumed hunt uses the name
+already in the file for it.
+
+Then append, with one Bash call that doesn't lean on the earlier one. Put the
+heading and the lines between the `FOUNDRY_RETRO_END` markers, a blank line
+first. No line of the entry may be that marker, or the shell would run the
+lines after it:
+
+```
+F="${FOUNDRY_RETRO_FILE:-$HOME/.foundry/retro.md}"; case "$F" in /*) ;; *) F="$PWD/$F" ;; esac
+mkdir -p "$(dirname "$F")" && cat >> "$F" <<'FOUNDRY_RETRO_END'
+
+## 2026-11-23 | my-project | debug flaky-expiry
+- implement [didnt-hold]: the first fix moved the leak to a second test; should have fixed the shared state (fix 1 of 2)
+FOUNDRY_RETRO_END
+echo "retro exit=$?"
+```
+
+Append, never rewrite: two sessions can finish together, and a rewrite loses
+one's lines. The folder and the file are created if they're missing. If the
+exit isn't 0, say in the report that the retro wasn't written, and go on.
+
+A repeat is the same agent or skill with the same kind word as an earlier line
+in that file (a line this same run wrote before an early stop isn't a repeat
+of itself). When a new line is one, the report quotes both lines and offers
+to work out a fix with the user through `brainstorm`.
+
+Never edit an agent or skill file yourself, here or in the plugin's install
+folder: a fix goes through the user and the repo's own review.
 
 ---
 

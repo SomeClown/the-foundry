@@ -117,8 +117,8 @@ the orchestrating session itself:
 | Skill | What it does |
 |---|---|
 | `brainstorm` | Talks a new feature through with you before the architect sees it. Numbered questions with a recommended option (answer "1A, 2B" and move on), the design played back in numbered parts for approval, a cold read by a fresh subagent to catch what the design left out, and a written section in `docs/design.md`. Nothing gets built until you approve it. Say you're on your phone and it batches every question into one message. |
-| `run-plan` | Runs an architect plan task by task: the builder builds, `test-engineer` tries to break it, failures go back for at most three fix rounds, and the project's gate has to pass with a real exit code before the task is committed. Then a `qa` pass over the whole branch, fix batches, and `docs`. It keeps a build log in the plan file, so a session that loses its memory halfway through a twelve-task plan picks up where it left off instead of building task 3 twice. At the end it writes a short retro of every time the team needed correcting, and tells you when a mistake repeats one from an earlier run. |
-| `debug` | No fix without a root cause. It starts by asking what you saw (where, how often, since when), makes the failure happen on demand (a hang gets a watchdog so it fails with stack traces instead of just sitting there), tests one hypothesis at a time, and pins the cause with a test that fails every time before `implement` touches the code. It knows the usual suspects: a test that leaves state behind (found by halving the suite until one test is left, then proved by running it right before the victim), a race that only loses under load, a fixed sleep a slow CI runner outlasts, and the test that was the bug all along. Three failed fixes and it stops to question the design with you. It ends with the same short retro as `run-plan`. |
+| `run-plan` | Runs an architect plan task by task: the builder builds, `test-engineer` tries to break it, failures go back for at most three fix rounds, and the project's gate has to pass with a real exit code before the task is committed. Then a `qa` pass over the whole branch, fix batches, and `docs`. It keeps a build log in the plan file, so a session that loses its memory halfway through a twelve-task plan picks up where it left off instead of building task 3 twice. At the end it writes a short retro of every time the team needed correcting (in the build log, and in `~/.foundry/retro.md`), and tells you when a mistake repeats one from an earlier run. |
+| `debug` | No fix without a root cause. It starts by asking what you saw (where, how often, since when), makes the failure happen on demand (a hang gets a watchdog so it fails with stack traces instead of just sitting there), tests one hypothesis at a time, and pins the cause with a test that fails every time before `implement` touches the code. It knows the usual suspects: a test that leaves state behind (found by halving the suite until one test is left, then proved by running it right before the victim), a race that only loses under load, a fixed sleep a slow CI runner outlasts, and the test that was the bug all along. Three failed fixes and it stops to question the design with you. It ends by adding any corrections the hunt needed to `~/.foundry/retro.md`, in the same line shape as `run-plan`. |
 | `ship` | Takes finished work from a branch to production: the gate, push, PR, CI (including the check GitHub leaves "in progress" after its run passed), merge, a local image check, the tag, and a wait for the tag's own build before it hands you the deploy commands, so nobody pulls an image that doesn't exist yet. It learns each project's habits from its runbook and history (PRs or straight to `main`, annotated or lightweight tags), asks once with every step listed, and never runs a production command itself. You do the deploy; it updates the status docs afterwards and asks before pushing them. |
 
 All four came from watching how features actually got built, bugs got
@@ -190,7 +190,9 @@ project (the skills as `/the-foundry:brainstorm`, `/the-foundry:run-plan`,
 `/the-foundry:debug` and `/the-foundry:ship`, though your session will
 usually reach for them on its own), they update
 when you ask the plugin manager to update, and uninstalling is one command
-instead of an archaeology expedition through your home directory.
+instead of an archaeology expedition through your home directory. (The one
+thing it leaves behind is the retro file, if your runs have written one:
+`rm -r ~/.foundry` takes it away.)
 
 ### Manually (the artisanal method)
 
@@ -312,11 +314,14 @@ version, so you don't have to take my word for it:
   UI code, tests, config and infrastructure, documentation). The skills write
   design and plan files into `docs/`, and `run-plan` and `debug` keep their
   working files in `.git/foundry-run/`, inside the git directory where nothing
-  gets tracked. At the end, both also append a short retro (one line per time
-  the team needed correcting, no code or file contents) to
-  `~/.claude/foundry-retro.md`, or under `CLAUDE_CONFIG_DIR` if you set it. It
-  stays on your machine, and it's the one file the plugin writes outside your
-  project.
+  gets tracked. At the end, a run that needed correcting also appends a retro
+  to `~/.foundry/retro.md` (or the file named by `FOUNDRY_RETRO_FILE`, if you
+  set it): the date, the project folder's name, the plan file's name or the
+  bug's short name, and one line per correction. A run with nothing to correct
+  writes nothing. The instructions tell the session to keep code, file
+  contents and secrets out of it. The file stays on your machine, and it's the
+  one file the plugin writes outside your project. `run-plan` also keeps a
+  copy of its lines in the build log, which is committed with the plan.
 - **The web.** `qa` and `uiux` can use web search and fetch pages (to check
   a library's docs or an accessibility guideline). `frontend` and `uiux` drive
   the Claude desktop app's built-in browser when it's there, mostly against

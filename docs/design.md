@@ -545,9 +545,11 @@ where they differ:**
 - The kind words: `blocked`, `fix-rounds`, `misread`, `missed`, `didnt-hold`,
   `user`. A line reads `- <agent or skill> [<kind>]: what it did; what it
   should have done (where it came from)`.
-- No double entries: before appending, the session looks for a heading with
-  the same date, project and run, and skips the append if it's there. That
-  covers a resumed session without a separate marker.
+- No double entries: before appending, the session drops any line that's
+  already in the file under a heading for this run (the same project and
+  run, whatever the date), and appends only what's left. That covers a resumed session
+  without a separate marker, and a run that stopped early, wrote its retro,
+  and then went on: its later lines still get written.
 - The session resolves the path with one Bash call before it reads or
   appends, since the file tools don't expand a shell expression. It appends
   and never rewrites the file, so two sessions finishing together don't lose
@@ -558,4 +560,7 @@ where they differ:**
 - The README's uninstall line says the file stays and how to remove it.
   `run-plan`'s list of reasons to stop names the retro file as the one write
   outside the branch that doesn't stop the run.
+- When two kind words fit a line, the session uses the one listed first, so
+  the same mistake gets the same word each time. Lines are copied as first
+  written, not reworded, so the check for lines already there holds.
 - Left open: the file has no size limit. It can wait until a real file grows.

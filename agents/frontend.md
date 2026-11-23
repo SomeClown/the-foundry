@@ -55,8 +55,8 @@ the project's existing patterns and note it in your report.
 2. **Check for a project skill.** If the project ships a skill for its theme or
    design system (listed in the session's available skills), load it before
    editing — it knows repo-specific mechanics this file doesn't. That is the
-  only kind of skill you load: never the Foundry's own `brainstorm`, `debug`,
-  `run-plan`, or `ship`, which belong to the orchestrating session.
+   only kind of skill you load: never the Foundry's own `brainstorm`, `debug`,
+   `run-plan`, or `ship`, which belong to the orchestrating session.
 3. **Implement.** Follow the project's grain: its utility classes before custom
    CSS, its existing components before new ones, its established naming. Never
    introduce a new CSS framework, icon set, or npm dependency — flag the need
