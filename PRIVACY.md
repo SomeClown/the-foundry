@@ -12,7 +12,10 @@ permissions you've set:
   files there, each in its own lane (application code, UI code, tests, config,
   docs). `investigate` starts read-only reader agents inside your session, and
   they go nowhere new. On a large repo it also starts copies of itself as area
-  leads, which hold Bash like it does. Nothing is copied anywhere else by the plugin.
+  leads, which hold Bash like it does. Nothing is copied anywhere else by the plugin,
+  with one exception: `run-plan` and `debug` append a short retro (one line per
+  time the team needed correcting, no code or file contents) to
+  `~/.claude/foundry-retro.md` on your own machine.
 - **The web:** two agents (`qa` and `uiux`) can use Claude Code's own web search
   and page fetching, and two (`frontend` and `uiux`) can drive the Claude
   desktop app's built-in browser, mostly against your own dev server.
