@@ -44,7 +44,10 @@ The brief command in step 2 of the loop copies Task N out of the plan into
    worktree gets its own. Write its path into the build log header.
 6. **Make the rules file.** Copy the plan's global rules verbatim (hard rules,
    tripwires, "no new dependencies", voice rules, files nobody may read) into
-   `<work dir>/rules.md`. Every dispatch points at it.
+   `<work dir>/rules.md`, then the gate from step 4 with any failures it's
+   expected to show, marked as not this task's to fix. The brief starts at
+   the task's heading, so this file is the only place a builder sees the
+   gate. Every dispatch points at it.
 7. **Check task sizes once.** Every task should be one implement or frontend
    dispatch that leaves the gate green. Split a task that isn't; merge a run
    of tiny same-shape tasks (section 3). Record either as a ruling.

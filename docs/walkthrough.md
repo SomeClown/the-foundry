@@ -160,7 +160,7 @@ A plan with three or more tasks goes to `run-plan`, which replaces the separate
 implement and test-engineer stages. The session stays on `feat/blackout-dates`
 (never `main`), makes a work directory inside the git directory
 (`.git/foundry-run/2026-10-23-blackout-dates/`, so it's never tracked and
-survives a compaction), copies the plan's rules into a `rules.md` there, and
+survives a compaction), copies the plan's rules and its gate into a `rules.md` there, and
 starts the build log as the plan's last section. Then, per task, using Task 2:
 
 1. *Brief and build.* Record `BASE=$(git rev-parse HEAD)`; run-plan's brief
