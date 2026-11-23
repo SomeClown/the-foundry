@@ -46,6 +46,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
   - The retro in a model's hands: two debug hunts wrote one (flaky-pressure run 1, wrong-total run 2), each with the resolve command, the heading, the line shape, a kind word and `retro exit=0`, and each said so in its report. The other full hunts had nothing to correct and wrote nothing.
   - The harness runs each case with its own throwaway home (`/private/tmp/e-.../home`), and the caller's `FOUNDRY_RETRO_FILE` did not reach the session: both writes resolved to that home's `.foundry/retro.md`. The real file's checksum was the same before and after. So the prefix on the documented commands does nothing, and the real file was never at risk from these cases.
 - Batch 4: complete (from c629b21; gate: Ran 857, OK on both Pythons (1 and 5 skips), validates 0/0/0; the eval prefix removed and the docs corrected, who a retro line names, debug's Production paragraph; adversarial: no bugs, no fix rounds; one phrase sent back by me, the ban on a leading `cd`)
+- Re-run after Batch 4, on 8a73e2d: debug-production-report x 4: exit 0, $0.76, 105 s. 1.00 in all four runs; `asks-and-hands-over` PASS PASS PASS each time (12 of 12 votes, against 0 of 6 before the fix). Paid spend so far: $5.35 of the $15 cap.
 
 ### Decisions made during the build
 
@@ -79,6 +80,7 @@ Work dir: `.git/foundry-run/foundry-self-improve/`
 - implement [fix-rounds]: read the unittest verdict from the verbose line, which a printing test or a failing subTest hides, then grew the fix into a 600-character awk program; should have read the end-of-run failure headers with one grep from the start (Batch 1, fix rounds 1 and 2)
 - run-plan [missed]: my design call skipped the retro append whenever the run's heading was already in the file, which loses a stopped run's later lines; should have keyed the check on lines, which the builder pointed out (Batch 3, fix round 1)
 - implement [missed]: put a sentence between the two clean-run sentences in run-plan's Retro text, so "Nothing goes to the cross-project file" read as a rule for every run; should have reread the paragraph after the insert (the first real run of the step, after Batch 3)
+- run-plan [missed]: built an eval-command prefix and its explanation on qa's reading that the cases would write the real retro file, which qa had marked "by reading; not run"; should have checked what home the harness gives a case before building on it (the paid cases, after Batch 3)
 
 Appended to `~/.foundry/retro.md` on 2026-11-23 with the owner's OK, following run-plan's Retro text as written: the first real run of the step. The file didn't exist, the folder and file were created, `retro exit=0`, and there were no earlier lines to repeat. The session was in auto mode, so this run doesn't show what the default mode's prompt looks like.
 

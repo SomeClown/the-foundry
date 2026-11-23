@@ -621,24 +621,34 @@ text is `skills/run-plan/SKILL.md` ("Retro" in section 4) and
 - **A clean `run-plan` writes `- none` to the build log only**, so the log
   shows the step ran; nothing goes to the cross-project file. A clean `debug`
   writes nothing, since it has no log.
-- **The evals.** `evals/README.md` and CONTRIBUTING.md put
-  `FOUNDRY_RETRO_FILE="$(mktemp)"` before the routine eval command. The three
-  `evals-expensive/` head-to-head commands don't carry it: they run
-  `investigate`, which has no retro step.
+- **The evals.** The build first put `FOUNDRY_RETRO_FILE="$(mktemp)"` before
+  the routine eval command, on the amendment's call above. The paid cases
+  then showed it does nothing: the harness gives each case its own throwaway
+  home and doesn't pass the caller's variable through, so a case's retro lands
+  in that home and never in the user's file. The prefix came off, and
+  `evals/README.md` and CONTRIBUTING.md say what's true.
+- **What the paid cases showed (2026-11-23).** Two debug hunts wrote a retro
+  as the text says; hunts with nothing to correct wrote nothing. One line
+  named `test-engineer` for work the session did itself, close to a copy of
+  the skill's example, and counted something redone once. Both skills now say
+  who a line names (the dispatched agent, or the skill for the session's own
+  work), leave out what was tried once and corrected on the spot, and say the
+  examples show the shape.
 - **Tests.** `RetroTest` in `tests/test_structure.py` holds the skills, README,
   PRIVACY.md and the eval commands to this section. `tests/test_retro_commands.py`
   runs the two shell lines from the skills. `tests/test_retro_pin_mutations.py`
   and `tests/test_self_consistency_pin_mutations.py` change the docs one pin at
   a time and check a test fails.
-- **One session has run the retro step, once.** After the build, with the
-  owner's OK, the session that ran this branch's fixes followed run-plan's
-  text and wrote its two lines: the file didn't exist, the folder and file
-  were created, and the append exited 0. It found one sentence in the wrong
-  place, since moved. Spotting a repeat, debug's version, and a run in the
-  default permission mode are still unseen. No eval
-  case exists, as the non-goals say. The paid `--tag debug` and `--tag
-  run-plan` cases would run it, and nobody has confirmed that `claude plugin
-  eval .` hands the caller's `FOUNDRY_RETRO_FILE` to the case's session.
+- **The retro step has run for real.** After the build, with the owner's OK,
+  the session that ran this branch's fixes followed run-plan's text: the file
+  didn't exist, the folder and file were created, and the append exited 0.
+  Later lines went in as further blocks under the same heading. That run
+  found one sentence in the wrong place, since moved, and its fourth line was
+  the first repeat the file showed (`run-plan [missed]`, twice in one run).
+  The paid `--tag debug` cases ran debug's version twice; the `--tag run-plan`
+  cases are four-turn decision cases and don't reach the step. A run in the
+  default permission mode is still unseen. No eval case exists for the retro
+  itself, as the non-goals say.
 - **Parked.** A line exactly `FOUNDRY_RETRO_END` still ends the entry. With matching by project and run, a later separate run
   of the same plan that records an identical line has it dropped as already
   written. In a git worktree the project's name is the worktree's folder, so
