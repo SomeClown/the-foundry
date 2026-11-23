@@ -147,7 +147,8 @@ brainstorm → investigate → architect → run-plan: [ implement / frontend (u
 Division-of-labor rules the agents enforce on themselves:
 
 - Read-only agents (investigate, file-reader, architect, uiux, qa) never write files.
-- One full sweep at a time: nothing else that spawns readers runs alongside it.
+- `investigate` runs alone, scoped or full: nothing else that starts agents
+  runs alongside it (the orchestrator's rule, since only it can see both).
 - test-engineer touches only tests; docs only documentation; devops only
   config/infra. Application-code fixes always route back through
   implement/frontend.
@@ -293,7 +294,7 @@ version, so you don't have to take my word for it:
   leads, and the one-level bound on leads holds at Claude Code's default nesting
   depth; a raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, `claude --agent`, or
   running `investigate` as an agent-team teammate leaves only the instructions.
-  It stops above 500 files and asks instead. That costs more than
+  It stops above 500 files so your session can ask you first. That costs more than
   one agent reading everything: on one test repo of 191 files, one full sweep
   with the readers on Haiku cost about $2.31 and about 710 seconds a run (the
   mean of three eval runs, judge cost included), against about $0.47 and 109
@@ -307,8 +308,9 @@ version, so you don't have to take my word for it:
 - **Files in your project.** `implement`, `frontend`, `test-engineer`,
   `devops`, and `docs` write files, each in its own lane (application code,
   UI code, tests, config and infrastructure, documentation). The skills write
-  design and plan files into `docs/`, and `run-plan` keeps its working files
-  in `.git/foundry-run/`, inside the git directory where nothing gets tracked.
+  design and plan files into `docs/`, and `run-plan` and `debug` keep their
+  working files in `.git/foundry-run/`, inside the git directory where nothing
+  gets tracked.
 - **The web.** `qa` and `uiux` can use web search and fetch pages (to check
   a library's docs or an accessibility guideline). `frontend` and `uiux` drive
   the Claude desktop app's built-in browser when it's there, mostly against
@@ -373,7 +375,7 @@ If you improve an agent in a way that isn't specific to your setup, send it
 back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 [CHANGELOG](CHANGELOG.md).
 
-The Foundry tests itself, too, in two layers. `tests/` checks run-plan's brief command and holds the repo to its own README (a read-only agent that grows a
+The Foundry tests itself, too, in two layers. `tests/` checks run-plan's brief command and debug's polluter procedure, and holds the repo to its own README (a read-only agent that grows a
 Write tool, or a skill count that goes stale, fails the suite). `evals/` is a
 library of behavior cases for `claude plugin eval .`, each one a situation that
 once caught a skill doing the wrong thing; the second run of it caught the
