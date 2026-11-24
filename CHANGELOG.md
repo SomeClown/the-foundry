@@ -4,6 +4,14 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.2.1] — 2026-11-23
+
+A docs-only patch. The README's manual-install section now describes the
+steps in words and links to Claude Code's own docs for where agents and skills
+live. It used to show the steps as shell commands to paste, and the plugin
+directory's review read those as a download-and-run. The steps themselves are
+the same. No behavior change.
+
 ## [2.2.0] — 2026-11-23
 
 A minor version, and a self-improvement pass: I had `qa` review the Foundry
