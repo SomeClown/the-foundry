@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds the big-sweep fixture: a fictional toll-road operator ("tollway") with a CLI called twctl.
-# 690 tracked files, one of them a flat folder of 310 rules, sized so a whole-repo read can't fit
+# 990 tracked files, one of them a flat folder of 610 rules, sized so a whole-repo read can't fit
 # in one report. Self-contained on purpose: everything is generated from the Python below, with a
 # fixed seed, so two builds are byte-identical.
 #
@@ -240,7 +240,7 @@ class World:
         night = rng.sample(NOUNS, 24)
         py += ["jobs/nightly/%s_close.py" % w for w in night]
         word_of = {}
-        for i in range(1, 311):
+        for i in range(1, 611):
             word_of[i] = rng.choice(NOUNS)
             py.append("rules/r%04d_%s.py" % (i, word_of[i]))
         py += ["scripts/%s.py" % s for s in "bootstrap seed_data export_ledger rotate_logs check_gantry backfill dump_schema smoke".split()]
@@ -271,7 +271,7 @@ class World:
             self.plant(path, "command")
         self.plant("jobs/runner.py", "command")
         self.plant(rng.choice(["jobs/nightly/%s_close.py" % w for w in night]), "gotcha")
-        for k, rank in enumerate([int(round(i * 309 / 11.0)) + 1 for i in range(12)]):
+        for k, rank in enumerate([int(round(i * 609 / 11.0)) + 1 for i in range(12)]):
             self.plant("rules/r%04d_%s.py" % (rank, word_of[rank]), ["gotcha", "route", "command"][k % 3], "rules")
         self.plant("scripts/export_ledger.py", "command")
         self.plant(rng.choice(["tests/test_%s.py" % w for w in test_words]), "gotcha")
@@ -313,6 +313,9 @@ class World:
         cmds = [p for p in self.py if p.startswith(("cli/cmd_", "scripts/"))] * 3
         cmds += [p for p in self.py if p.startswith("jobs/") and not p.endswith("__init__.py")]
         self.spread(cmds, 193, 8, "command", lambda p: None)
+        late_rules = [p for p in self.py if p.startswith("rules/r") and int(p[7:11]) > 310]
+        self.spread(late_rules, 60, 2, "route", lambda p: "rules")
+        self.spread(late_rules, 90, 2, "command", lambda p: None)
         for path in self.py:
             if not path.startswith("web/vendor/"):
                 self.publics[path] = rng.choice(PUBLIC_COUNTS)
@@ -498,9 +501,9 @@ def build():
     blobs.update(w.binaries())
     untracked = {path: ("\n".join(lines) + "\n").encode("utf-8") for path, lines in w.untracked.items()}
     # checks that would make a paid run worthless
-    assert len(blobs) == 690, len(blobs)
-    assert len([p for p in blobs if not p.startswith("web/vendor/")]) == 650
-    assert len([p for p in blobs if eligible(p)]) == 645
+    assert len(blobs) == 990, len(blobs)
+    assert len([p for p in blobs if not p.startswith("web/vendor/")]) == 950
+    assert len([p for p in blobs if eligible(p)]) == 945
     assert len(w.facts) == 33 and len(w.decoys) == 5
     for path, blob in blobs.items():
         if path.endswith(".bin"):

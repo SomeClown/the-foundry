@@ -26,7 +26,7 @@ SCAFFOLD = EXPENSIVE / "big-sweep-in-parts" / "scaffold.sh"
 CONTINUE = ("To read the rest, dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first line, "
             "then every line from `Project:` to `END OF BLOCK`, copied as it stands.")
 UNTRACKED = ["notes/scratch.md", "rules/r9999_draft.py", "zones/zz_todo.txt"]
-WHOLE_1 = ("Whole repo: 690 tracked files; 40 in folders skipped whole (web/vendor/: 40, vendored); "
+WHOLE_1 = ("Whole repo: 990 tracked files; 40 in folders skipped whole (web/vendor/: 40, vendored); "
            "3 untracked (%s)" % ", ".join(UNTRACKED))
 WHOLE_LATER = "Whole repo: given in part 1."
 INSTRUCTIONS = ("Instructions: In the route inventory, give every route its full path on its own line, never grouped under a prefix; "
@@ -105,9 +105,15 @@ def rules_range(name, lo, hi, direct=True, third=None):
     return Area(name, "%s from `%s` to `%s`" % (d, lo, hi), files)
 
 
+PART_SIZE = 450       # the owner's part size: a part holds whole areas of at most about 150 files, summing to at most 450
+RULES_AREA = 122      # rules/ holds 610 files directly: five ranges of 122
+
+
 def base_areas():
+    """The split a 450-file part size gives the 950 files left after the whole-folder skip: 17 areas, none over 150 files."""
     rules = select("rules/")
     web = select("web/", excepts=["web/vendor/"])
+    r = RULES_AREA
     return [
         Area("root", "(root)", select(None)),
         Area("api-top", "`api/` (direct)", select("api/", direct=True)),
@@ -118,16 +124,19 @@ def base_areas():
         folder("cli", "cli/"),
         folder("docs", "docs/"),
         folder("jobs", "jobs/"),
-        rules_range("rules-1", rules[0], rules[103]),
-        rules_range("rules-2", rules[104], rules[206], direct=False),
-        rules_range("rules-3", rules[207], rules[-1]),
+        rules_range("rules-1", rules[0], rules[r - 1]),
+        rules_range("rules-2", rules[r], rules[2 * r - 1], direct=False),
+        rules_range("rules-3", rules[2 * r], rules[3 * r - 1]),
+        rules_range("rules-4", rules[3 * r], rules[4 * r - 1]),
+        rules_range("rules-5", rules[4 * r], rules[-1]),
         Area("scripts-zones", "`scripts/` + `zones/`", select("scripts/") + select("zones/")),
         folder("tests", "tests/"),
         Area("web", "`web/` except `web/vendor/`", web),
     ]
 
 
-BASE_CUTS = (8, 11)   # part 1 reads areas[0:8], part 2 areas[8:11], part 3 the rest
+# part 1 reads areas[0:10] (368 files), part 2 areas[10:13] (366), part 3 the rest (216): the cuts greedy packing under 450 makes
+BASE_CUTS = (10, 13)
 
 
 def is_file_skip(path):
@@ -229,19 +238,38 @@ class Base(unittest.TestCase):
 # ---------------------------------------------------------------- a correct split passes
 
 class CorrectSplitTest(Base):
-    def test_the_base_areas_cover_650_files_once(self):
+    def test_the_base_areas_cover_950_files_once(self):
         # guards this file's own generator, so a later failure is the script's, not the test's
         files = [f for a in base_areas() for f in a.files]
-        self.assertEqual(len(files), 650)
-        self.assertEqual(len(set(files)), 650)
+        self.assertEqual(len(files), 950)
+        self.assertEqual(len(set(files)), 950)
         self.assertFalse(any(f.startswith("web/vendor/") for f in files))
+        self.assertEqual(len(Fixture.tracked), 990)
+
+    def test_the_base_split_is_the_one_a_450_file_part_size_really_gives(self):
+        areas = base_areas()
+        self.assertTrue(all(a.count <= 150 for a in areas), [(a.name, a.count) for a in areas if a.count > 150])
+        # greedy: whole areas in order, a part closes when the next area would take it past 450
+        sizes, cuts, run = [], [], 0
+        for i, a in enumerate(areas):
+            if run and run + a.count > PART_SIZE:
+                sizes.append(run)
+                cuts.append(i)
+                run = 0
+            run += a.count
+        sizes.append(run)
+        self.assertEqual(tuple(cuts), BASE_CUTS)
+        self.assertEqual(sizes, [368, 366, 216])
+        self.assertTrue(all(s <= PART_SIZE for s in sizes))
+        self.assertGreaterEqual(len(sizes), 3)
+        self.assertEqual(sum(sizes), 950)
 
     def test_a_correct_three_part_split_is_proved_with_a_summary(self):
         out = self.assertProved(build_parts(base_areas()))
         self.assertIn("parts: 3", out)
-        self.assertIn("areas: 15", out)
+        self.assertIn("areas: 17", out)
         self.assertIn("facts found: 33 of 33", out)
-        self.assertIn("650 of 650", out)
+        self.assertIn("950 of 950", out)
 
     def test_a_correct_two_part_split_is_proved(self):
         self.assertProved(build_parts(base_areas(), cuts=(9,)))
@@ -281,7 +309,7 @@ class AreaNotationTest(Base):
 
     def test_direct_plus_root_in_one_area(self):
         both = Area("top", "`api/` (direct) + (root)", select("api/", direct=True) + select(None))
-        self.assertProved(self.swap(0, 2, [both], cuts=(7, 10)))
+        self.assertProved(self.swap(0, 2, [both], cuts=(9, 12)))
 
     def test_except_piece(self):
         # the base web area is `web/` except `web/vendor/`; a wrong except would count 70, not 30
@@ -294,7 +322,7 @@ class AreaNotationTest(Base):
         new = [folder("api-accounts", "api/accounts/"), folder("api-billing", "api/billing/"),
                Area("api-rest", "`api/` except `api/accounts/` except `api/billing/`", rest)]
         self.assertEqual(len(rest), 84)
-        self.assertProved(self.swap(1, 6, new, cuts=(6, 9)))
+        self.assertProved(self.swap(1, 6, new, cuts=(8, 11)))
 
     def test_range_over_a_whole_folder(self):
         # rules-2 in the base is `rules/` from..to (not direct); rules-1 and rules-3 are (direct) ranges
@@ -308,13 +336,13 @@ class AreaNotationTest(Base):
         w2 = Area("web-2", "`web/` except `web/vendor/` from `%s` to `%s`" % (web[cut], web[-1]),
                   select("web/", excepts=["web/vendor/"], lo=web[cut], hi=web[-1]))
         self.assertEqual(w1.count + w2.count, 30)
-        self.assertProved(self.swap(14, 15, [w1, w2], cuts=BASE_CUTS))
+        self.assertProved(self.swap(16, 17, [w1, w2], cuts=BASE_CUTS))
 
     def test_range_pieces_inside_a_plus_definition(self):
         rules = select("rules/")
-        a = Area("rules-2", "`rules/` (direct) from `%s` to `%s` + `rules/` from `%s` to `%s`" % (rules[104], rules[150], rules[151], rules[206]),
-                 select("rules/", lo=rules[104], hi=rules[206]))
-        self.assertEqual(a.count, 103)
+        a = Area("rules-2", "`rules/` (direct) from `%s` to `%s` + `rules/` from `%s` to `%s`" % (rules[122], rules[180], rules[181], rules[243]),
+                 select("rules/", lo=rules[122], hi=rules[243]))
+        self.assertEqual(a.count, 122)
         self.assertProved(self.swap(10, 11, [a], cuts=BASE_CUTS))
 
     def test_range_over_a_folders_direct_files_with_subfolders_present(self):
@@ -336,17 +364,17 @@ class AreaNotationTest(Base):
 
     def test_a_range_is_a_comparison_so_a_renamed_end_path_still_selects_the_right_files(self):
         rules = select("rules/")
-        # an end path that does not exist, sorting just after rules[103]
-        hi = rules[103] + "~"
+        # an end path that does not exist, sorting just after rules[121]
+        hi = rules[121] + "~"
         a = Area("rules-1", "`rules/` (direct) from `%s` to `%s`" % (rules[0], hi), select("rules/", direct=True, lo=rules[0], hi=hi))
-        self.assertEqual(a.count, 104)
+        self.assertEqual(a.count, 122)
         self.assertProved(self.swap(9, 10, [a], cuts=BASE_CUTS))
 
     def test_a_range_end_that_is_one_file_short_rebuilds_to_a_different_count(self):
         rules = select("rules/")
-        a = rules_range("rules-1", rules[0], rules[103])
-        a = a.copy(definition="`rules/` (direct) from `%s` to `%s`" % (rules[0], rules[102]))  # count still 104
-        self.assertFails(self.swap(9, 10, [a], cuts=BASE_CUTS), r"stated 104 files, the definition rebuilds to 103")
+        a = rules_range("rules-1", rules[0], rules[121])
+        a = a.copy(definition="`rules/` (direct) from `%s` to `%s`" % (rules[0], rules[120]))  # count still 122
+        self.assertFails(self.swap(9, 10, [a], cuts=BASE_CUTS), r"stated 122 files, the definition rebuilds to 121")
 
     def test_a_folder_without_trailing_slash_is_not_the_notation(self):
         a = Area("cli", "`cli`", select("cli/"))
@@ -361,17 +389,17 @@ class AreaNotationTest(Base):
 
     def test_pieces_must_be_joined_by_space_plus_space(self):
         areas = base_areas()
-        areas[12] = areas[12].copy(definition="`scripts/` and `zones/`")
+        areas[14] = areas[14].copy(definition="`scripts/` and `zones/`")
         self.assertFails(build_parts(areas), r"area 'scripts-zones': expected ' \+ ' between pieces")
 
     def test_pieces_joined_without_spaces_are_not_the_notation(self):
         areas = base_areas()
-        areas[12] = areas[12].copy(definition="`scripts/`+`zones/`")
+        areas[14] = areas[14].copy(definition="`scripts/`+`zones/`")
         self.assertFails(build_parts(areas), r"area 'scripts-zones': expected ' \+ ' between pieces")
 
     def test_a_trailing_plus_is_not_the_notation(self):
         areas = base_areas()
-        areas[12] = areas[12].copy(definition="`scripts/` + `zones/` + ")
+        areas[14] = areas[14].copy(definition="`scripts/` + `zones/` + ")
         self.assertFails(build_parts(areas), r"area 'scripts-zones': cannot read a piece at ''")
 
     def test_an_area_line_without_a_count_is_rejected(self):
@@ -397,20 +425,20 @@ class ExactlyOnceTest(Base):
     def test_an_overlapping_area_is_reported_as_in_more_than_one_area(self):
         areas = base_areas()
         rules = select("rules/")
-        areas[9] = rules_range("rules-1", rules[0], rules[113])   # runs 10 files into rules-2
+        areas[9] = rules_range("rules-1", rules[0], rules[131])   # runs 10 files into rules-2
         out = self.assertFails(build_parts(areas), r"exactly once: 10 files are in more than one area read")
         self.assertIn("rules-1", out)
 
     def test_a_file_missing_between_two_ranges_is_reported_as_in_no_area(self):
         areas = base_areas()
         rules = select("rules/")
-        areas[9] = rules_range("rules-1", rules[0], rules[102])   # rules[103] is now in no area
+        areas[9] = rules_range("rules-1", rules[0], rules[120])   # rules[121] is now in no area
         out = self.assertFails(build_parts(areas), r"exactly once: .*1 are in no area read")
-        self.assertIn(rules[103], out)
+        self.assertIn(rules[121], out)
 
     def test_a_file_covered_by_no_area_when_a_whole_area_is_dropped(self):
         areas = [a for a in base_areas() if a.name != "docs"]
-        out = self.assertFails(build_parts(areas, cuts=(7, 10)), r"exactly once: .*12 are in no area read")
+        out = self.assertFails(build_parts(areas, cuts=(9, 12)), r"exactly once: .*12 are in no area read")
         self.assertIn("docs/", out)
 
     def test_a_file_covered_by_two_areas_in_different_parts(self):
@@ -421,20 +449,20 @@ class ExactlyOnceTest(Base):
 
     def test_an_area_holding_the_skipped_whole_folder_is_reported(self):
         areas = base_areas()
-        areas[14] = Area("web", "`web/`", select("web/"))
+        areas[16] = Area("web", "`web/`", select("web/"))
         self.assertFails(build_parts(areas), r"exactly once: 40 files in areas read are not expected")
 
     def test_an_area_that_repeats_one_part_1_already_read_is_caught(self):
         areas = base_areas()
-        reads = [areas[0:8], [areas[0]] + areas[8:11], areas[11:]]    # part 2 reads `root` again
-        blocks = [areas[8:], areas[11:], []]
+        reads = [areas[0:10], [areas[0]] + areas[10:13], areas[13:]]    # part 2 reads `root` again
+        blocks = [areas[10:], areas[13:], []]
         self.assertFails(build_parts(areas, reads=reads, blocks=blocks), r"more than one area read", r"part-2\.md: 'Areas read:' should be exactly")
 
     def test_the_same_area_listed_twice_in_one_part_is_caught(self):
         areas = base_areas()
-        reads = [areas[0:8], areas[8:11] + [areas[10]], areas[11:]]
-        self.assertFails(build_parts(areas, reads=reads, blocks=[areas[8:], areas[11:], []]),
-                         r"103 files are in more than one area read")
+        reads = [areas[0:10], areas[10:13] + [areas[12]], areas[13:]]
+        self.assertFails(build_parts(areas, reads=reads, blocks=[areas[10:], areas[13:], []]),
+                         r"122 files are in more than one area read")
 
     def test_a_decoy_area_in_a_part_that_names_a_tracked_file_twice_is_caught(self):
         areas = base_areas()
@@ -562,7 +590,7 @@ class ShapeTest(Base):
         self.assertFails(parts, r"part-1\.md: block line 5: expected 'Environment: <text>'")
 
     def test_the_block_missing_the_areas_not_read_header(self):
-        parts = edit(self.parts, "part-1.md", "Areas not read:\n- jobs", "- jobs")
+        parts = edit(self.parts, "part-1.md", "Areas not read:\n- rules-2", "- rules-2")
         self.assertFails(parts, r"part-1\.md: block line 7: expected 'Areas not read:'")
 
     def test_the_block_with_its_lines_in_the_wrong_order(self):
@@ -578,7 +606,8 @@ class ShapeTest(Base):
         self.assertFails(parts, r"part-1\.md: block line 5: expected 'Environment: <text>'")
 
     def test_a_blank_line_between_area_lines_is_not_tolerated(self):
-        parts = edit(self.parts, "part-1.md", "- jobs: `jobs/` (28 files)\n- rules-1", "- jobs: `jobs/` (28 files)\n\n- rules-1")
+        first = base_areas()[10].line()
+        parts = edit(self.parts, "part-1.md", first + "\n- rules-3", first + "\n\n- rules-3")
         self.assertFails(parts, r"part-1\.md: block line \d+: expected an area line")
 
     def test_the_block_never_reaching_end_of_block(self):
@@ -614,38 +643,38 @@ class OrderTest(Base):
         self.parts = build_parts(base_areas())
 
     def test_a_re_split_block_in_part_2_is_not_a_suffix_of_part_1s_block(self):
-        # rules-3 split into two ranges in part 2 only
+        # rules-5 split into two ranges in part 2 only
         rules = select("rules/")
-        h1 = rules_range("rules-3a", rules[207], rules[250]).line()
-        h2 = rules_range("rules-3b", rules[251], rules[-1]).line()
-        old = rules_range("rules-3", rules[207], rules[-1]).line()
+        h1 = rules_range("rules-5a", rules[488], rules[540]).line()
+        h2 = rules_range("rules-5b", rules[541], rules[-1]).line()
+        old = rules_range("rules-5", rules[488], rules[-1]).line()
         parts = edit(self.parts, "part-2.md", old, h1 + "\n" + h2)
         parts = edit(parts, "part-2.md", "SWEEP IN PARTS: 4 areas not read", "SWEEP IN PARTS: 5 areas not read")
         self.assertFails(parts, r"part-2\.md: block areas must be a strict suffix of part-1\.md's block")
 
     def test_a_block_in_part_2_that_keeps_every_area_part_1_listed_is_not_a_strict_suffix(self):
-        block = "\n".join(a.line() for a in base_areas()[8:])
-        old = "\n".join(a.line() for a in base_areas()[11:])
+        block = "\n".join(a.line() for a in base_areas()[10:])
+        old = "\n".join(a.line() for a in base_areas()[13:])
         parts = edit(self.parts, "part-2.md", old, block)
         parts = edit(parts, "part-2.md", "SWEEP IN PARTS: 4 areas not read", "SWEEP IN PARTS: 7 areas not read")
         self.assertFails(parts, r"part-2\.md: expected n to fall from 7", r"part-2\.md: block areas must be a strict suffix")
 
     def test_part_2_listing_its_areas_in_a_different_order_from_part_1(self):
         a = base_areas()
-        l1, l2 = a[12].line(), a[13].line()    # scripts-zones and tests: both stay in part 2's block
+        l1, l2 = a[14].line(), a[15].line()    # scripts-zones and tests: both stay in part 2's block
         parts = edit(self.parts, "part-2.md", l1 + "\n" + l2, l2 + "\n" + l1)
         self.assertFails(parts, r"part-2\.md: block areas must be a strict suffix of part-1\.md's block")
 
     def test_part_2_reading_its_areas_in_a_different_order_than_the_block_dropped_them(self):
         a = base_areas()
-        l1, l2 = a[8].line(), a[9].line()
+        l1, l2 = a[10].line(), a[11].line()
         self.assertIn(l1 + "\n" + l2, self.parts["part-2.md"])
         parts = edit(self.parts, "part-2.md", l1 + "\n" + l2, l2 + "\n" + l1)
         self.assertFails(parts, r"part-2\.md: 'Areas read:' should be exactly the 3 areas dropped from part-1\.md's block")
 
     def test_part_2_reading_fewer_areas_than_the_block_dropped(self):
         a = base_areas()
-        parts = edit(self.parts, "part-2.md", a[10].line() + "\n\nINVESTIGATE", "\nINVESTIGATE")
+        parts = edit(self.parts, "part-2.md", a[12].line() + "\n\nINVESTIGATE", "\nINVESTIGATE")
         self.assertFails(parts, r"part-2\.md: 'Areas read:' should be exactly the 3 areas dropped")
 
     def test_n_not_falling_between_parts(self):
@@ -660,16 +689,16 @@ class OrderTest(Base):
 
     def test_the_last_part_not_saying_zero(self):
         areas = base_areas()
-        reads = [areas[0:8], areas[8:11], areas[11:14]]
-        blocks = [areas[8:], areas[11:], areas[14:]]
+        reads = [areas[0:10], areas[10:13], areas[13:16]]
+        blocks = [areas[10:], areas[13:], areas[16:]]
         out = self.assertFails(build_parts(areas, reads=reads, blocks=blocks), r"part-3\.md: the last part must say 0 areas not read, found 1")
         self.assertIn("exactly once", out)   # and the unread area is flagged as covered by no part
 
     def test_n_must_fall_at_the_last_step_too(self):
         # three parts, each still carrying the same n: the loop never ends
         areas = base_areas()
-        same = areas[8:]
-        parts = build_parts(areas, reads=[areas[0:8], areas[8:11], areas[11:]], blocks=[same, same, same])
+        same = areas[10:]
+        parts = build_parts(areas, reads=[areas[0:10], areas[10:13], areas[13:]], blocks=[same, same, same])
         self.assertFails(parts, r"expected n to fall", r"the last part must say 0")
 
     def test_no_final_zero_part_when_the_last_part_is_cut_short_by_a_missing_file(self):
@@ -855,29 +884,29 @@ class CoverageTest(Base):
     # ---- Mode
 
     def test_mode_says_the_wrong_number_of_leads(self):
-        parts = edit(self.parts, "part-1.md", "Mode: full sweep, 8 area leads", "Mode: full sweep, 7 area leads")
-        self.assertFails(parts, r"part-1\.md: Mode says 7 area leads, 'Areas read:' lists 8 areas")
+        parts = edit(self.parts, "part-1.md", "Mode: full sweep, 10 area leads", "Mode: full sweep, 7 area leads")
+        self.assertFails(parts, r"part-1\.md: Mode says 7 area leads, 'Areas read:' lists 10 areas")
 
     def test_mode_counting_the_leads_of_the_whole_sweep_instead_of_this_run(self):
-        parts = edit(self.parts, "part-3.md", "Mode: full sweep, 4 area leads", "Mode: full sweep, 15 area leads")
-        self.assertFails(parts, r"part-3\.md: Mode says 15 area leads, 'Areas read:' lists 4 areas")
+        parts = edit(self.parts, "part-3.md", "Mode: full sweep, 4 area leads", "Mode: full sweep, 17 area leads")
+        self.assertFails(parts, r"part-3\.md: Mode says 17 area leads, 'Areas read:' lists 4 areas")
 
     def test_mode_line_missing(self):
         parts = edit(self.parts, "part-2.md", "Mode: full sweep, 3 area leads\n", "")
         self.assertFails(parts, r"part-2\.md: no line 'Mode: full sweep, <N> area leads'")
 
     def test_mode_line_with_another_mode(self):
-        parts = edit(self.parts, "part-1.md", "Mode: full sweep, 8 area leads", "Mode: scoped, 8 area leads")
+        parts = edit(self.parts, "part-1.md", "Mode: full sweep, 10 area leads", "Mode: scoped, 10 area leads")
         self.assertFails(parts, r"part-1\.md: no line 'Mode: full sweep")
 
     def test_mode_line_that_is_a_per_file_read(self):
-        parts = edit(self.parts, "part-1.md", "Mode: full sweep, 8 area leads", "Mode: per-file read")
+        parts = edit(self.parts, "part-1.md", "Mode: full sweep, 10 area leads", "Mode: per-file read")
         self.assertFails(parts, r"part-1\.md: no line 'Mode: full sweep")
 
     # ---- areas not read
 
     def test_coverage_areas_not_read_line_with_the_wrong_file_total(self):
-        total = sum(a.count for a in base_areas()[8:])
+        total = sum(a.count for a in base_areas()[10:])
         parts = edit(self.parts, "part-1.md", "Areas not read: 7 areas, %d files;" % total, "Areas not read: 7 areas, %d files;" % (total - 1))
         self.assertFails(parts, r"part-1\.md: Coverage says 7 areas, %d files not read; the block holds 7 areas, %d files" % (total - 1, total))
 
@@ -896,22 +925,22 @@ class CoverageTest(Base):
         self.assertFails(parts, r"part-2\.md: no 'Areas read:' line in Coverage")
 
     def test_areas_read_with_no_area_lines_under_it(self):
-        parts = edit(self.parts, "part-3.md", "Areas read:\n" + "\n".join(a.line() for a in base_areas()[11:]), "Areas read:")
+        parts = edit(self.parts, "part-3.md", "Areas read:\n" + "\n".join(a.line() for a in base_areas()[13:]), "Areas read:")
         self.assertFails(parts, r"part-3\.md: 'Areas read:' has no area lines under it")
 
     # ---- Whole repo
 
     def test_part_1_whole_repo_with_the_wrong_tracked_count(self):
-        parts = edit(self.parts, "part-1.md", "690 tracked files", "689 tracked files")
-        self.assertFails(parts, r"part-1\.md: Whole repo expected 690 tracked, 40 skipped whole, 3 untracked; found 689, 40, 3")
+        parts = edit(self.parts, "part-1.md", "990 tracked files", "989 tracked files")
+        self.assertFails(parts, r"part-1\.md: Whole repo expected 990 tracked, 40 skipped whole, 3 untracked; found 989, 40, 3")
 
     def test_part_1_whole_repo_with_the_wrong_skipped_count(self):
         parts = edit(self.parts, "part-1.md", "40 in folders skipped whole", "41 in folders skipped whole")
-        self.assertFails(parts, r"part-1\.md: Whole repo expected 690 tracked, 40 skipped whole, 3 untracked; found 690, 41, 3")
+        self.assertFails(parts, r"part-1\.md: Whole repo expected 990 tracked, 40 skipped whole, 3 untracked; found 990, 41, 3")
 
     def test_part_1_whole_repo_with_the_wrong_untracked_count(self):
         parts = edit(self.parts, "part-1.md", "3 untracked", "2 untracked")
-        self.assertFails(parts, r"part-1\.md: Whole repo expected 690 tracked, 40 skipped whole, 3 untracked; found 690, 40, 2")
+        self.assertFails(parts, r"part-1\.md: Whole repo expected 990 tracked, 40 skipped whole, 3 untracked; found 990, 40, 2")
 
     def test_part_1_whole_repo_naming_only_two_of_the_three_untracked_paths(self):
         parts = edit(self.parts, "part-1.md", ", zones/zz_todo.txt", "")
@@ -973,7 +1002,8 @@ class FactsTest(Base):
         fact = self.key["facts"][0]
         self.assertEqual(self.holder(fact["token"]), ["part-1.md"])
         parts = edit(self.parts, "part-1.md", "- %s found while reading.\n" % fact["token"], "")
-        out = self.assertFails(parts, r"facts: f01 \(gotcha, in api/accounts/booth\.py\) was not found in any part: expected 'ticket 1192'")
+        out = self.assertFails(parts, r"facts: f01 \(%s, in %s\) was not found in any part: expected %s"
+                               % (fact["kind"], re.escape(fact["path"]), re.escape(repr(fact["token"]))))
         self.assertEqual(len([l for l in out.splitlines() if l.startswith("facts:")]), 1)
 
     def test_every_one_of_the_33_facts_is_needed(self):
@@ -1004,18 +1034,18 @@ class FactsTest(Base):
 
     def test_a_fact_with_more_digits_after_it_is_not_found(self):
         fact = self.key["facts"][0]
-        self.assertEqual(fact["token"], "ticket 1192")
-        parts = edit(self.parts, "part-1.md", "- ticket 1192 found", "- ticket 11923 found")
+        self.assertEqual(fact["token"], "ticket 6005")
+        parts = edit(self.parts, "part-1.md", "- ticket 6005 found", "- ticket 60053 found")
         self.assertFails(parts, r"facts: f01 ")
 
     def test_a_fact_is_found_case_insensitively_across_odd_spacing(self):
-        parts = edit(self.parts, "part-1.md", "- ticket 1192 found", "- TICKET\t1192 found")
+        parts = edit(self.parts, "part-1.md", "- ticket 6005 found", "- TICKET\t6005 found")
         self.assertProved(parts)
 
     def test_a_decoy_present_in_a_part(self):
         decoy = self.key["decoys"][0]
         parts = edit(self.parts, "part-2.md", "## Findings\n", "## Findings\n- %s\n" % decoy["token"])
-        self.assertFails(parts, r"decoys: d1 \(untracked, from notes/scratch\.md\) appears in part-2\.md: 'runbook section 4\.3'")
+        self.assertFails(parts, r"decoys: d1 \(untracked, from notes/scratch\.md\) appears in part-2\.md: 'runbook section 2\.1'")
 
     def test_every_decoy_is_caught(self):
         for decoy in self.key["decoys"]:
@@ -1031,7 +1061,7 @@ class FactsTest(Base):
         self.assertFails(parts, r"decoys: d5 .* part-3\.md")
 
     def test_a_decoy_with_different_case_is_still_a_decoy(self):
-        parts = edit(self.parts, "part-1.md", "## Findings\n", "## Findings\n- RUNBOOK SECTION 4.3\n")
+        parts = edit(self.parts, "part-1.md", "## Findings\n", "## Findings\n- RUNBOOK SECTION 2.1\n")
         self.assertFails(parts, r"decoys: d1 ")
 
     def test_a_decoy_in_two_parts_is_named_in_both(self):
@@ -1041,8 +1071,8 @@ class FactsTest(Base):
         self.assertFails(parts, r"decoys: d2 .* part-1\.md, part-3\.md")
 
     def test_a_decoy_hidden_inside_a_longer_word_is_not_a_decoy(self):
-        # the found rule is the same for decoys: '#68345' glued to letters is not present
-        parts = edit(self.parts, "part-1.md", "## Findings\n", "## Findings\n- abc#683456\n")
+        # the found rule is the same for decoys: '#50520' glued to letters and digits is not present
+        parts = edit(self.parts, "part-1.md", "## Findings\n", "## Findings\n- abc#505206\n")
         self.assertProved(parts)
 
 
@@ -1083,18 +1113,18 @@ class ToleranceTest(Base):
 
     def test_area_lead_singular_for_one_lead(self):
         areas = base_areas()
-        parts = build_parts(areas, cuts=(8, 14))   # part 3 reads only `web`
+        parts = build_parts(areas, cuts=(10, 16))   # part 3 reads only `web`
         self.assertIn("Mode: full sweep, 1 area leads", parts["part-3.md"])
         self.assertProved(edit(parts, "part-3.md", "1 area leads", "1 area lead"))
 
     def test_area_lead_singular_is_accepted_for_any_count_as_built(self):
         # a tolerance, pinned: "area lead" is not tied to N == 1
-        self.assertProved(edit(self.parts, "part-1.md", "8 area leads", "8 area lead"))
+        self.assertProved(edit(self.parts, "part-1.md", "10 area leads", "10 area lead"))
 
     def test_area_leads_is_exact_otherwise(self):
-        for bad in ("8 areas", "8 leads", "8 area-leads", "8 area leader"):
+        for bad in ("10 areas", "10 leads", "10 area-leads", "10 area leader"):
             with self.subTest(bad=bad):
-                self.assertFails(edit(self.parts, "part-1.md", "8 area leads", bad), r"part-1\.md: no line 'Mode: full sweep")
+                self.assertFails(edit(self.parts, "part-1.md", "10 area leads", bad), r"part-1\.md: no line 'Mode: full sweep")
 
     def test_area_lines_indented_under_areas_read(self):
         def indent(t):
@@ -1202,7 +1232,7 @@ class CantCheckTest(Base):
             self.assertCantCheck(run_script(parts_dir=d), r"cannot read part-1\.md")
 
     def test_a_fixture_that_does_not_match_the_key(self):
-        self.assertCantCheck(run_script(self.parts, repo=Fixture.small), r"the fixture tracks \d+ files, the key says 690; rebuild the fixture")
+        self.assertCantCheck(run_script(self.parts, repo=Fixture.small), r"the fixture tracks \d+ files, the key says 990; rebuild the fixture")
 
     def test_a_repo_folder_without_the_git_wrapper(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1293,7 +1323,7 @@ class CantCheckTest(Base):
 class OutputTest(Base):
     def test_a_failure_prints_one_line_per_failure_and_nothing_else(self):
         parts = build_parts(base_areas())
-        parts = edit(parts, "part-1.md", "Mode: full sweep, 8 area leads", "Mode: full sweep, 7 area leads")
+        parts = edit(parts, "part-1.md", "Mode: full sweep, 10 area leads", "Mode: full sweep, 7 area leads")
         parts = edit(parts, "part-3.md", "INVESTIGATE REPORT ENDS\n", "")
         code, out = run_script(parts)
         self.assertEqual(code, 1)
@@ -1303,9 +1333,9 @@ class OutputTest(Base):
 
     def test_several_breakages_are_all_reported_at_once(self):
         parts = build_parts(base_areas())
-        parts = edit(parts, "part-1.md", "Mode: full sweep, 8 area leads", "Mode: full sweep, 7 area leads")
+        parts = edit(parts, "part-1.md", "Mode: full sweep, 10 area leads", "Mode: full sweep, 7 area leads")
         parts = edit(parts, "part-2.md", "failed: 0;", "failed: 3;")
-        parts = edit(parts, "part-3.md", "## Findings\n", "## Findings\n- twctl hold-trailer\n")
+        parts = edit(parts, "part-3.md", "## Findings\n", "## Findings\n- %s\n" % Fixture.key["decoys"][4]["token"])
         self.assertFails(parts, r"part-1\.md: Mode says 7", r"part-2\.md: Files listed", r"decoys: d5")
 
     def test_a_proved_run_prints_no_failure_lines(self):

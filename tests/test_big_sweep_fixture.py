@@ -32,7 +32,9 @@ SYNC = EXPENSIVE / "sync_big_sweep.py"
 
 UNTRACKED = ["notes/scratch.md", "rules/r9999_draft.py", "zones/zz_todo.txt"]
 ROOT_FILES = ["CHANGELOG.md", "Makefile", "README.md", "main.py", "poetry.lock", "pyproject.toml"]
-SUBSET_SIZES = (150, 230, 320, 400, 450)
+SUBSET_SIZES = (150, 230, 320, 400, 450, 600, 900, 945)
+LATE_RULES_FROM = 311   # rules/r0311 to r0610 carry the ordinary routes and commands added with the growth
+TRACKED, AFTER_WHOLE, READABLE = 990, 950, 945
 STOCK_PYTHON = "/usr/bin/python3"
 
 
@@ -69,49 +71,51 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-# What the fix for thin inventories pinned: the committed answer key's facts and decoys as the first build wrote them.
-# The fix may move line numbers, never these.
+# The committed answer key's facts and decoys as the 990-file build wrote them (growing rules/ from 310 to 610 files
+# shifted the seeded draws, so every token and most paths differ from the 690-file build; the owner accepted that).
+# What must not move is the layout, the ids and the per-folder counts: see FactDistributionTest.
+# A later change may move line numbers, never these.
 GOLDEN_FACTS = [
-    ('f01', 'gotcha', 'api/accounts/booth.py', 'ticket 1192'),
-    ('f02', 'route', 'api/accounts/plaza.py', '/v3/accounts/fleets/unlock'),
-    ('f03', 'route', 'api/app.py', '/v3/gateway/tows/assign'),
-    ('f04', 'gotcha', 'api/billing/entry.py', 'CHG6901825'),
-    ('f05', 'route', 'api/billing/fine.py', '/v3/billing/syncs/stage'),
-    ('f06', 'gotcha', 'api/plazas/account.py', '#10854'),
-    ('f07', 'route', 'api/plazas/speed.py', '/v3/plazas/tiers/assign'),
-    ('f08', 'gotcha', 'api/trips/deposit.py', 'runbook section 8.2'),
-    ('f09', 'route', 'api/trips/fine.py', '/v3/trips/vaults/recalc'),
-    ('f10', 'command', 'cli/cmd_fleet.py', 'twctl preview-lane'),
-    ('f11', 'command', 'cli/cmd_trailer.py', 'twctl sweep-booth'),
-    ('f12', 'gotcha', 'jobs/nightly/notice_close.py', 'TWY-1718'),
-    ('f13', 'command', 'jobs/runner.py', 'twctl redact-plate'),
-    ('f14', 'gotcha', 'main.py', 'TWY-8667'),
-    ('f15', 'gotcha', 'rules/r0001_vehicle.py', 'ticket 3533'),
-    ('f16', 'route', 'rules/r0029_span.py', '/v3/rules/incidents/rollup'),
-    ('f17', 'command', 'rules/r0057_tag.py', 'twctl recalc-commuter'),
-    ('f18', 'gotcha', 'rules/r0085_tow.py', 'CHG5378130'),
-    ('f19', 'route', 'rules/r0113_incident.py', '/v3/rules/lanes/rollup'),
-    ('f20', 'command', 'rules/r0141_queue.py', 'twctl escalate-span'),
-    ('f21', 'gotcha', 'rules/r0170_tag.py', '#43906'),
-    ('f22', 'route', 'rules/r0198_class.py', '/v3/rules/transponders/reopen'),
-    ('f23', 'command', 'rules/r0226_axle.py', 'twctl export-export'),
-    ('f24', 'gotcha', 'rules/r0254_lien.py', 'runbook section 2.5'),
-    ('f25', 'route', 'rules/r0282_account.py', '/v3/rules/transponders/reconcile'),
-    ('f26', 'command', 'rules/r0310_transponder.py', 'twctl notify-bridge'),
-    ('f27', 'command', 'scripts/export_ledger.py', 'twctl defer-bridge'),
-    ('f28', 'gotcha', 'tests/test_invoice.py', 'TWY-5116'),
-    ('f29', 'gotcha', 'web/session.py', 'ticket 8341'),
-    ('f30', 'route', 'web/views/invoice.py', '/v3/web/transponders/confirm'),
-    ('f31', 'route', 'zones/z04_batch.py', '/v3/zones/plates/archive'),
-    ('f32', 'command', 'zones/z11_deposit.py', 'twctl void-commuter'),
-    ('f33', 'gotcha', 'zones/z20_discount.py', 'CHG7011438'),
+    ('f01', 'gotcha', 'api/accounts/account.py', 'ticket 6005'),
+    ('f02', 'route', 'api/accounts/trailer.py', '/v3/accounts/ledgers/reopen'),
+    ('f03', 'route', 'api/app.py', '/v3/gateway/balances/cancel'),
+    ('f04', 'route', 'api/billing/bridge.py', '/v3/billing/permits/refresh'),
+    ('f05', 'gotcha', 'api/billing/export.py', 'CHG1134393'),
+    ('f06', 'gotcha', 'api/plazas/deposit.py', '#70513'),
+    ('f07', 'route', 'api/plazas/tow.py', '/v3/plazas/booths/split'),
+    ('f08', 'route', 'api/trips/axle.py', '/v3/trips/speeds/cancel'),
+    ('f09', 'gotcha', 'api/trips/refund.py', 'runbook section 4.2'),
+    ('f10', 'command', 'cli/cmd_booth.py', 'twctl reprice-class'),
+    ('f11', 'command', 'cli/cmd_weight.py', 'twctl reprice-axle'),
+    ('f12', 'gotcha', 'jobs/nightly/commuter_close.py', 'TWY-7179'),
+    ('f13', 'command', 'jobs/runner.py', 'twctl confirm-ledger'),
+    ('f14', 'gotcha', 'main.py', 'TWY-5256'),
+    ('f15', 'gotcha', 'rules/r0001_vehicle.py', 'ticket 2107'),
+    ('f16', 'route', 'rules/r0056_span.py', '/v3/rules/permits/assign'),
+    ('f17', 'command', 'rules/r0112_receipt.py', 'twctl cancel-batch'),
+    ('f18', 'gotcha', 'rules/r0167_ramp.py', 'CHG3081312'),
+    ('f19', 'route', 'rules/r0222_discount.py', '/v3/rules/classes/thaw'),
+    ('f20', 'command', 'rules/r0278_entry.py', 'twctl lock-account'),
+    ('f21', 'gotcha', 'rules/r0333_waiver.py', '#76355'),
+    ('f22', 'route', 'rules/r0389_height.py', '/v3/rules/vaults/unlock'),
+    ('f23', 'command', 'rules/r0444_payment.py', 'twctl defer-audit'),
+    ('f24', 'gotcha', 'rules/r0499_refund.py', 'runbook section 1.4'),
+    ('f25', 'route', 'rules/r0555_camera.py', '/v3/rules/imports/reassign'),
+    ('f26', 'command', 'rules/r0610_vehicle.py', 'twctl sweep-sensor'),
+    ('f27', 'command', 'scripts/export_ledger.py', 'twctl purge-carpool'),
+    ('f28', 'gotcha', 'tests/test_sync.py', 'TWY-7816'),
+    ('f29', 'gotcha', 'web/session.py', 'ticket 8293'),
+    ('f30', 'route', 'web/views/lien.py', '/v3/web/permits/purge'),
+    ('f31', 'route', 'zones/z04_camera.py', '/v3/zones/bridges/split'),
+    ('f32', 'command', 'zones/z11_discount.py', 'twctl reprice-batch'),
+    ('f33', 'gotcha', 'zones/z20_cashier.py', 'CHG4677291'),
 ]
 GOLDEN_DECOYS = [
-    ('d1', 'untracked', 'notes/scratch.md', 'runbook section 4.3'),
-    ('d2', 'untracked', 'rules/r9999_draft.py', '/v3/drafts/payments/lock'),
-    ('d3', 'vendored', 'web/vendor/plazalib.py', '#68345'),
-    ('d4', 'vendored', 'web/vendor/towlib.py', '/v3/legacy/speeds/recalc'),
-    ('d5', 'untracked', 'zones/zz_todo.txt', 'twctl hold-trailer'),
+    ('d1', 'untracked', 'notes/scratch.md', 'runbook section 2.1'),
+    ('d2', 'untracked', 'rules/r9999_draft.py', '/v3/drafts/fines/merge'),
+    ('d3', 'vendored', 'web/vendor/conelib.py', '#50520'),
+    ('d4', 'vendored', 'web/vendor/speedlib.py', '/v3/legacy/imports/reassign'),
+    ('d5', 'untracked', 'zones/zz_todo.txt', 'twctl split-balance'),
 ]
 
 ROUTE_DECORATOR = re.compile(r'^@route\("([^"]+)"\)', re.M)
@@ -119,6 +123,21 @@ COMMAND_DECORATOR = re.compile(r'^@command\("([^"]+)"\)', re.M)
 PUBLIC_DEF = re.compile(r"^def ([A-Za-z][A-Za-z0-9_]*)\(", re.M)
 ROUTE_HOMES = ("api/", "web/views/")
 COMMAND_HOMES = ("cli/", "scripts/", "jobs/")
+LATE_RULES_ROUTES, LATE_RULES_COMMANDS, LATE_RULES_CAP = 60, 90, 2
+
+
+def late_rules(path):
+    """rules/r0311_x.py to rules/r0610_x.py: the files the growth gave ordinary routes and commands."""
+    m = re.fullmatch(r"rules/r(\d{4})_[a-z]+\.py", path)
+    return bool(m) and LATE_RULES_FROM <= int(m.group(1)) <= 610
+
+
+def in_route_home(path):
+    return path.startswith(ROUTE_HOMES) or late_rules(path)
+
+
+def in_command_home(path):
+    return path.startswith(COMMAND_HOMES) or late_rules(path)
 CODE_FOLDERS = ("api/", "api/accounts/", "api/billing/", "api/plazas/", "api/trips/", "cli/", "jobs/", "jobs/nightly/",
                 "rules/", "scripts/", "tests/", "web/", "web/views/", "zones/")
 
@@ -230,16 +249,16 @@ def count_under(prefix, direct=False):
 
 
 class CountsAndLayoutTest(unittest.TestCase):
-    def test_tracked_counts_are_690_650_and_645(self):
-        self.assertEqual(len(Fixtures.tracked), 690)
-        self.assertEqual(len([p for p in Fixtures.tracked if not is_whole_skip(p)]), 650)
-        self.assertEqual(len(Fixtures.eligible), 645)
+    def test_tracked_counts_are_990_950_and_945(self):
+        self.assertEqual(len(Fixtures.tracked), TRACKED)
+        self.assertEqual(len([p for p in Fixtures.tracked if not is_whole_skip(p)]), AFTER_WHOLE)
+        self.assertEqual(len(Fixtures.eligible), READABLE)
 
     def test_the_briefs_verify_command_lines(self):
         # the brief's own pipeline: ls-files count, then the count with web/vendor/ removed (quotepath off), then untracked
-        self.assertEqual(git(Fixtures.a, "-c", "core.quotepath=off", "ls-files").count("\n"), 690)
+        self.assertEqual(git(Fixtures.a, "-c", "core.quotepath=off", "ls-files").count("\n"), TRACKED)
         kept = [p for p in git(Fixtures.a, "-c", "core.quotepath=off", "ls-files").splitlines() if not p.startswith("web/vendor/")]
-        self.assertEqual(len(kept), 650)
+        self.assertEqual(len(kept), AFTER_WHOLE)
         self.assertEqual(Fixtures.untracked, UNTRACKED)
 
     def test_root_holds_exactly_the_six_files(self):
@@ -259,8 +278,8 @@ class CountsAndLayoutTest(unittest.TestCase):
         self.assertEqual(count_under("jobs/"), 28)
         self.assertEqual(count_under("jobs/", direct=True), 4)
         self.assertEqual(count_under("jobs/nightly/"), 24)
-        self.assertEqual(count_under("rules/"), 310)
-        self.assertEqual(count_under("rules/", direct=True), 310)
+        self.assertEqual(count_under("rules/"), 610)
+        self.assertEqual(count_under("rules/", direct=True), 610)
         self.assertEqual(count_under("scripts/"), 8)
         self.assertEqual(count_under("scripts/", direct=True), 8)
         self.assertEqual(count_under("tests/"), 36)
@@ -280,11 +299,11 @@ class CountsAndLayoutTest(unittest.TestCase):
 
     def test_the_folders_add_up_to_the_total(self):
         parts = sum(count_under(p) for p in ("api/", "cli/", "docs/", "jobs/", "rules/", "scripts/", "tests/", "web/", "zones/"))
-        self.assertEqual(parts + 6, 690)
+        self.assertEqual(parts + 6, TRACKED)
         self.assertEqual({p.split("/")[0] for p in Fixtures.tracked if "/" in p},
                          {"api", "cli", "docs", "jobs", "rules", "scripts", "tests", "web", "zones"})
 
-    def test_rules_is_flat_and_numbered_one_to_310(self):
+    def test_rules_is_flat_and_numbered_one_to_610(self):
         names = sorted(p[len("rules/"):] for p in Fixtures.tracked if p.startswith("rules/"))
         self.assertTrue(all("/" not in n for n in names))
         numbers = []
@@ -292,8 +311,8 @@ class CountsAndLayoutTest(unittest.TestCase):
             m = re.fullmatch(r"r(\d{4})_[a-z]+\.py", name)
             self.assertIsNotNone(m, name)
             numbers.append(int(m.group(1)))
-        self.assertEqual(numbers, list(range(1, 311)))
-        self.assertTrue(names[-1].startswith("r0310_"))
+        self.assertEqual(numbers, list(range(1, 611)))
+        self.assertTrue(names[-1].startswith("r0610_"))
 
     def test_the_last_eligible_path_in_byte_order_is_in_zones(self):
         ordered = sorted(Fixtures.eligible, key=lambda p: p.encode("utf-8"))
@@ -473,14 +492,14 @@ class PlantedFactsTest(unittest.TestCase):
 
     def test_the_key_layout_matches_the_built_repo(self):
         layout = Fixtures.key["layout"]
-        self.assertEqual(layout["tracked"], 690)
-        self.assertEqual(layout["after_whole_folder_skips"], 650)
+        self.assertEqual(layout["tracked"], TRACKED)
+        self.assertEqual(layout["after_whole_folder_skips"], AFTER_WHOLE)
         self.assertEqual(layout["skipped_whole"], {"web/vendor/": 40})
         self.assertEqual(layout["file_skips"], {"lock": 1, "binary": 4})
         self.assertEqual(layout["untracked"], UNTRACKED)
         self.assertEqual(layout["tracked"], len(Fixtures.tracked))
         self.assertEqual(layout["untracked"], Fixtures.untracked)
-        self.assertEqual(layout["tracked"] - layout["skipped_whole"]["web/vendor/"] - sum(layout["file_skips"].values()), 645)
+        self.assertEqual(layout["tracked"] - layout["skipped_whole"]["web/vendor/"] - sum(layout["file_skips"].values()), READABLE)
 
     def test_there_are_33_facts_with_unique_ids_and_tokens(self):
         facts = self.facts()
@@ -580,23 +599,34 @@ class PlantedFactsTest(unittest.TestCase):
         commands = set(re.findall(r"twctl [a-z][a-z0-9-]*", Fixtures.everything))
         self.assertEqual(routes | commands, {t for t in known if t.startswith(("/v3/", "twctl "))} | ordinary["route"] | ordinary["command"])
 
-    def test_a_fact_sits_in_rules_at_every_fifty_file_stretch(self):
+    def rules_ranks(self):
         names = sorted(p for p in Fixtures.tracked if p.startswith("rules/"))
-        ranks = {names.index(f["path"]) + 1 for f in self.prefix("rules/")}
-        self.assertEqual(len(ranks), 12)
-        for start in range(1, 311, 50):
-            with self.subTest(stretch="%d-%d" % (start, start + 49)):
-                self.assertTrue([r for r in ranks if start <= r < start + 50], sorted(ranks))
+        return sorted(names.index(f["path"]) + 1 for f in self.prefix("rules/"))
+
+    def test_a_fact_sits_in_every_56_file_stretch_of_rules(self):
+        # 12 facts over 610 files, first and last included: the gaps are 55 or 56, so the real guarantee is that
+        # every run of 56 consecutive rules files holds a fact (not 50: a run of 50 can miss one)
+        ranks = self.rules_ranks()
+        self.assertEqual(len(set(ranks)), 12)
+        for start in range(1, 610 - 56 + 2):
+            self.assertTrue([r for r in ranks if start <= r < start + 56], (start, ranks))
+
+    def test_a_run_of_55_rules_files_can_miss_every_fact_so_56_is_the_real_bound(self):
+        ranks = self.rules_ranks()
+        gaps = [b - a for a, b in zip(ranks, ranks[1:])]
+        self.assertEqual(max(gaps), 56)
+        start = ranks[gaps.index(56)] + 1     # the 55 files strictly between two facts 56 apart
+        self.assertFalse([r for r in ranks if start <= r < start + 55])
 
     def test_rules_facts_include_the_first_and_the_last_file_and_are_evenly_spaced(self):
-        names = sorted(p for p in Fixtures.tracked if p.startswith("rules/"))
-        ranks = sorted(names.index(f["path"]) + 1 for f in self.prefix("rules/"))
+        ranks = self.rules_ranks()
         self.assertEqual(ranks[0], 1)
-        self.assertEqual(ranks[-1], 310)
+        self.assertEqual(ranks[-1], 610)
         gaps = {b - a for a, b in zip(ranks, ranks[1:])}
         self.assertTrue(max(gaps) - min(gaps) <= 1, gaps)
-        self.assertTrue(10 <= min(gaps), gaps)
-        self.assertEqual(self.prefix("rules/")[-1]["path"].split("/")[1][:5], "r0310")
+        self.assertEqual(gaps, {55, 56})
+        self.assertEqual(self.prefix("rules/")[0]["path"].split("/")[1][:5], "r0001")
+        self.assertEqual(self.prefix("rules/")[-1]["path"].split("/")[1][:5], "r0610")
 
     def test_a_fact_sits_in_the_last_eligible_file_in_byte_order(self):
         last = sorted(Fixtures.eligible, key=lambda p: p.encode("utf-8"))[-1]
@@ -609,7 +639,7 @@ class PlantedFactsTest(unittest.TestCase):
             for i, part in enumerate(parts):
                 with self.subTest(size=size, part=i + 1):
                     self.assertTrue(paths & set(part))
-        # and the final stretch of 45 files, the shortest tail a 300-file part leaves
+        # and the final stretch of 45 files, the tail a 450-file part size leaves (945 = 450 + 450 + 45)
         self.assertTrue(paths & set(Fixtures.eligible[-45:]))
 
     def test_each_api_subfolder_and_each_eligible_top_folder_holds_a_fact(self):
@@ -674,7 +704,7 @@ class DecoyTest(unittest.TestCase):
 
     def test_the_untracked_file_in_the_flat_folder_is_not_numbered_into_the_rules(self):
         self.assertTrue((Fixtures.a / "rules" / "r9999_draft.py").is_file())
-        self.assertEqual(count_under("rules/"), 310)
+        self.assertEqual(count_under("rules/"), 610)
 
 
 class SubsetTest(unittest.TestCase):
@@ -719,11 +749,11 @@ class SubsetTest(unittest.TestCase):
 
     def test_the_biggest_subset_is_every_eligible_file_and_one_more_is_refused(self):
         with tempfile.TemporaryDirectory() as tmp:
-            run_scaffold(tmp, "--subset", "645")
+            run_scaffold(tmp, "--subset", "945")
             self.assertEqual(sorted(git(tmp, "ls-files").splitlines()),
                              sorted(Fixtures.eligible))
         with tempfile.TemporaryDirectory() as tmp:
-            result = run_scaffold(tmp, "--subset", "646", check=False)
+            result = run_scaffold(tmp, "--subset", "946", check=False)
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse((Path(tmp) / ".git").exists())
 
@@ -1143,8 +1173,15 @@ class InventoryDensityTest(unittest.TestCase):
 
     def test_the_full_fixture_sits_inside_every_density_band(self):
         m = self.full()
-        self.assertEqual(m["files"], 645)
+        self.assertEqual(m["files"], READABLE)
         self.assertEqual(band_failures(m), [], m)
+
+    def test_the_reported_ratios_hold_1_40_functions_0_200_routes_and_0_299_commands_a_readable_file(self):
+        m = self.full()
+        self.assertEqual(round(m["functions"] / float(m["files"]), 2), 1.40, m)
+        self.assertEqual(round(m["routes"] / float(m["files"]), 3), 0.200, m)
+        self.assertEqual(round(m["commands"] / float(m["files"]), 3), 0.299, m)
+        self.assertEqual((m["py"], m["functions"], m["routes"], m["commands"]), (929, 1323, 189, 283))
 
     def test_public_functions_per_readable_python_file_are_between_1_1_and_1_7(self):
         m = self.full()
@@ -1232,14 +1269,14 @@ class InventoryDensityTest(unittest.TestCase):
         self.assertTrue(fails, fails)
 
     def test_the_bands_hold_for_the_numbers_the_fix_reported_and_fail_just_outside(self):
-        base = {"files": 645, "py": 629, "functions": 892, "routes": 129, "commands": 193}
+        base = {"files": 945, "py": 929, "functions": 1323, "routes": 189, "commands": 283}
         self.assertEqual(band_failures(base), [])
-        self.assertTrue(band_failures(dict(base, functions=int(629 * 1.1) - 2)))
-        self.assertTrue(band_failures(dict(base, functions=int(629 * 1.7) + 2)))
-        self.assertTrue(band_failures(dict(base, routes=int(645 * 0.15) - 1)))
-        self.assertTrue(band_failures(dict(base, routes=int(645 * 0.25) + 2)))
-        self.assertTrue(band_failures(dict(base, commands=int(645 * 0.25) - 1)))
-        self.assertTrue(band_failures(dict(base, commands=int(645 * 0.35) + 2)))
+        self.assertTrue(band_failures(dict(base, functions=int(929 * 1.1) - 2)))
+        self.assertTrue(band_failures(dict(base, functions=int(929 * 1.7) + 2)))
+        self.assertTrue(band_failures(dict(base, routes=int(945 * 0.15) - 1)))
+        self.assertTrue(band_failures(dict(base, routes=int(945 * 0.25) + 2)))
+        self.assertTrue(band_failures(dict(base, commands=int(945 * 0.25) - 1)))
+        self.assertTrue(band_failures(dict(base, commands=int(945 * 0.35) + 2)))
 
 
 class OrdinaryInventoryRulesTest(unittest.TestCase):
@@ -1256,14 +1293,40 @@ class OrdinaryInventoryRulesTest(unittest.TestCase):
         for _path, token in found["command"]:
             self.assertRegex(token, r"^twctl [a-z][a-z0-9-]*$")
 
-    def test_ordinary_routes_sit_in_api_or_web_views_and_commands_in_cli_scripts_or_jobs(self):
+    def test_ordinary_routes_sit_in_api_web_views_or_the_late_rules_and_commands_in_cli_scripts_jobs_or_the_late_rules(self):
         found = self.ordinary()
         for path, token in found["route"]:
             with self.subTest(path=path, token=token):
-                self.assertTrue(path.startswith(ROUTE_HOMES), path)
+                self.assertTrue(in_route_home(path), path)
         for path, token in found["command"]:
             with self.subTest(path=path, token=token):
-                self.assertTrue(path.startswith(COMMAND_HOMES), path)
+                self.assertTrue(in_command_home(path), path)
+
+    def test_rules_r0001_to_r0310_hold_no_ordinary_route_or_command(self):
+        found = self.ordinary()
+        early = [p for p, _t in found["route"] + found["command"] if p.startswith("rules/") and not late_rules(p)]
+        self.assertEqual(early, [])
+
+    def test_the_late_rules_hold_60_ordinary_routes_and_90_ordinary_commands_at_most_2_of_each_a_file(self):
+        found = self.ordinary()
+        for kind, total in (("route", LATE_RULES_ROUTES), ("command", LATE_RULES_COMMANDS)):
+            per_file = {}
+            for path, _t in found[kind]:
+                if path.startswith("rules/"):
+                    per_file[path] = per_file.get(path, 0) + 1
+            with self.subTest(kind=kind):
+                self.assertEqual(sum(per_file.values()), total)
+                self.assertTrue(all(late_rules(p) for p in per_file), sorted(per_file)[:3])
+                self.assertLessEqual(max(per_file.values()), LATE_RULES_CAP)
+
+    def test_every_50_file_stretch_of_the_late_rules_holds_an_ordinary_route_and_an_ordinary_command(self):
+        # measured, not promised by the brief: it is what lets each part of a sweep that reads a rules range report both
+        found = self.ordinary()
+        for kind in ("route", "command"):
+            numbers = {int(p[7:11]) for p, _t in found[kind] if p.startswith("rules/")}
+            for start in range(LATE_RULES_FROM, 610 - 50 + 2):
+                with self.subTest(kind=kind, start=start):
+                    self.assertTrue([n for n in numbers if start <= n < start + 50])
 
     def test_no_ordinary_route_or_command_sits_in_docs_vendor_untracked_lock_or_binary_files(self):
         found = self.ordinary()
@@ -1274,7 +1337,7 @@ class OrdinaryInventoryRulesTest(unittest.TestCase):
     def test_only_known_tokens_appear_in_files_outside_the_ordinary_homes(self):
         known = known_tokens(Fixtures.key)
         for path, text in Fixtures.text.items():
-            if path in Fixtures.eligible and path.endswith(".py") and path.startswith(ROUTE_HOMES + COMMAND_HOMES):
+            if path in Fixtures.eligible and path.endswith(".py") and (path.startswith(ROUTE_HOMES + COMMAND_HOMES) or late_rules(path)):
                 continue
             found = set(re.findall(r"/v3/[a-z][a-z0-9_-]*/[a-z][a-z0-9_/-]*", text)) | set(re.findall(r"twctl [a-z][a-z0-9-]*", text))
             with self.subTest(path=path):
@@ -1364,7 +1427,7 @@ class WhatMustNotChangeTest(unittest.TestCase):
             self.assertFalse(is_skipped(path) or path in UNTRACKED, path)
 
     def test_the_layout_in_the_key_is_the_one_the_brief_gave(self):
-        self.assertEqual(Fixtures.key["layout"], {"tracked": 690, "after_whole_folder_skips": 650, "skipped_whole": {"web/vendor/": 40},
+        self.assertEqual(Fixtures.key["layout"], {"tracked": TRACKED, "after_whole_folder_skips": AFTER_WHOLE, "skipped_whole": {"web/vendor/": 40},
                                                   "file_skips": {"lock": 1, "binary": 4}, "untracked": UNTRACKED})
 
     def test_vendored_lock_and_binary_files_and_untracked_ones_hold_only_their_decoys(self):
@@ -1398,6 +1461,98 @@ class WhatMustNotChangeTest(unittest.TestCase):
             emitted = json.loads(target.read_text(encoding="utf-8"))
         self.assertEqual(emitted, Fixtures.key)
         self.assertEqual([(f["id"], f["kind"], f["path"], f["token"]) for f in emitted["facts"]], GOLDEN_FACTS)
+
+
+class FactDistributionTest(unittest.TestCase):
+    """What the growth must not move: the plan's table, read from the key and not from the golden tokens."""
+
+    def kinds(self, prefix, direct=False):
+        out = []
+        for f in Fixtures.key["facts"]:
+            if f["path"].startswith(prefix) and not (direct and "/" in f["path"][len(prefix):]):
+                out.append(f["kind"])
+        return sorted(out)
+
+    def test_ids_run_f01_to_f33_in_path_order(self):
+        facts = Fixtures.key["facts"]
+        self.assertEqual([f["id"] for f in facts], ["f%02d" % i for i in range(1, 34)])
+        self.assertEqual([f["path"] for f in facts], sorted(f["path"] for f in facts))
+
+    def test_each_api_subfolder_holds_one_route_and_one_gotcha(self):
+        for sub in ("accounts", "billing", "plazas", "trips"):
+            with self.subTest(sub=sub):
+                self.assertEqual(self.kinds("api/%s/" % sub), ["gotcha", "route"])
+
+    def test_the_other_folders_hold_the_kinds_the_plan_gives(self):
+        self.assertEqual(self.kinds("main.py"), ["gotcha"])
+        self.assertEqual(self.kinds("api/app.py"), ["route"])
+        self.assertEqual(self.kinds("cli/"), ["command", "command"])
+        self.assertEqual(self.kinds("jobs/", direct=True), ["command"])
+        self.assertEqual(self.kinds("jobs/nightly/"), ["gotcha"])
+        self.assertEqual(self.kinds("scripts/"), ["command"])
+        self.assertEqual(self.kinds("tests/"), ["gotcha"])
+        self.assertEqual(self.kinds("web/views/"), ["route"])
+        self.assertEqual(self.kinds("web/", direct=True), ["gotcha"])
+        self.assertEqual(self.kinds("zones/"), ["command", "gotcha", "route"])
+
+    def test_the_12_rules_facts_cycle_gotcha_route_command(self):
+        facts = [f for f in Fixtures.key["facts"] if f["path"].startswith("rules/")]
+        self.assertEqual([f["kind"] for f in facts], ["gotcha", "route", "command"] * 4)
+
+    def test_the_three_zones_facts_are_the_4th_the_11th_and_the_last_file(self):
+        zones = sorted(p for p in Fixtures.eligible if p.startswith("zones/"))
+        got = [f["path"] for f in Fixtures.key["facts"] if f["path"].startswith("zones/")]
+        self.assertEqual(got, [zones[3], zones[10], zones[19]])
+        self.assertEqual(zones[19], sorted(Fixtures.eligible, key=lambda p: p.encode("utf-8"))[-1])
+
+    def test_the_decoys_are_one_in_each_untracked_file_and_two_in_the_vendored_folder(self):
+        decoys = Fixtures.key["decoys"]
+        self.assertEqual(sorted(d["path"] for d in decoys if d["why"] == "untracked"), UNTRACKED)
+        vendored = [d["path"] for d in decoys if d["why"] == "vendored"]
+        self.assertEqual(len(vendored), 2)
+        self.assertTrue(all(p.startswith("web/vendor/") for p in vendored))
+
+
+class ReplySizeCopiesTest(unittest.TestCase):
+    """The six reply-size scaffolds are byte copies of the big-sweep scaffold with one line changed."""
+
+    SIZES = (("150", 150), ("230", 230), ("320", 320), ("400", 400), ("450", 450), ("full", None))
+
+    def test_each_copy_differs_from_the_scaffold_in_line_14_only(self):
+        main = SCAFFOLD.read_text(encoding="utf-8").split("\n")
+        for suffix, n in self.SIZES:
+            with self.subTest(copy=suffix):
+                copy = (EXPENSIVE / ("reply-size-" + suffix) / "scaffold.sh").read_text(encoding="utf-8").split("\n")
+                self.assertEqual(len(copy), len(main))
+                diff = [i + 1 for i, (a, b) in enumerate(zip(main, copy)) if a != b]
+                self.assertEqual(diff, [] if n is None else [14])
+                self.assertEqual(copy[13], 'SUBSET=""' if n is None else 'SUBSET="%d"' % n)
+
+    def test_sync_out_writes_the_same_copies_that_are_committed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            subprocess.run([sys.executable, str(SYNC), "--out", tmp], check=True, capture_output=True, text=True)
+            for suffix, _n in self.SIZES:
+                with self.subTest(copy=suffix):
+                    name = "reply-size-%s/scaffold.sh" % suffix
+                    self.assertEqual((Path(tmp) / name).read_bytes(), (EXPENSIVE / name).read_bytes())
+
+    def test_sync_check_exits_zero_and_names_nothing(self):
+        result = subprocess.run([sys.executable, str(SYNC), "--check"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("differs", result.stdout)
+
+    def test_each_copy_builds_the_repo_its_name_says(self):
+        for suffix, n in self.SIZES:
+            with self.subTest(copy=suffix), tempfile.TemporaryDirectory() as tmp:
+                dest = Path(tmp)
+                subprocess.run(["bash", str(EXPENSIVE / ("reply-size-" + suffix) / "scaffold.sh")], cwd=str(dest),
+                               check=True, capture_output=True, text=True)
+                tracked = git(dest, "ls-files").splitlines()
+                if n is None:
+                    self.assertEqual(tracked, Fixtures.tracked)
+                else:
+                    self.assertEqual(tracked, git(Fixtures.subsets[n], "ls-files").splitlines())
+                    self.assertEqual(len(tracked), n)
 
 
 class FoundRuleTest(unittest.TestCase):
