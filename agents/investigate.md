@@ -214,7 +214,10 @@ above, and list the paths of those areas only. Then take out the files skipped o
 one (lock files, generated and build output, data and fixture files, binaries; the list
 in "Build the File List"), count each by reason, and give each lead only what's left.
 No reader is sent for a skipped file, by you or by a lead. The area line's count
-doesn't change: it's the definition's count, skips and all. Every area in a part gets
+doesn't change: it's the definition's count, skips and all. A file skipped one by one
+still counts in its area's count and in `Files listed:`, where it goes under `skipped`;
+it is left out only of what the lead is given. `Files listed:` is the sum of the part's
+area counts, as "8. Coverage" says. Every area in a part gets
 its own lead, even a small one, run one at a time as in "Run the Readers".
 
 A continuing run rebuilds each area it picked the same way.
@@ -235,8 +238,11 @@ Every part carries this block, and it's the whole of the next brief. Its first l
 `SWEEP IN PARTS: <n> areas not read`, goes at line 1 of your report, or line 2 under
 `NOT A PER-FILE READ`, and the report's sections follow it as usual.
 
-Work out the block's area lines before you write line 1, and count them. The `<n>` on
-line 1 is the number of area lines in the block, no more and no fewer.
+Work out the block's area lines before you write line 1, and count them with a
+command, as "8. Coverage" says of every count, for example
+`printf '%s\n' '<area line>' '<area line>' | wc -l`. Write line 1 only after you have
+the number. The `<n>` on line 1 is the number of area lines in the block, no more and
+no fewer.
 
 ```
 SWEEP IN PARTS: 3 areas not read
@@ -310,7 +316,9 @@ Dispatch readers and leads with only the agent type and the brief. Pass no
 isolation, model, or background setting.
 
 Send readers 10 at a time, in one message, and wait for all of them before sending
-the next 10. Leads go one at a time, as below. If an `Agent` result says the agent started in the background, wait for its
+the next 10. Leads go one at a time: never
+two in one message. Start one, wait for its return, then start the next. If an `Agent`
+result says the agent started in the background, wait for its
 completion before counting it done or sending the next batch. Reports only ever
 come up; no reader hears from another.
 
@@ -544,7 +552,8 @@ front of `Areas read:` or `Areas not read:`:
   number of these area lines: it counts areas, not restarts.
 - `Areas not read: <n> areas, <m> files; see SWEEP IN PARTS at the top.`, on the line
   straight after the last area line. The `<n>` is the same as on line 1. The `<m>` is the
-  sum of the block's area counts.
+  sum of the block's area counts, written as one number (`554 files`, never
+  `488 + 66 = 554 files`).
 - After it, a note on its own line, never starting with `-`, for each rebuilt area
   that changed: `Count changed: <name>: found <n>, the brief said <m>.` or
   `Area dropped: <name>: now <n> files, the brief said <m>; not read.`

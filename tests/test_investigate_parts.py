@@ -121,6 +121,8 @@ PINS = [
     ("after rebuilding, the files skipped one by one are taken out and counted by reason", "Reading a Part", r"Then take out the files skipped one by one \(lock files, generated and build output, data and fixture files, binaries; the list in \"Build the File List\"\), count each by reason, and give each lead only what's left"),
     ("no reader is sent for a skipped file, by you or by a lead", "Reading a Part", r"No reader is sent for a skipped file, by you or by a lead"),
     ("the area line's count doesn't change, skips and all", "Reading a Part", r"The area line's count doesn't change: it's the definition's count, skips and all"),
+    ("a file skipped one by one still counts in its area's count and in Files listed, under skipped, and is left out only of what the lead is given", "Reading a Part", r"A file skipped one by one still counts in its area's count and in `Files listed:`, where it goes under `skipped`; it is left out only of what the lead is given"),
+    ("Files listed is the part's area counts summed, as Coverage says", "Reading a Part", r"`Files listed:` is the sum of the part's area counts, as \"8\. Coverage\" says"),
     ("a continuing run rebuilds each area it picked", "Reading a Part", r"A continuing run rebuilds each area it picked the same way"),
     ("a different count is read as found, with a Count changed line", "Reading a Part", r"If a count differs from the brief's, read what was found, and say so in Coverage with a `Count changed:` line"),
     ("a rebuilt area is dropped when it matches nothing or its count changed and is now over about 150", "Reading a Part", r"A rebuilt area that matches nothing, or whose count differs from the brief's and is now over about 150 files, is dropped"),
@@ -137,6 +139,8 @@ PINS = [
     ("a sweep that fits in one report never carries the block", "The Block", r"A sweep that fits in one report never carries the block"),
     ("work out the block's area lines before line 1 and count them", "The Block", r"Work out the block's area lines before you write line 1, and count them"),
     ("the n on line 1 is the number of area lines, no more and no fewer", "The Block", r"The `<n>` on line 1 is the number of area lines in the block, no more and no fewer"),
+    ("the block's area lines are counted with a command, as Coverage says of every count, the printf example", "The Block", r"count them with a command, as \"8\. Coverage\" says of every count, for example `printf '%s\\n' '<area line>' '<area line>' \| wc -l`"),
+    ("line 1 is written only after the number is in hand", "The Block", r"Write line 1 only after you have the number"),
     ("Environment carries the wrapper or the find command", "The Block", r"`Environment:` carries the git wrapper, or the find command outside git"),
 
     # A Scoped Read Above the Part Size
@@ -154,7 +158,8 @@ PINS = [
 
     # Run the Readers
     ("readers go 10 at a time in one message", "Run the Readers", r"Send readers 10 at a time, in one message, and wait for all of them before sending the next 10"),
-    ("leads go one at a time, pointing to the rule below", "Run the Readers", r"Leads go one at a time, as below"),
+    ("leads go one at a time, never two in one message", "Run the Readers", r"Leads go one at a time: never two in one message"),
+    ("a lead is started, its return awaited, then the next started", "Run the Readers", r"Start one, wait for its return, then start the next"),
     ("a sweep in parts takes its areas from its own section", "Run the Readers", r"A sweep in parts takes its areas from \"A Sweep in Parts\" instead"),
 
     # Check Before You Compile
@@ -210,6 +215,7 @@ PINS = [
     ("the command rule names the Areas not read m and Files listed", "8. Coverage", r"That goes for the `<m>` on the `Areas not read:` line, for `Files listed:` and the numbers after it"),
     ("the command rule covers any total of routes, commands or files", "8. Coverage", r"and for any total you give of routes, commands or files"),
     ("the Areas not read m is the sum of the block's area counts", "8. Coverage", r"The `<m>` is the sum of the block's area counts"),
+    ("the Areas not read m is written as one number, never the working", "8. Coverage", r"written as one number \(`554 files`, never `488 \+ 66 = 554 files`\)"),
     ("a note goes on its own line, never starting with a dash", "8. Coverage", r"a note on its own line, never starting with `-`"),
     ("the Count changed line", "8. Coverage", r"`Count changed: <name>: found <n>, the brief said <m>\.`"),
     ("the Area dropped line", "8. Coverage", r"`Area dropped: <name>: now <n> files, the brief said <m>; not read\.`"),
@@ -377,6 +383,26 @@ class PartsPinsTest(unittest.TestCase):
             with self.subTest(shell=shell[0]):
                 proc = subprocess.run(shell + [command], capture_output=True, text=True, timeout=30)
                 self.assertEqual((proc.returncode, proc.stdout.strip()), (0, str(sum(numbers))), proc.stderr)
+
+    def test_the_block_count_example_is_real_shell_that_counts_the_area_lines_under_bash_and_zsh(self):
+        found = re.findall(r"`(printf '%s\\n'[^`]*\| wc -l)`", self.body_raw("### The Block"))
+        self.assertEqual(len(found), 1, found)
+        self.assertEqual(len(re.findall(r"printf '%s", self.text)), 1)  # one example in the whole file
+        template = found[0]
+        self.assertEqual(template.count("'<area line>'"), 2)
+        lines = ["- docs: `docs/` (22 files)", "- web: `web/` except `web/vendor/` (86 files)", "- top: `(root)` + `scripts/` (70 files)"]
+        shells = [["bash", "-c"]]
+        if shutil.which("zsh"):
+            shells.append(["zsh", "-f", "-c"])
+        for n in (2, 3):
+            # two placeholders filled with two lines; for three, one more argument before the pipe
+            command = template.replace("'<area line>'", "{}").format(*["'%s'" % l for l in lines[:2]])
+            if n == 3:
+                command = command.replace(" | wc -l", " '%s' | wc -l" % lines[2])
+            for shell in shells:
+                with self.subTest(lines=n, shell=shell[0]):
+                    proc = subprocess.run(shell + [command], capture_output=True, text=True, timeout=30)
+                    self.assertEqual((proc.returncode, proc.stdout.strip()), (0, str(n)), proc.stderr)
 
     # ------------------------------------------------------------ the fence
 
@@ -653,7 +679,7 @@ class QaFixAOldSentencesTest(unittest.TestCase):
 
     def test_readers_and_leads_have_their_own_dispatch_rules_in_run_the_readers(self):
         body = self.sections["Run the Readers"]
-        self.assertTrue(precedes(body, r"Send readers 10 at a time", r"Leads go one at a time, as below"))
+        self.assertTrue(precedes(body, r"Send readers 10 at a time", r"Leads go one at a time: never two in one message"))
         self.assertEqual(len(re.findall(r"Leads go one at a time", body)), 1)  # a pointer, not a second statement of the rule
 
 

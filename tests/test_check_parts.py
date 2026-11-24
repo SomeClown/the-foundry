@@ -1442,6 +1442,33 @@ class RealRunShapesTest(Base):
         self.assertEqual(note_lines(out), ["NOTE: part-3.md names an untracked path that only part 1 should list: " + ", ".join(UNTRACKED)])
 
 
+class FixBatch3RunShapesTest(Base):
+    """Run 7 and run 8 of the loop, set into synthetic parts: a skipped file left out of the counts, and the working on the Areas not read line."""
+
+    def test_a_last_part_that_leaves_its_skipped_binaries_out_of_files_listed_fails_on_the_sum_and_on_the_skipped_total(self):
+        # run 7: the last part's areas add up to more than its Files listed, which says `skipped: 0`
+        parts = build_parts(base_areas())
+        listed, read, skipped = listed_of(parts["part-3.md"])[:3]
+        self.assertGreater(skipped, 0)  # the base part 3 holds the web/ binaries
+        left_out = set_listed(parts, "part-3.md", listed=listed - skipped, read=listed - skipped, skipped=0)
+        total_skipped = sum(listed_of(left_out["part-%d.md" % n])[2] for n in (1, 2, 3))
+        out = self.assertFails(left_out,
+                               r"^part-3\.md: Files listed %d should equal the sum of its areas' counts, %d$" % (listed - skipped, listed),
+                               r"^read: the skipped numbers add up to %d, expected 5 \(the key's file_skips\)$" % total_skipped)
+        self.assertNotIn("should equal read+skipped+failed+unread", out)  # the line's own arithmetic is fine
+
+    def test_an_areas_not_read_line_with_the_working_in_place_of_the_number_is_not_the_areas_not_read_line(self):
+        # run 8: `Areas not read: 5 areas, 488 + 66 = 554 files; see SWEEP IN PARTS at the top.`
+        parts = build_parts(base_areas())
+        m = re.search(r"^Areas not read: (\d+) areas, (\d+) files; see SWEEP IN PARTS at the top\.$", parts["part-1.md"], flags=re.M)
+        n, total = int(m.group(1)), int(m.group(2))
+        a, b = total - 66, 66
+        working = "Areas not read: %d areas, %d + %d = %d files; see SWEEP IN PARTS at the top." % (n, a, b, total)
+        parts = edit(parts, "part-1.md", m.group(0), working)
+        self.assertIn(working, parts["part-1.md"])
+        self.assertFails(parts, r"^part-1\.md: no line 'Areas not read: <n> areas, <m> files; see SWEEP IN PARTS at the top\.' in Coverage$")
+
+
 class FixBatch1MutationTest(Base):
     """A temp copy of the script with one tolerance undone must behave differently from the script on a part that needs it."""
 
