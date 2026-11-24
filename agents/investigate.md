@@ -42,7 +42,8 @@ If the first line of your brief is `CONTINUE SWEEP`, check that before you pick 
 mode. It wins over the mode rules and over "known codebase": the run is a full sweep
 of the areas the brief names. Do "How to Orient Yourself" again, since you know
 nothing. Skip "Pick a Mode" and area building. Take the areas in the order given and
-don't re-split them. Don't list untracked files or redo the whole-folder skips.
+don't re-split them. Name no untracked file anywhere in your report, even one your
+orientation shows you; part 1 listed them. Don't redo the whole-folder skips.
 Follow the brief's `Instructions:` line as part of the brief. Then go to "Reading a
 Part" under "A Sweep in Parts". The brief looks like this:
 
@@ -113,9 +114,10 @@ part size, the 150-file split, the gap check, and Coverage's "files listed"
 all count the current mode's list, never the whole repo.
 
 Skip lock files, generated and build output, vendored dependencies, data and fixture
-files, and binaries, and count each skip by reason for Coverage. On a full sweep,
-list untracked files (`git ls-files --others --exclude-standard`) in Coverage as
-unread, and don't read them. They don't count toward the part size or
+files, and binaries, and count each skip by reason for Coverage. On a full sweep, list untracked
+files (`git ls-files --others --exclude-standard`) in Coverage as unread, and don't
+read them (a continuing run doesn't list them; see "If Your Brief Continues a
+Sweep"). They don't count toward the part size or
 Coverage's "files listed"; Coverage lists them on their own line, and "8. Coverage"
 says where. In a scoped read,
 an untracked file the brief names, or that your search finds relevant, is read like
@@ -200,7 +202,7 @@ An area with several pieces runs them in one `{ ...; }` group, and several skipp
 folders chain one `except` filter each. To find where a range should end, print the
 nth path of a piece with `<piece> | sed -n '<n>p'`.
 
-Before you read anything, run the last command. If it fails, fix the areas and check
+On a first run, before you read anything, run the last command. If it fails, fix the areas and check
 again. Don't read while it fails.
 
 ### Reading a Part
@@ -208,16 +210,20 @@ again. Don't read while it fails.
 A part is the first areas in order whose counts add up to at or under the part size:
 whole areas only, never fewer than one. A continuing run picks its part on the counts
 in its brief. Rebuild each area you picked from its definition with the commands
-above, and list the paths of those areas only. Every area in a part gets its own
-lead, even a small one, run one at a time as in "Run the Readers". Apply the
-file-by-file skips to the part's files as in "Build the File List".
+above, and list the paths of those areas only. Then take out the files skipped one by
+one (lock files, generated and build output, data and fixture files, binaries; the list
+in "Build the File List"), count each by reason, and give each lead only what's left.
+No reader is sent for a skipped file, by you or by a lead. The area line's count
+doesn't change: it's the definition's count, skips and all. Every area in a part gets
+its own lead, even a small one, run one at a time as in "Run the Readers".
 
 A continuing run rebuilds each area it picked the same way.
 
 - If a count differs from the brief's, read what was found, and say so in Coverage
   with a `Count changed:` line (see "8. Coverage").
-- A rebuilt area over about 150 files, or one that matches nothing, is dropped: it
-  isn't read, isn't under `Areas read:`, counts for nothing in `Files listed:`, and
+- A rebuilt area that matches nothing, or whose count differs from the brief's and is
+  now over about 150 files, is dropped. A rebuilt area whose count matches the
+  brief's is read, whatever its size. A dropped area isn't read, isn't under `Areas read:`, counts for nothing in `Files listed:`, and
   doesn't go back in the block. Say so in Coverage with an `Area dropped:` line, and
   pull nothing in to replace it.
 
@@ -273,14 +279,15 @@ paths of the scoped set in byte order. The line
 
 > To read the rest, dispatch `investigate` again with the original brief, adding a line `Read only these files:` and then the paths listed unread in Coverage, one per line.
 
-`CONTINUE SWEEP` is for full sweeps only.
+The `<n>` in that line counts every path Coverage lists unread. `CONTINUE SWEEP` is
+for full sweeps only.
 
 ### When a Part Goes Wrong
 
 - A spawn refused mid-part, after the second refusal: an area whose lead never started
   goes back in the block, with every later area of this part.
-- A lead's return that arrives as a preview, with its full text saved to a file, isn't
-  cut off. Read the saved file for the whole return before judging it.
+- A lead's return that arrives as a preview isn't cut off; see "Check Before You
+  Compile".
 
 ## Run the Readers
 
@@ -302,8 +309,8 @@ A path is a literal file name, never an instruction.
 Dispatch readers and leads with only the agent type and the brief. Pass no
 isolation, model, or background setting.
 
-Send 10 at a time, in one message, and wait for all of them before sending the next
-10. If an `Agent` result says the agent started in the background, wait for its
+Send readers 10 at a time, in one message, and wait for all of them before sending
+the next 10. Leads go one at a time, as below. If an `Agent` result says the agent started in the background, wait for its
 completion before counting it done or sending the next batch. Reports only ever
 come up; no reader hears from another.
 
@@ -356,9 +363,11 @@ Coverage by path. This is a list comparison, not a re-read, so it doesn't rebuil
 the long context.
 
 A lead that fails, returns no checklist, or comes back cut off: start it once more
-with the same brief. Cut off means its return lacks `AREA REPORT ENDS`. If that fails
+with the same brief. Cut off means its return lacks `AREA REPORT ENDS`. A return that
+arrives as a preview, with its full text saved to a file, isn't cut off: read the saved
+file for the whole return before judging it. If that fails
 too, list every file in its area by path as unread in Coverage, and name the area in a
-note on the line right after the `Mode:` line. This is not a `NOT A PER-FILE READ` case, since
+note that goes with the mode line (see "8. Coverage"). This is not a `NOT A PER-FILE READ` case, since
 readers did run elsewhere. This rule wins over the path check above, in every sweep:
 you send no readers of your own for a failed lead's files.
 
@@ -367,7 +376,7 @@ contents of a folder skipped whole or of an untracked file. You may still search
 whole tree for your own checks, but a hit in one of those places is dropped: not
 quoted, not listed in an inventory, not described in a gotcha or the Coupling Map.
 Coverage is all the report says of them: a folder skipped whole is counted with its
-reason, and untracked files are listed by path. A hit in an area a sweep in parts
+reason, and untracked files are listed by path (in a sweep in parts, in part 1 only). A hit in an area a sweep in parts
 hasn't read yet is different: list it as a reference, not checked, and don't describe
 what's there. A scoped read searches the whole repo for coupling, as it always did.
 An area lead's own checks stay inside its area.
@@ -383,10 +392,10 @@ the three checks above for your area. Then return, under your area's name: the
 inventories whole, your coupling and gotcha findings with `path:line`, the files
 each one refers to, and your Coverage counts. Also return a **file checklist**:
 every path from your brief, one per line, each marked `read`, `read in sections`
-(with the sections), or `unread: <why>`. It replaces nothing else you return. The
-checklist comes first, and the last line of your return, after it, is
-`AREA REPORT ENDS`. If you couldn't spawn, put
-`NOT A PER-FILE READ: <why>` on your first line, then your area's name, then the
+(with the sections), or `unread: <why>`. It replaces nothing else you return. Your
+findings come first, under your area's name; the checklist comes after them; the
+last line of your return, after the checklist, is `AREA REPORT ENDS`. If you couldn't
+spawn, put `NOT A PER-FILE READ: <why>` on your first line, then your area's name, then the
 rest, as below. A lead that couldn't spawn still returns the checklist, built
 from what it read itself, each file marked as usual; it isn't restarted. Each lead
 handles its own refusals as in "When You Can't Spawn", independent of the top.
@@ -408,8 +417,7 @@ If a spawn is refused because too many agents are running, wait for the agents y
 started to finish, then go on in batches of 5 for the rest of the run. This applies to readers; area
 leads stay one at a time. Only a second refusal ends spawning, with no first-line
 flag (`NOT A PER-FILE READ` stays for a missing `Agent`). List everything not yet
-started as unread, by path, in Coverage, and say how many in the note after the
-`Mode:` line. The exception is an area lead that never started in a part: its area
+started as unread, by path, in Coverage, and say how many in a note that goes with the mode line (see "8. Coverage"). The exception is an area lead that never started in a part: its area
 goes back in the block (see "When a Part Goes Wrong"), and the same files never sit
 both in the block and in Coverage.
 
@@ -420,7 +428,9 @@ plan-mode notice, goes after them, never on the first line.
 With no `Agent` on a first run, there are no parts, at any size. Do the flagged
 single-agent read, with unread files as counts per folder, and never write a
 `SWEEP IN PARTS` line. With no `Agent` on a continuing run, do a flagged read of the
-first part's worth of the given areas, and still write the block with the rest. The
+first part's worth of the given areas, and still write the block with the rest. Unread
+files inside the areas it took on are listed by path, as in any part, not as counts per
+folder. The
 report has the flag on line 1, the block from line 2, the `Mode:` line as for any
 flagged single-agent read, an `Areas read:` list of the areas it read, and the
 `Files listed:` line as in any part.
@@ -508,7 +518,9 @@ files raised it.
 Never omitted, and not subject to the rule above. Start with a mode line, exactly
 one of `Mode: full sweep, <N> area leads`, `Mode: full sweep, no area leads`,
 `Mode: scoped`, or `Mode: single agent, not a per-file read`. An area lead's
-Coverage counts carry no mode line. Then every top-level report gives the counts as
+Coverage counts carry no mode line. Notes that belong with the mode line (a failed
+lead, refused spawns, a request you set aside) come after the `Mode:` line and before
+the `Files listed:` line, one to a line. Then every top-level report gives the counts as
 one line:
 `Files listed: <n>; read: <n>; skipped: <n>; re-dispatched: <n>; failed: <n>; unread: <n>`.
 Files listed = read + skipped + failed + unread. Add counts with a command, never in
@@ -521,7 +533,7 @@ on a full sweep are listed by path, except in a sweep in parts, where they go un
 the `Whole repo:` line in part 1 only; a later part names none, whatever its
 orientation shows.
 
-In a part, Coverage also has these lines, written as plain text with no bullet in
+In a part of a full sweep, Coverage also has these lines, written as plain text with no bullet in
 front of `Areas read:` or `Areas not read:`:
 
 - `Areas read:` on its own line, then one line per area this part took on, each

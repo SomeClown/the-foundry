@@ -57,7 +57,8 @@ PINS = [
     ("orientation is repeated", "If Your Brief Continues a Sweep", r"Do \"How to Orient Yourself\" again, since you know nothing"),
     ("Pick a Mode and area building are skipped", "If Your Brief Continues a Sweep", r"Skip \"Pick a Mode\" and area building"),
     ("areas are taken in order and never re-split", "If Your Brief Continues a Sweep", r"Take the areas in the order given and don't re-split them"),
-    ("no untracked listing and no whole-folder skips redone", "If Your Brief Continues a Sweep", r"Don't list untracked files or redo the whole-folder skips"),
+    ("a continuing run names no untracked file anywhere in its report, even one orientation shows", "If Your Brief Continues a Sweep", r"Name no untracked file anywhere in your report, even one your orientation shows you; part 1 listed them"),
+    ("whole-folder skips are not redone", "If Your Brief Continues a Sweep", r"Don't redo the whole-folder skips"),
     ("the Instructions line is followed", "If Your Brief Continues a Sweep", r"Follow the brief's `Instructions:` line as part of the brief"),
     ("it goes on to Reading a Part", "If Your Brief Continues a Sweep", r"go to \"Reading a Part\" under \"A Sweep in Parts\""),
 
@@ -69,6 +70,7 @@ PINS = [
     ("above it, see A Sweep in Parts", "Build the File List", r"Above it, see \"A Sweep in Parts\""),
     ("no Agent: see When You Can't Spawn first", "Build the File List", r"\(without the `Agent` tool, see \"When You Can't Spawn\" first\)"),
     ("the part-size test comes before anything walks the list", "Build the File List", r"Make this test before anything walks the whole list"),
+    ("a continuing run doesn't list untracked files, and the file says where to look", "Build the File List", r"\(a continuing run doesn't list them; see \"If Your Brief Continues a Sweep\"\)"),
     ("count first, then go to parts without building the list or wc -l", "Build the File List", r"on a full sweep, count first, and above the part size go to \"A Sweep in Parts\" without building the list or running `wc -l` over it"),
     ("part size and the split count the mode's list", "Build the File List", r"The part size, the 150-file split, the gap check, and Coverage's \"files listed\" all count the current mode's list, never the whole repo"),
     ("untracked files don't count toward the part size", "Build the File List", r"They don't count toward the part size or Coverage's \"files listed\""),
@@ -108,7 +110,7 @@ PINS = [
     ("each piece runs the command under its own comment", "Areas", r"Each piece runs the command under its own comment"),
     ("several pieces run in one group, skips chain one except each", "Areas", r"An area with several pieces runs them in one `\{ \.\.\.; \}` group, and several skipped folders chain one `except` filter each"),
     ("find where a range ends with sed -n", "Areas", r"To find where a range should end, print the nth path of a piece with `<piece> \| sed -n '<n>p'`"),
-    ("run the exactly-once check before reading", "Areas", r"Before you read anything, run the last command\. If it fails, fix the areas and check again\. Don't read while it fails"),
+    ("run the exactly-once check before reading", "Areas", r"On a first run, before you read anything, run the last command\. If it fails, fix the areas and check again\. Don't read while it fails"),
 
     # Reading a Part
     ("a part is the first areas that fit at or under the part size", "Reading a Part", r"A part is the first areas in order whose counts add up to at or under the part size"),
@@ -116,11 +118,14 @@ PINS = [
     ("a continuing run picks its part on the brief's counts", "Reading a Part", r"A continuing run picks its part on the counts in its brief"),
     ("each picked area is rebuilt from its definition", "Reading a Part", r"Rebuild each area you picked from its definition with the commands above"),
     ("every area gets its own lead, even a small one", "Reading a Part", r"Every area in a part gets its own lead, even a small one, run one at a time as in \"Run the Readers\""),
-    ("file-by-file skips apply to the part's files", "Reading a Part", r"Apply the file-by-file skips to the part's files as in \"Build the File List\""),
+    ("after rebuilding, the files skipped one by one are taken out and counted by reason", "Reading a Part", r"Then take out the files skipped one by one \(lock files, generated and build output, data and fixture files, binaries; the list in \"Build the File List\"\), count each by reason, and give each lead only what's left"),
+    ("no reader is sent for a skipped file, by you or by a lead", "Reading a Part", r"No reader is sent for a skipped file, by you or by a lead"),
+    ("the area line's count doesn't change, skips and all", "Reading a Part", r"The area line's count doesn't change: it's the definition's count, skips and all"),
     ("a continuing run rebuilds each area it picked", "Reading a Part", r"A continuing run rebuilds each area it picked the same way"),
     ("a different count is read as found, with a Count changed line", "Reading a Part", r"If a count differs from the brief's, read what was found, and say so in Coverage with a `Count changed:` line"),
-    ("a rebuilt area over about 150 or matching nothing is dropped", "Reading a Part", r"A rebuilt area over about 150 files, or one that matches nothing, is dropped"),
-    ("a dropped area isn't read, isn't under Areas read, counts for nothing, isn't back in the block", "Reading a Part", r"it isn't read, isn't under `Areas read:`, counts for nothing in `Files listed:`, and doesn't go back in the block"),
+    ("a rebuilt area is dropped when it matches nothing or its count changed and is now over about 150", "Reading a Part", r"A rebuilt area that matches nothing, or whose count differs from the brief's and is now over about 150 files, is dropped"),
+    ("a rebuilt area whose count matches the brief's is read, whatever its size", "Reading a Part", r"A rebuilt area whose count matches the brief's is read, whatever its size"),
+    ("a dropped area isn't read, isn't under Areas read, counts for nothing, isn't back in the block", "Reading a Part", r"A dropped area isn't read, isn't under `Areas read:`, counts for nothing in `Files listed:`, and doesn't go back in the block"),
     ("a dropped area gets an Area dropped line and nothing replaces it", "Reading a Part", r"Say so in Coverage with an `Area dropped:` line, and pull nothing in to replace it"),
     ("the rest go back in the block in the order given", "Reading a Part", r"The rest of the areas go back in the block, in the order given"),
 
@@ -139,31 +144,35 @@ PINS = [
     ("read the first part's worth, list the rest unread by path", "A Scoped Read Above the Part Size", r"Read the first part's worth, and list the rest unread by path in Coverage"),
     ("the first part's worth is the first 450 paths in byte order", "A Scoped Read Above the Part Size", r"The first part's worth is the first 450 paths of the scoped set in byte order"),
     ("the files-not-read line goes at 1 or 2", "A Scoped Read Above the Part Size", r"`SWEEP IN PARTS: <n> files not read` goes at line 1, or line 2 under `NOT A PER-FILE READ`"),
+    ("the n in the files-not-read line counts every path Coverage lists unread", "A Scoped Read Above the Part Size", r"The `<n>` in that line counts every path Coverage lists unread"),
     ("CONTINUE SWEEP is for full sweeps only", "A Scoped Read Above the Part Size", r"`CONTINUE SWEEP` is for full sweeps only"),
 
     # When a Part Goes Wrong
     ("a refused spawn after the second refusal", "When a Part Goes Wrong", r"A spawn refused mid-part, after the second refusal"),
     ("an area whose lead never started goes back in the block with every later area", "When a Part Goes Wrong", r"an area whose lead never started goes back in the block, with every later area of this part"),
-    ("a lead's return that arrives as a preview isn't cut off", "When a Part Goes Wrong", r"A lead's return that arrives as a preview, with its full text saved to a file, isn't cut off"),
-    ("the saved file is read for the whole return before judging", "When a Part Goes Wrong", r"Read the saved file for the whole return before judging it"),
+    ("a preview of a lead's return is a pointer to Check Before You Compile, not a second statement", "When a Part Goes Wrong", r"A lead's return that arrives as a preview isn't cut off; see \"Check Before You Compile\""),
 
     # Run the Readers
+    ("readers go 10 at a time in one message", "Run the Readers", r"Send readers 10 at a time, in one message, and wait for all of them before sending the next 10"),
+    ("leads go one at a time, pointing to the rule below", "Run the Readers", r"Leads go one at a time, as below"),
     ("a sweep in parts takes its areas from its own section", "Run the Readers", r"A sweep in parts takes its areas from \"A Sweep in Parts\" instead"),
 
     # Check Before You Compile
     ("a cut-off lead return lacks AREA REPORT ENDS", "Check Before You Compile", r"Cut off means its return lacks `AREA REPORT ENDS`"),
+    ("a lead's return that arrives as a preview isn't cut off", "Check Before You Compile", r"A return that arrives as a preview, with its full text saved to a file, isn't cut off"),
+    ("the saved file is read for the whole return before judging", "Check Before You Compile", r"read the saved file for the whole return before judging it"),
     ("a lead that failed twice has its files listed unread by path", "Check Before You Compile", r"If that fails too, list every file in its area by path as unread in Coverage"),
     ("the failed-lead rule wins over the path check in every sweep", "Check Before You Compile", r"This rule wins over the path check above, in every sweep: you send no readers of your own for a failed lead's files"),
     ("quoting: a full sweep, one report or parts", "Check Before You Compile", r"On a full sweep, in one report or in parts, the report holds nothing drawn from the contents of a folder skipped whole or of an untracked file"),
     ("quoting: the whole tree may be searched, hits there are dropped", "Check Before You Compile", r"You may still search the whole tree for your own checks, but a hit in one of those places is dropped: not quoted, not listed in an inventory, not described in a gotcha or the Coupling Map"),
-    ("quoting: Coverage is all the report says of them", "Check Before You Compile", r"Coverage is all the report says of them: a folder skipped whole is counted with its reason, and untracked files are listed by path"),
+    ("quoting: Coverage is all the report says of them", "Check Before You Compile", r"Coverage is all the report says of them: a folder skipped whole is counted with its reason, and untracked files are listed by path \(in a sweep in parts, in part 1 only\)"),
     ("quoting: a hit in an unread area is a reference, not checked", "Check Before You Compile", r"A hit in an area a sweep in parts hasn't read yet is different: list it as a reference, not checked, and don't describe what's there"),
     ("quoting: a scoped read is unchanged", "Check Before You Compile", r"A scoped read searches the whole repo for coupling, as it always did"),
     ("quoting: a lead's checks stay in its area", "Check Before You Compile", r"An area lead's own checks stay inside its area"),
 
     # When You're an Area Lead
     ("a lead applies no part size", "When You're an Area Lead", r"Don't build a list, apply the part size, or split further"),
-    ("the lead's checklist comes first and AREA REPORT ENDS is last", "When You're an Area Lead", r"The checklist comes first, and the last line of your return, after it, is `AREA REPORT ENDS`"),
+    ("the lead's findings come first, then the checklist, then AREA REPORT ENDS", "When You're an Area Lead", r"Your findings come first, under your area's name; the checklist comes after them; the last line of your return, after the checklist, is `AREA REPORT ENDS`"),
 
     # When You Can't Spawn
     ("the only first-line flag, with the parts line under it", "When You Can't Spawn", r"the only one is `NOT A PER-FILE READ`, and a `SWEEP IN PARTS` line goes under it"),
@@ -171,6 +180,7 @@ PINS = [
     ("no Agent on a first run: flagged single-agent read with per-folder counts", "When You Can't Spawn", r"Do the flagged single-agent read, with unread files as counts per folder, and never write a `SWEEP IN PARTS` line"),
     ("no Agent on a continuing run: a flagged read of the first part's worth, block kept", "When You Can't Spawn", r"With no `Agent` on a continuing run, do a flagged read of the first part's worth of the given areas, and still write the block with the rest"),
     ("no Agent on a continuing run: the report's shape", "When You Can't Spawn", r"The report has the flag on line 1, the block from line 2, the `Mode:` line as for any flagged single-agent read, an `Areas read:` list of the areas it read, and the `Files listed:` line as in any part"),
+    ("no Agent on a continuing run: unread files in its areas are listed by path, not as counts per folder", "When You Can't Spawn", r"Unread files inside the areas it took on are listed by path, as in any part, not as counts per folder"),
     ("an unstarted lead goes back in the block, never in Coverage too", "When You Can't Spawn", r"The exception is an area lead that never started in a part: its area goes back in the block \(see \"When a Part Goes Wrong\"\), and the same files never sit both in the block and in Coverage"),
 
     # What to Produce
@@ -185,6 +195,8 @@ PINS = [
     ("every unread file by path, with two exceptions", "8. Coverage", r"Then every file left unread, by path, with two exceptions"),
     ("unread areas are named by their block line, never file by file", "8. Coverage", r"Areas this run never started are named by their one line in the block, never file by file"),
     ("untracked files in a part go under Whole repo in part 1 only", "8. Coverage", r"Untracked files on a full sweep are listed by path, except in a sweep in parts, where they go under the `Whole repo:` line in part 1 only; a later part names none, whatever its orientation shows"),
+    ("notes that belong with the mode line come after Mode and before Files listed, one to a line", "8. Coverage", r"Notes that belong with the mode line \(a failed lead, refused spawns, a request you set aside\) come after the `Mode:` line and before the `Files listed:` line, one to a line"),
+    ("a part of a full sweep has the part lines; a scoped read has none", "8. Coverage", r"In a part of a full sweep, Coverage also has these lines"),
     ("the part lines are plain text with no bullet", "8. Coverage", r"written as plain text with no bullet in front of `Areas read:` or `Areas not read:`"),
     ("Areas read has one line per area the part took on, each starting dash", "8. Coverage", r"`Areas read:` on its own line, then one line per area this part took on, each starting `- ` and in the notation from \"Areas\""),
     ("an area whose lead failed twice is on Areas read and counted unread", "8. Coverage", r"An area whose lead failed twice is on it too: its files are listed unread by path and counted as unread"),
@@ -501,10 +513,16 @@ class PartsPinsTest(unittest.TestCase):
         self.assertNotRegex(" ".join(self.text.split()), r"in a part, this part's areas")
 
     def test_untracked_files_in_a_part_are_not_listed_by_path_in_a_second_way(self):
+        # Untracked files are placed one way in a sweep in parts: by path under `Whole repo:`, in part 1 only. Three places say
+        # "part 1 only" (Coverage twice, the quoting rule once), and the continuing brief says a later part names none anywhere.
         flat = " ".join(self.text.split())
-        # The one place that puts them under Whole repo in part 1 only; no sentence sends them anywhere else in a part.
-        self.assertEqual(len(re.findall(r"part 1 only", flat, flags=re.I)), 2)
+        self.assertEqual(len(re.findall(r"part 1 only", flat, flags=re.I)), 3)
+        by_section = dict((h, len(re.findall(r"part 1 only", b, flags=re.I))) for h, b in self.sections.items())
+        self.assertEqual(dict((h, n) for h, n in by_section.items() if n), {"8. Coverage": 2, "Check Before You Compile": 1})
+        self.assertIn("Name no untracked file anywhere in your report", self.sections["If Your Brief Continues a Sweep"])
         self.assertNotRegex(flat, r"(?i)untracked[^.]{0,80}\bevery part\b")
+        # no sentence sends untracked files into a findings section of a part
+        self.assertNotRegex(flat, r"(?i)untracked[^.]{0,80}(?:Feature Status|Gotchas|Findings)")
 
     def test_the_find_command_appears_once_with_its_default_and_goes_on_environment(self):
         flat = " ".join(self.text.split())
@@ -514,9 +532,129 @@ class PartsPinsTest(unittest.TestCase):
         flat = " ".join(self.text.split())
         self.assertEqual(flat.count("you send no readers of your own for a failed lead's files"), 1)
 
-    def test_the_orphan_template_line_about_preview_is_said_once(self):
+    def test_the_preview_rule_is_said_once_and_only_where_a_one_report_sweep_looks(self):
+        # The rule (a lead's return that arrives as a preview isn't cut off) is stated in "Check Before You Compile", which every sweep
+        # reads; "When a Part Goes Wrong" only points there, so the two can't drift apart.
         flat = " ".join(self.text.split())
-        self.assertEqual(len(re.findall(r"Read the saved file for the whole return before judging it", flat)), 1)
+        self.assertEqual(len(re.findall(r"the saved file for the whole return before judging it", flat, flags=re.I)), 1)
+        self.assertEqual(len(re.findall(r"arrives as a preview", flat)), 2)
+        self.assertEqual(len(re.findall(r"with its full text saved to a file", flat)), 1)
+        self.assertIn("the saved file for the whole return", self.sections["Check Before You Compile"])
+        wrong = self.sections["When a Part Goes Wrong"]
+        self.assertNotIn("saved", wrong)
+        self.assertIn("see \"Check Before You Compile\"", wrong)
+
+    def test_the_preview_rule_sits_beside_the_cut_off_definition(self):
+        body = self.sections["Check Before You Compile"]
+        self.assertEqual(body.index("Cut off means its return lacks `AREA REPORT ENDS`") < body.index("arrives as a preview")
+                         < body.index("If that fails too, list every file"), True)
+
+
+# ---------------------------------------------------------------- fix batch A of the final qa pass: the old inviting sentences are gone
+
+# (item, pattern that must not match the file, the old sentence it is aimed at). Each pattern is shown to catch its old sentence.
+OLD_SENTENCES = [
+    ("1 an untracked-files ban that reads as a rule about Coverage only", r"Don't list untracked files",
+     "Take the areas in the order given and don't re-split them. Don't list untracked files or redo the whole-folder skips."),
+    ("3 a dispatch count with no subject", r"\bSend \d+ at a time",
+     "Send 10 at a time, in one message, and wait for all of them before sending the next 10."),
+    ("4 a rebuilt area dropped on size alone", r"rebuilt area over about 150",
+     "A rebuilt area over about 150 files, or one that matches nothing, is dropped: it isn't read."),
+    ("5 the exactly-once command for every run, not only a first one", r"(?<!On a first run, )[Bb]efore you read anything, run the last command",
+     "Before you read anything, run the last command. If it fails, fix the areas and check again."),
+    ("6 part lines for any part, scoped reads included", r"In a part, Coverage also has these lines",
+     "In a part, Coverage also has these lines, written as plain text with no bullet in front of `Areas read:`."),
+    ("8 two places that claim the line right after Mode", r"(?:on the line right after|in the note after) the `Mode:` line",
+     "name the area in a note on the line right after the `Mode:` line."),
+    ("8 the refusal count claiming the same line", r"(?:on the line right after|in the note after) the `Mode:` line",
+     "and say how many in the note after the `Mode:` line."),
+    ("9 the checklist as the first thing a lead returns", r"The checklist comes first",
+     "The checklist comes first, and the last line of your return, after it, is `AREA REPORT ENDS`."),
+    ("10 the skips applied after the lead sentence", r"Apply the file-by-file skips to the part's files",
+     "Every area in a part gets its own lead. Apply the file-by-file skips to the part's files as in \"Build the File List\"."),
+]
+
+
+def precedes(body, first, second):
+    a, b = re.search(first, body), re.search(second, body)
+    return bool(a and b and a.start() < b.start())
+
+
+class QaFixAOldSentencesTest(unittest.TestCase):
+    """The ten items of qa-fix-A, the negative side: a sentence that invited the old behavior is gone, and the new order holds."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = raw()
+        cls.flat = " ".join(cls.text.split())
+        cls.sections = sections(cls.text)
+
+    def test_each_old_inviting_sentence_is_gone(self):
+        for item, pattern, _old in OLD_SENTENCES:
+            with self.subTest(item=item):
+                m = re.search(pattern, self.flat)
+                self.assertIsNone(m, m.group(0) if m else "")
+
+    def test_each_negative_pattern_catches_the_old_sentence_it_is_aimed_at(self):
+        for item, pattern, old in OLD_SENTENCES:
+            with self.subTest(item=item):
+                self.assertIsNotNone(re.search(pattern, old), "the pattern would not have caught the old text")
+
+    def test_each_negative_pattern_fires_when_the_old_sentence_is_put_back(self):
+        # a mutation of the file's text: append the old sentence to the end and the pattern must see it
+        for item, pattern, old in OLD_SENTENCES:
+            with self.subTest(item=item):
+                self.assertIsNotNone(re.search(pattern, self.flat + " " + old))
+
+    def test_the_exactly_once_command_is_for_a_first_run_only(self):
+        # every mention of running the last command before reading carries "On a first run"
+        found = re.findall(r"(.{0,20})efore you read anything, run the last command", self.flat)
+        self.assertEqual(len(found), 1)
+        self.assertTrue(found[0].endswith("On a first run, b"), found)
+
+    def test_the_continuing_run_has_one_untracked_ban_and_it_is_report_wide(self):
+        body = self.sections["If Your Brief Continues a Sweep"]
+        self.assertEqual(len(re.findall(r"untracked", body)), 1)  # one ban in the section, not a second way of saying it
+        ban = re.search(r"Name no untracked file anywhere in your report[^.]*\.", body)
+        self.assertIsNotNone(ban)
+        self.assertNotIn("Coverage", ban.group(0))
+
+    def test_the_skips_are_taken_out_before_the_lead_is_mentioned(self):
+        body = self.sections["Reading a Part"]
+        skips = r"take out the files skipped one by one"
+        lead = r"Every area in a part gets its own lead"
+        self.assertTrue(precedes(body, skips, lead))
+        self.assertTrue(precedes(body, r"No reader is sent for a skipped file", lead))
+        self.assertFalse(precedes(body, lead, skips))
+
+    def test_the_order_check_fails_when_the_skips_sentence_moves_after_the_lead_sentence(self):
+        body = self.sections["Reading a Part"]
+        skips = re.search(r"Then take out the files skipped one by one.*?skips and all\.", body).group(0)
+        lead = re.search(r"Every area in a part gets its own lead, even a small one, run one at a time as in \"Run the Readers\"\.", body).group(0)
+        swapped = body.replace(skips, "@@").replace(lead, skips).replace("@@", lead)
+        self.assertNotEqual(swapped, body)
+        self.assertFalse(precedes(swapped, r"take out the files skipped one by one", r"Every area in a part gets its own lead"))
+
+    def test_a_lead_returns_findings_then_the_checklist_then_the_last_line(self):
+        body = self.sections["When You're an Area Lead"]
+        order = [body.index(x) for x in ("under your area's name", "Also return a **file checklist**", "Your findings come first", "the checklist comes after them",
+                                         "the last line of your return, after the checklist, is `AREA REPORT ENDS`")]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(len(re.findall(r"is `AREA REPORT ENDS`", body)), 1)
+
+    def test_the_mode_line_note_placement_is_said_once_and_the_two_notes_point_to_it(self):
+        self.assertEqual(len(re.findall(r"come after the `Mode:` line and before the `Files listed:` line", self.flat)), 1)
+        self.assertEqual(len(re.findall(r"a note that goes with the mode line \(see \"8\. Coverage\"\)", self.flat)), 2)
+        self.assertEqual(len(re.findall(r"line right after the `Mode:`", self.flat)), 0)
+
+    def test_the_scoped_read_has_no_part_lines_and_the_part_lines_are_for_a_part_of_a_full_sweep(self):
+        self.assertEqual(len(re.findall(r"Coverage also has these lines", self.flat)), 1)
+        self.assertIn("In a part of a full sweep, Coverage also has these lines", self.sections["8. Coverage"])
+
+    def test_readers_and_leads_have_their_own_dispatch_rules_in_run_the_readers(self):
+        body = self.sections["Run the Readers"]
+        self.assertTrue(precedes(body, r"Send readers 10 at a time", r"Leads go one at a time, as below"))
+        self.assertEqual(len(re.findall(r"Leads go one at a time", body)), 1)  # a pointer, not a second statement of the rule
 
 
 # ---------------------------------------------------------------- a report written from the templates, scored
@@ -631,8 +769,8 @@ class ReportFromTemplatesIsAcceptedByTheScorerTest(unittest.TestCase):
             parts.mkdir()
             for n in (1, 2, 3):
                 text = self.part(n, mutate=mutate)
-                if n == 2:
-                    text = text.replace("A toy repo.", "A toy repo. Route TOKENONE is here.")
+                if n == 1:
+                    text = text.replace("A toy repo.", "A toy repo. Route TOKENONE is here.", 1)
                 (parts / ("part-%d.md" % n)).write_text(text, encoding="utf-8")
             done = subprocess.run([sys.executable, "-I", str(SCORER), "--key", str(base / "key.json"), "--repo", str(base / "repo"), "--parts", str(parts)],
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=60)

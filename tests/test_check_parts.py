@@ -159,6 +159,12 @@ def build_parts(areas, cuts=BASE_CUTS, reads=None, blocks=None, instructions=INS
         blocks = [areas[bounds[i + 1]:] for i in range(len(bounds) - 1)]
     key = Fixture.key
     tokens = [f["token"] for f in key["facts"]]
+    # a correct run writes a fact where the part that read its file says it; a fact whose file no part reads is spread round-robin
+    home = {}
+    for i, read in enumerate(reads):
+        for a in read:
+            for path in a.files:
+                home.setdefault(path, i)
     parts = {}
     for i, (read, block) in enumerate(zip(reads, blocks)):
         n = len(block)
@@ -171,8 +177,8 @@ def build_parts(areas, cuts=BASE_CUTS, reads=None, blocks=None, instructions=INS
             lines += [a.line() for a in block]
             lines += ["END OF BLOCK"]
         lines += ["", "# Investigation report (part %d)" % (i + 1), "", "## Findings"]
-        lines += ["- %s found while reading." % t for j, t in enumerate(tokens) if j % len(reads) == i]
-        lines += ["", "## Coverage",
+        lines += ["- %s found while reading." % t for j, t in enumerate(tokens) if home.get(key["facts"][j]["path"], j % len(reads)) == i]
+        lines += ["", "## 8. Coverage",
                   "Mode: full sweep, %d area leads" % len(read),
                   "Files listed: %d; read: %d; skipped: %d; re-dispatched: 0; failed: 0; unread: 0" % (listed, listed - skipped, skipped),
                   "Skip reasons: %d by rule." % skipped]
@@ -1552,14 +1558,24 @@ class FactsTest(Base):
                 self.assertEqual(code, 1, out)
                 self.assertRegex(out, r"facts: %s \(" % fact["id"])
 
-    def test_a_fact_found_in_a_later_part_only_counts(self):
-        # move every fact into part 3: still proved
+    def test_a_fact_found_in_a_later_part_only_is_a_failure(self):
+        # move every fact into part 3: the facts whose files parts 1 and 2 read no longer count
         parts = dict(self.parts)
         facts = "\n".join("- %s" % f["token"] for f in self.key["facts"])
         for name in ("part-1.md", "part-2.md"):
             for f in self.key["facts"]:
                 parts[name] = parts[name].replace(f["token"], "REDACTED")
         parts["part-3.md"] = parts["part-3.md"].replace("## Findings\n", "## Findings\n" + facts + "\n")
+        out = self.assertFails(parts, r"facts: f01 \(gotcha, in api/accounts/account\.py\) was not found in part-1\.md, the part that read the file; only part-3\.md held it")
+        self.assertEqual(len([l for l in out.splitlines() if l.startswith("facts:")]), len([f for f in self.key["facts"] if f["path"] not in
+                                                                                         [x for a in base_areas()[13:] for x in a.files]]))
+
+    def test_a_fact_found_in_its_own_part_and_mentioned_in_another_part_passes(self):
+        fact = self.key["facts"][0]
+        self.assertEqual(self.holder(fact["token"]), ["part-1.md"])
+        parts = edit(self.parts, "part-3.md", "## Findings\n", "## Findings\n- also seen in passing: %s\n" % fact["token"])
+        parts = edit(parts, "part-2.md", "## Findings\n", "## Findings\n- %s\n" % fact["token"])
+        self.assertEqual(self.holder(fact["token"]), ["part-1.md"])  # setUp's parts are not touched
         self.assertProved(parts)
 
     def test_a_fact_inside_a_longer_word_is_not_found(self):
@@ -1935,28 +1951,38 @@ class PartSizeBoundaryTest(PartSizeBase):
         self.assertEqual(code, 1, out)
         self.assertEqual(len(self.size_lines(out)), 3, out)
 
-    def test_part_size_1_passes_a_split_of_single_area_parts(self):
+    def test_part_size_1_fails_a_split_of_single_area_parts(self):
+        # the one-area exemption is gone: every one of the 17 parts holds a single area, and each is over 1
         parts = build_parts(base_areas(), cuts=tuple(range(1, 17)))
         code, out = self.sized(1, parts)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out.splitlines()[0], "LOOP FAILED")
+        self.assertEqual(len(self.size_lines(out)), 17, out)
+        self.assertIn("part size: part-1.md holds 6 files in 1 areas, over the part size of 1", out)
+
+    def test_a_split_of_single_area_parts_passes_when_the_part_size_holds_the_largest_area(self):
+        parts = build_parts(base_areas(), cuts=tuple(range(1, 17)))
+        code, out = self.sized(122, parts)
         self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
         self.assertIn("largest part: 122 files", out)
 
 
 class PartSizeOneAreaTest(PartSizeBase):
-    def test_a_part_of_exactly_one_area_over_the_part_size_passes(self):
-        # four parts hold one 122-file area each, over 121; the others are 90, 80, 76 and 94
-        code, out = self.sized(121, build_parts(base_areas(), cuts=SMALL_PARTS))
-        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
-        self.assertEqual(self.size_lines(out), [])
+    def test_a_part_of_exactly_one_area_over_the_part_size_fails(self):
+        # five parts hold one 122-file area each, over 121; the others are 90, 80, 76 and 94 and stay quiet
+        out = self.assertFails(build_parts(base_areas(), cuts=SMALL_PARTS), extra=["--part-size", "121"])
+        lines = self.size_lines(out)
+        self.assertEqual(len(lines), 5, out)
+        self.assertTrue(all(re.match(r"^part size: part-[4-8]\.md holds 122 files in 1 areas, over the part size of 121$", l) for l in lines), lines)
 
     def test_a_part_of_two_areas_over_the_part_size_fails_even_if_each_area_alone_fits(self):
-        # r1 and r2 together: 244 files in 2 areas, over 121
+        # r1 and r2 together: 244 files in 2 areas, over 121; the three single-area parts after it are over 121 too
         cuts = (4, 6, 9, 11, 12, 13, 14)
         out = self.assertFails(build_parts(base_areas(), cuts=cuts), r"^part size: part-4\.md holds 244 files in 2 areas, over the part size of 121",
                                extra=["--part-size", "121"])
-        self.assertEqual(len(self.size_lines(out)), 1, out)
+        self.assertEqual(len(self.size_lines(out)), 4, out)
 
-    def test_the_one_area_exemption_leaves_the_other_checks_running(self):
+    def test_the_size_check_runs_alongside_the_other_checks(self):
         parts = edit(build_parts(base_areas(), cuts=SMALL_PARTS), "part-1.md", "Mode: full sweep, 4 area leads", "Mode: full sweep, 9 area leads")
         self.assertFails(parts, r"part-1\.md: Mode says 9", extra=["--part-size", "121"])
 
@@ -2061,7 +2087,7 @@ class PartSizeNoteTest(PartSizeBase):
 
 
 class PartSizeOutputTest(PartSizeBase):
-    OLD_SUMMARY = "parts: 3; areas: 17; files covered: 950 of 950; facts found: 33 of 33; decoys found: 0 of %d"
+    OLD_SUMMARY = "parts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d"
 
     def old_summary(self):
         return self.OLD_SUMMARY % len(Fixture.key["decoys"])
@@ -2221,7 +2247,7 @@ class PartSizeUnparsedAreaTest(PartSizeBase):
 class PartSizeMutationTest(PartSizeBase):
     """Each new check has to be shown to fail: a temp copy of the script with one piece broken must be caught by a test."""
 
-    SIZE_IF = "if sum(counts) > args.part_size and len(counts) > 1:"
+    SIZE_IF = "if sum(counts) > args.part_size:"
     FIT_IF = "if sum(counts) + nxt[0] <= args.part_size:"
 
     @classmethod
@@ -2263,10 +2289,11 @@ class PartSizeMutationTest(PartSizeBase):
         self.assertEqual(mutated[0], 0)  # the mutant proves a part of 368 under 367: the boundary tests above catch it
 
     def test_dropping_the_one_area_exemption_is_caught(self):
-        m = self.mutant("noexempt", " and len(counts) > 1:", ":")
+        # the mutant puts the exemption back: a part of one area over the part size passes again
+        m = self.mutant("exempt", self.SIZE_IF, "if sum(counts) > args.part_size and len(counts) > 1:")
         real, mutated = self.both(m, build_parts(base_areas(), cuts=SMALL_PARTS), ["--part-size", "121"])
-        self.assertEqual(real[0], 0)
-        self.assertEqual(mutated[0], 1)
+        self.assertEqual(real[0], 1)
+        self.assertEqual(mutated[0], 0)
 
     def test_making_the_note_a_failure_is_caught(self):
         m = self.mutant("notefail", "notes.append(", "fails.append(")
@@ -2310,6 +2337,1295 @@ class PartSizeMutationTest(PartSizeBase):
         m = self.mutant("sizeless", "if args.part_size is not None:", "if True:")
         code, out, err = run_script_at(m, build_parts(base_areas()), [])
         self.assertNotEqual(out, run_script_at(SCRIPT, build_parts(base_areas()), [])[1])
+
+
+# ---------------------------------------------------------------- fix batch B of the final qa pass: the scorer proves reading
+
+LISTED_RE = re.compile(r"Files listed: (\d+); read: (\d+); skipped: (\d+); re-dispatched: (\d+); failed: (\d+); unread: (\d+)")
+
+
+def listed_of(text):
+    """(listed, read, skipped, redispatched, failed, unread) of the part text's Files listed line."""
+    return tuple(int(x) for x in LISTED_RE.search(text).groups())
+
+
+def set_listed(parts, name, **changes):
+    """The part with its Files listed line's numbers changed (listed, read, skipped, redisp, failed, unread by keyword)."""
+    keys = ("listed", "read", "skipped", "redisp", "failed", "unread")
+    old = dict(zip(keys, listed_of(parts[name])))
+    old.update(changes)
+    line = "Files listed: %(listed)d; read: %(read)d; skipped: %(skipped)d; re-dispatched: %(redisp)d; failed: %(failed)d; unread: %(unread)d" % old
+    out = dict(parts)
+    out[name] = LISTED_RE.sub(line, parts[name], count=1)
+    return out
+
+
+def coverage_of(text):
+    """The Coverage section's lines (between the 8. Coverage heading and the last line)."""
+    return text.split("## 8. Coverage\n", 1)[1].split("\n\nINVESTIGATE REPORT ENDS", 1)[0]
+
+
+def with_coverage(text, new_coverage):
+    head, rest = text.split("## 8. Coverage\n", 1)
+    return head + "## 8. Coverage\n" + new_coverage + "\n\nINVESTIGATE REPORT ENDS" + rest.split("\n\nINVESTIGATE REPORT ENDS", 1)[1]
+
+
+def with_lookalike(text, lookalike):
+    """The part with lookalike lines put in its Findings, before the Coverage section."""
+    return text.replace("## Findings\n", "## Findings\n" + lookalike + "\nThat is the end of that copy.\n", 1)
+
+
+class MutantBase(Base):
+    """A temp copy of the script with one piece broken must be caught by a test: each new check is shown able to fail."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = SCRIPT.read_text(encoding="utf-8")
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.count = 0
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def mutant(self, old, new):
+        self.assertEqual(self.src.count(old), 1, "the script no longer has %r once; update this mutation" % old)
+        type(self).count += 1
+        path = Path(self.tmp.name) / ("m%d.py" % type(self).count)
+        path.write_text(self.src.replace(old, new), encoding="utf-8")
+        return path
+
+    def both(self, mutant, parts, extra=()):
+        """((code, out) of the script, (code, out) of the mutant) on the same parts."""
+        real = run_script(parts, extra=list(extra))
+        code, out, err = run_script_at(mutant, parts, list(extra))
+        return real, (code, out + err)
+
+    def assertCaught(self, mutant, parts, line_pattern, extra=()):
+        """The script prints a failure line matching line_pattern; the mutant doesn't."""
+        real, mutated = self.both(mutant, parts, extra)
+        self.assertEqual(real[0], 1, real[1])
+        self.assertTrue(any(re.search(line_pattern, l) for l in real[1].splitlines()), real[1])
+        self.assertFalse(any(re.search(line_pattern, l) for l in mutated[1].splitlines()), "the mutant still prints the line:\n" + mutated[1])
+        return real, mutated
+
+
+# ---- totals: the read numbers across the parts
+
+class TotalsTest(Base):
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.l1, self.l2, self.l3 = (listed_of(self.parts["part-%d.md" % n]) for n in (1, 2, 3))
+
+    def test_the_base_split_adds_up_to_945_read_and_5_skipped(self):
+        # guards this file's own generator
+        self.assertEqual(sum(l[1] for l in (self.l1, self.l2, self.l3)), 945)
+        self.assertEqual(sum(l[2] for l in (self.l1, self.l2, self.l3)), 5)
+
+    def test_a_proved_run_says_read_945_of_945_in_its_summary(self):
+        code, out = run_script(self.parts)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out, "LOOP PROVED\nparts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d\n"
+                         % len(Fixture.key["decoys"]))
+
+    def test_unread_above_zero_in_a_part_fails_naming_the_part_and_the_number(self):
+        parts = set_listed(self.parts, "part-3.md", read=self.l3[1] - 62, unread=62)
+        out = self.assertFails(parts, r"^read: part-3\.md says unread: 62, expected 0$")
+        self.assertNotIn("failed:", "\n".join(l for l in out.splitlines() if l.startswith("read:")))
+
+    def test_failed_above_zero_in_a_part_fails_naming_the_part_and_the_number(self):
+        parts = set_listed(self.parts, "part-3.md", read=self.l3[1] - 62, failed=62)
+        out = self.assertFails(parts, r"^read: part-3\.md says failed: 62, expected 0$")
+        self.assertNotIn("unread:", "\n".join(l for l in out.splitlines() if l.startswith("read:")))
+
+    def test_unread_or_failed_of_one_is_enough_in_any_part(self):
+        for n in (1, 2, 3):
+            for field, word in (("unread", "unread"), ("failed", "failed")):
+                with self.subTest(part=n, field=field):
+                    name = "part-%d.md" % n
+                    l = listed_of(self.parts[name])
+                    parts = set_listed(self.parts, name, read=l[1] - 1, **{field: 1})
+                    self.assertFails(parts, r"^read: part-%d\.md says %s: 1, expected 0$" % (n, word))
+
+    def test_skipped_numbers_that_add_up_wrongly_fail_with_the_total_found_against_the_expected(self):
+        # part 2 says read 66, skipped 300: the arithmetic of its own line adds up, the totals don't
+        parts = set_listed(self.parts, "part-2.md", read=66, skipped=300)
+        skipped = self.l1[2] + 300 + self.l3[2]
+        read = self.l1[1] + 66 + self.l3[1]
+        out = self.assertFails(parts, r"^read: the skipped numbers add up to %d, expected 5 \(the key's file_skips\)$" % skipped,
+                               r"^read: the read numbers add up to %d, expected 945 \(950 files after the whole-folder skips, less 5 skipped\)$" % read)
+        self.assertNotIn("says unread", out)
+        self.assertNotIn("says failed", out)
+
+    def test_a_split_that_skips_nothing_reads_950_and_fails_both_totals(self):
+        parts = dict(self.parts)
+        for n in (1, 2, 3):
+            name = "part-%d.md" % n
+            l = listed_of(parts[name])
+            parts = set_listed(parts, name, read=l[0], skipped=0)
+        self.assertFails(parts, r"^read: the skipped numbers add up to 0, expected 5 ", r"^read: the read numbers add up to 950, expected 945 ")
+
+    def test_one_skip_too_many_fails(self):
+        l = self.l3
+        parts = set_listed(self.parts, "part-3.md", read=l[1] - 1, skipped=l[2] + 1)
+        self.assertFails(parts, r"^read: the skipped numbers add up to 6, expected 5 ", r"^read: the read numbers add up to 944, expected 945 ")
+
+    def test_the_arithmetic_of_each_line_is_still_checked_by_the_old_identity(self):
+        parts = set_listed(self.parts, "part-3.md", read=self.l3[1] - 1)
+        self.assertFails(parts, r"part-3\.md: Files listed %d should equal read\+skipped\+failed\+unread" % self.l3[0])
+
+    def test_totals_wait_for_a_part_whose_line_cant_be_read(self):
+        # a part with no Files listed line gets its own failure; the totals aren't judged on a missing part
+        parts = edit(self.parts, "part-2.md", "Files listed:", "Files seen:")
+        out = self.assertFails(parts, r"part-2\.md: no line 'Files listed: ")
+        self.assertNotIn("the read numbers add up", out)
+        self.assertNotIn("the skipped numbers add up", out)
+
+
+class TotalsMutationTest(MutantBase):
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.l3 = listed_of(self.parts["part-3.md"])
+
+    def test_dropping_the_unread_check_is_caught(self):
+        parts = set_listed(self.parts, "part-3.md", read=self.l3[1] - 62, unread=62)
+        self.assertCaught(self.mutant("        if unread != 0:\n", "        if False:\n"), parts, r"^read: part-3\.md says unread: 62")
+
+    def test_dropping_the_failed_check_is_caught(self):
+        parts = set_listed(self.parts, "part-3.md", read=self.l3[1] - 62, failed=62)
+        self.assertCaught(self.mutant("        if failed != 0:\n", "        if False:\n"), parts, r"^read: part-3\.md says failed: 62")
+
+    def test_dropping_the_skipped_total_is_caught(self):
+        parts = set_listed(self.parts, "part-2.md", read=66, skipped=300)
+        self.assertCaught(self.mutant("if skipped_got != skips_expected:", "if False:"), parts, r"^read: the skipped numbers add up")
+
+    def test_dropping_the_read_total_is_caught(self):
+        parts = set_listed(self.parts, "part-2.md", read=66, skipped=300)
+        self.assertCaught(self.mutant("if read_got != read_expected:", "if False:"), parts, r"^read: the read numbers add up")
+
+    def test_a_summary_that_says_something_else_in_place_of_the_read_figures_is_caught_by_the_exact_summary(self):
+        m = self.mutant("; read: %d of %d; facts found", "; reads: %d of %d; facts found")
+        code, out, err = run_script_at(m, self.parts)
+        self.assertEqual(code, 0, out + err)
+        self.assertNotIn("; read: 945 of 945;", out)
+        self.assertIn("; read: 945 of 945;", run_script(self.parts)[1])
+
+
+# ---- a fact is found in the part that read its file
+
+class FactInReadingPartTest(Base):
+    F01 = "ticket 6005"
+
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.key = Fixture.key
+
+    def without_f01(self):
+        return edit(self.parts, "part-1.md", "- %s found while reading.\n" % self.F01, "")
+
+    def fact_lines(self, out):
+        return [l for l in out.splitlines() if l.startswith("facts:")]
+
+    def test_a_fact_found_only_in_another_parts_cross_reference_fails(self):
+        parts = edit(self.without_f01(), "part-2.md", "## Findings\n",
+                     "## Findings\n- Reference, not checked: %s in an area not yet read\n" % self.F01)
+        out = self.assertFails(parts, r"^facts: f01 \(gotcha, in api/accounts/account\.py\) was not found in part-1\.md, the part that read the file; "
+                                      r"only part-2\.md held it: expected 'ticket 6005'$")
+        self.assertEqual(len(self.fact_lines(out)), 1, out)
+
+    def test_a_fact_found_only_inside_a_quote_in_another_part_fails(self):
+        parts = edit(self.without_f01(), "part-3.md", "## Findings\n", "## Findings\n> an earlier part wrote: \"%s\" (quoted)\n" % self.F01)
+        out = self.assertFails(parts, r"^facts: f01 .* was not found in part-1\.md, the part that read the file; only part-3\.md held it: expected 'ticket 6005'$")
+        self.assertEqual(len(self.fact_lines(out)), 1, out)
+
+    def test_the_line_names_every_part_that_held_the_token(self):
+        parts = edit(self.without_f01(), "part-2.md", "## Findings\n", "## Findings\n- see %s\n" % self.F01)
+        parts = edit(parts, "part-3.md", "## Findings\n", "## Findings\n- quoted: \"%s\"\n" % self.F01)
+        self.assertFails(parts, r"^facts: f01 .* the part that read the file; only part-2\.md, part-3\.md held it: expected ")
+
+    def test_the_line_names_the_part_that_read_the_file_for_a_fact_read_in_part_2_or_3(self):
+        fact = next(f for f in self.key["facts"] if f["path"].startswith("rules/") and f["path"] in base_areas()[11].files)  # rules-3 is read in part 2
+        parts = edit(self.parts, "part-2.md", "- %s found while reading.\n" % fact["token"], "")
+        parts = edit(parts, "part-1.md", "## Findings\n", "## Findings\n- %s\n" % fact["token"])
+        self.assertFails(parts, r"^facts: %s .* was not found in part-2\.md, the part that read the file; only part-1\.md held it" % fact["id"])
+
+    def test_the_same_found_rule_applies_in_the_reading_part(self):
+        # the token glued to letters in the reading part is not found there, and a clean mention elsewhere doesn't save it
+        parts = edit(self.parts, "part-1.md", "- %s found" % self.F01, "- X%sX found" % self.F01)
+        parts = edit(parts, "part-3.md", "## Findings\n", "## Findings\n- %s\n" % self.F01)
+        self.assertFails(parts, r"^facts: f01 .* was not found in part-1\.md, the part that read the file; only part-3\.md held it")
+
+    def test_case_and_spacing_differences_are_found_in_the_reading_part(self):
+        self.assertProved(edit(self.parts, "part-1.md", "- ticket 6005 found", "- TICKET\t6005 found"))
+
+    def test_a_fact_in_no_part_keeps_its_old_line_and_not_the_new_one(self):
+        parts = dict((k, v.replace(self.F01, "REDACTED")) for k, v in self.parts.items())
+        out = self.assertFails(parts, r"^facts: f01 \(gotcha, in api/accounts/account\.py\) was not found in any part: expected 'ticket 6005'$")
+        self.assertNotIn("the part that read the file", out)
+
+    def test_a_fact_whose_file_no_part_reads_is_not_judged_by_where_it_sits(self):
+        # api-accounts is read nowhere: exactly-once fails for its files, and a fact in it isn't also a facts failure
+        areas = base_areas()
+        reads = [areas[0:2] + areas[3:10], areas[10:13], areas[13:]]
+        blocks = [areas[10:], areas[13:], []]
+        parts = build_parts(areas, reads=reads, blocks=blocks)
+        out = self.assertFails(parts, r"^exactly once: ")
+        self.assertEqual(self.fact_lines(out), [], out)
+        redacted = dict((k, v.replace(self.F01, "REDACTED")) for k, v in parts.items())
+        out = self.assertFails(redacted, r"^facts: f01 .* was not found in any part")
+        self.assertNotIn("the part that read the file", out)
+
+    def test_a_fact_in_its_own_part_and_quoted_in_others_passes(self):
+        parts = edit(self.parts, "part-2.md", "## Findings\n", "## Findings\n> \"%s\"\n" % self.F01)
+        self.assertProved(edit(parts, "part-3.md", "## Findings\n", "## Findings\n- Reference, not checked: %s\n" % self.F01))
+
+    def test_every_fact_moved_to_the_wrong_part_fails_with_its_own_line(self):
+        parts = dict(self.parts)
+        # move each fact to the next part (part 3's go to part 1)
+        for f in self.key["facts"]:
+            holder = next(n for n, t in parts.items() if "- %s found while reading." % f["token"] in t)
+            target = "part-%d.md" % (int(holder[5]) % 3 + 1)
+            parts[holder] = parts[holder].replace("- %s found while reading.\n" % f["token"], "", 1)
+            parts[target] = parts[target].replace("## Findings\n", "## Findings\n- %s moved\n" % f["token"], 1)
+        code, out = run_script(parts)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(len(self.fact_lines(out)), 33, out)
+        self.assertTrue(all("the part that read the file" in l for l in self.fact_lines(out)))
+
+
+class FactInReadingPartMutationTest(MutantBase):
+    def test_judging_a_fact_by_every_part_again_is_caught(self):
+        parts = build_parts(base_areas())
+        parts = edit(parts, "part-1.md", "- ticket 6005 found while reading.\n", "")
+        parts = edit(parts, "part-2.md", "## Findings\n", "## Findings\n- Reference, not checked: ticket 6005\n")
+        m = self.mutant('elif reader is not None and not token_found(f["token"], reader["text"]):', "elif False:")
+        real, mutated = self.assertCaught(m, parts, r"^facts: f01 .* the part that read the file")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_looking_the_token_up_in_every_part_instead_of_the_readers_is_caught(self):
+        parts = build_parts(base_areas())
+        m = self.mutant('not token_found(f["token"], reader["text"])', 'not token_found(f["token"], alltext)')
+        parts = edit(parts, "part-1.md", "- ticket 6005 found while reading.\n", "")
+        parts = edit(parts, "part-3.md", "## Findings\n", "## Findings\n- quoted \"ticket 6005\"\n")
+        real, mutated = self.both(m, parts)
+        self.assertEqual(real[0], 1)
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+
+# ---- area size
+
+def rules_areas(sizes):
+    """The base areas with the five rules ranges replaced by ranges of these sizes (they must add up to 610)."""
+    rules = select("rules/")
+    assert sum(sizes) == len(rules) == 610
+    areas = base_areas()
+    out, at = [], 0
+    for i, size in enumerate(sizes):
+        out.append(rules_range("rules-%d" % (i + 1), rules[at], rules[at + size - 1], direct=bool(i != 1)))
+        at += size
+    return areas[:9] + out + areas[14:]
+
+
+class AreaSizeTest(Base):
+    def test_an_area_of_165_files_passes(self):
+        areas = rules_areas((165, 165, 165, 115))
+        self.assertEqual([a.count for a in areas[9:13]], [165, 165, 165, 115])
+        self.assertProved(build_parts(areas))
+
+    def test_an_area_of_166_files_fails_naming_the_part_the_area_and_its_count(self):
+        areas = rules_areas((166, 164, 165, 115))
+        out = self.assertFails(build_parts(areas), r"^area size: part-1\.md: area 'rules-1' rebuilds to 166 files, over the area size of 165$")
+        self.assertEqual(len([l for l in out.splitlines() if l.startswith("area size:")]), 1, out)
+
+    def test_every_area_over_the_limit_is_reported(self):
+        out = self.assertFails(build_parts(rules_areas((200, 200, 200, 10))), r"area 'rules-1' rebuilds to 200 files", r"area 'rules-2' rebuilds to 200 files",
+                               r"area 'rules-3' rebuilds to 200 files")
+        self.assertEqual(len([l for l in out.splitlines() if l.startswith("area size:")]), 3, out)
+
+    def test_the_limit_holds_for_an_area_in_a_later_part_and_names_that_part(self):
+        areas = rules_areas((20, 400, 100, 90))   # rules-2 is read in part 2
+        self.assertFails(build_parts(areas), r"^area size: part-2\.md: area 'rules-2' rebuilds to 400 files, over the area size of 165$")
+
+    def test_one_area_of_366_files_fails_even_with_a_part_size_of_450(self):
+        rules = select("rules/")
+        areas = base_areas()[:9] + [rules_range("rules-1", rules[0], rules[365]), rules_range("rules-2", rules[366], rules[-1])] + base_areas()[14:]
+        out = self.assertFails(build_parts(areas, cuts=(9, 10)), r"^area size: part-2\.md: area 'rules-1' rebuilds to 366 files",
+                               extra=["--part-size", "450"])
+        self.assertNotIn("part size:", out)  # the part holds only that area, 366, under 450: only the area size sees it
+
+    def test_one_area_of_488_files_in_a_part_fails_both_checks(self):
+        files = select("rules/")
+        big = rules_range("rules-1", files[0], files[487])
+        rest = rules_range("rules-2", files[488], files[-1])
+        areas = base_areas()[:9] + [big, rest] + base_areas()[14:]
+        out = self.assertFails(build_parts(areas, cuts=(9, 10)), r"^area size: part-2\.md: area 'rules-1' rebuilds to 488 files",
+                               r"^part size: part-2\.md holds 488 files in 1 areas, over the part size of 450", extra=["--part-size", "450"])
+        self.assertEqual(len([l for l in out.splitlines() if l.startswith("area size:")]), 1, out)
+
+    def test_the_area_size_check_runs_without_a_part_size(self):
+        self.assertFails(build_parts(rules_areas((166, 164, 165, 115))), r"^area size: ")
+
+
+class AreaSizeMutationTest(MutantBase):
+    def test_dropping_the_area_size_check_is_caught(self):
+        m = self.mutant("            if count > AREA_MAX:\n", "            if False:\n")
+        self.assertCaught(m, build_parts(rules_areas((166, 164, 165, 115))), r"^area size: ")
+
+    def test_an_area_limit_one_too_high_is_caught(self):
+        m = self.mutant("AREA_MAX = 165\n", "AREA_MAX = 166\n")
+        self.assertCaught(m, build_parts(rules_areas((166, 164, 165, 115))), r"^area size: ")
+
+    def test_an_area_limit_one_too_low_is_caught(self):
+        m = self.mutant("AREA_MAX = 165\n", "AREA_MAX = 164\n")
+        real, mutated = self.both(m, build_parts(rules_areas((165, 165, 165, 115))))
+        self.assertEqual(real[0], 0, real[1])
+        self.assertEqual(mutated[0], 1, mutated[1])
+
+    def test_a_greater_or_equal_comparison_is_caught(self):
+        m = self.mutant("if count > AREA_MAX:", "if count >= AREA_MAX:")
+        real, mutated = self.both(m, build_parts(rules_areas((165, 165, 165, 115))))
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+
+    def test_bringing_the_one_area_exemption_back_is_caught(self):
+        m = self.mutant("            if sum(counts) > args.part_size:", "            if sum(counts) > args.part_size and len(counts) > 1:")
+        parts = build_parts(base_areas(), cuts=SMALL_PARTS)
+        real, mutated = self.both(m, parts, extra=["--part-size", "121"])
+        self.assertEqual((real[0], mutated[0]), (1, 0), mutated[1])
+
+
+# ---- Coverage lines are read from Coverage
+
+class CoverageHeadingTest(Base):
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.cov = coverage_of(self.parts["part-1.md"])
+
+    def broken(self, name, old, new):
+        """part-1 with the correct lines also put in its Findings, and one Coverage line wrong (a look-alike earlier)."""
+        text = self.parts[name]
+        cov = coverage_of(text)
+        self.assertIn(old, cov, "test setup")
+        parts = dict(self.parts)
+        parts[name] = with_lookalike(with_coverage(text, cov.replace(old, new, 1)), cov)
+        return parts
+
+    def test_the_base_part_has_the_numbered_heading(self):
+        self.assertIn("\n## 8. Coverage\n", self.parts["part-1.md"])
+
+    def test_a_wrong_mode_in_coverage_with_a_correct_one_earlier_fails(self):
+        self.assertFails(self.broken("part-1.md", "Mode: full sweep, 10 area leads", "Mode: full sweep, 9 area leads"),
+                         r"^part-1\.md: Mode says 9 area leads, 'Areas read:' lists 10 areas$")
+
+    def test_a_wrong_files_listed_in_coverage_with_a_correct_one_earlier_fails(self):
+        l = listed_of(self.parts["part-1.md"])
+        wrong = "Files listed: %d; read: %d" % (l[0] + 1, l[1])
+        self.assertFails(self.broken("part-1.md", "Files listed: %d; read: %d" % (l[0], l[1]), wrong),
+                         r"^part-1\.md: Files listed %d should equal read\+skipped\+failed\+unread" % (l[0] + 1))
+
+    def test_a_wrong_areas_read_list_in_coverage_with_a_correct_one_earlier_fails(self):
+        last = base_areas()[9].line()
+        out = self.assertFails(self.broken("part-1.md", "\n" + last, ""), r"^part-1\.md: Mode says 10 area leads, 'Areas read:' lists 9 areas$")
+        self.assertIn("Files listed", out)  # the sum of the area counts is off too
+
+    def test_a_wrong_areas_not_read_in_coverage_with_a_correct_one_earlier_fails(self):
+        self.assertFails(self.broken("part-1.md", "Areas not read: 7 areas,", "Areas not read: 6 areas,"),
+                         r"^part-1\.md: Coverage says 6 areas, \d+ files not read; the block holds 7 areas")
+
+    def test_a_wrong_whole_repo_in_coverage_with_a_correct_one_earlier_fails(self):
+        self.assertFails(self.broken("part-1.md", "Whole repo: 990 tracked files", "Whole repo: 989 tracked files"),
+                         r"^part-1\.md: Whole repo expected 990 tracked, 40 skipped whole, 3 untracked; found 989, 40, 3$")
+
+    def test_a_wrong_whole_repo_line_in_a_later_part_with_a_correct_one_earlier_fails(self):
+        self.assertFails(self.broken("part-2.md", WHOLE_LATER, "Whole repo: 990 tracked files."), r"^part-2\.md: expected 'Whole repo: given in part 1\.'")
+
+    def test_a_correct_line_in_coverage_with_a_wrong_look_alike_earlier_passes(self):
+        parts = dict(self.parts)
+        for name in parts:
+            cov = coverage_of(parts[name])
+            wrong = (cov.replace("Mode: full sweep,", "Mode: full sweep, 99 x,").replace("Files listed: ", "Files listed: 9", 1)
+                     .replace("Areas read:\n", "Areas read:\n- bogus: nothing (1 files)\n"))
+            wrong = wrong.replace("Mode: full sweep, 99 x,", "Mode: full sweep, 99")
+            parts[name] = with_lookalike(parts[name], wrong)
+        self.assertProved(parts)
+
+    def test_a_look_alike_before_the_report_with_a_correct_coverage_passes_for_each_line(self):
+        for old, new in (("Mode: full sweep, 10 area leads", "Mode: full sweep, 9 area leads"), ("Whole repo: 990 tracked", "Whole repo: 12 tracked"),
+                         ("Areas not read: 7 areas", "Areas not read: 1 areas")):
+            with self.subTest(old=old):
+                text = self.parts["part-1.md"]
+                look = self.cov.replace(old, new, 1)
+                self.assertNotEqual(look, self.cov)
+                parts = dict(self.parts)
+                parts["part-1.md"] = with_lookalike(text, look)
+                self.assertProved(parts)
+
+    def test_the_last_heading_wins_when_a_report_has_two(self):
+        text = self.parts["part-1.md"]
+        wrong = self.cov.replace("Mode: full sweep, 10 area leads", "Mode: full sweep, 9 area leads")
+        # an earlier "8. Coverage" heading with a wrong Mode, then the real one: passes; the other way round fails
+        early = text.replace("## Findings\n", "## Findings\n### 8. Coverage (a draft)\n" + wrong + "\n", 1)
+        parts = dict(self.parts)
+        parts["part-1.md"] = early
+        self.assertProved(parts)
+        late = with_coverage(text, wrong)
+        parts["part-1.md"] = late
+        self.assertFails(parts, r"^part-1\.md: Mode says 9 area leads")
+
+    def test_a_report_with_no_8_coverage_heading_gets_its_one_failure_line(self):
+        parts = edit(self.parts, "part-2.md", "## 8. Coverage", "## Coverage")
+        out = self.assertFails(parts, r"^part-2\.md: no '8\. Coverage' heading line \(a line starting with # that holds it\), "
+                                      r"so the Coverage lines are looked up from the end of the block$")
+        self.assertEqual(len(out.splitlines()), 2, out)  # LOOP FAILED and that one line
+
+    def test_every_part_without_the_heading_gets_its_own_line(self):
+        out = self.assertFails(edit_all(self.parts, lambda t: t.replace("## 8. Coverage", "## Coverage")), r"part-1\.md: no '8\. Coverage' heading",
+                               r"part-2\.md: no '8\. Coverage' heading", r"part-3\.md: no '8\. Coverage' heading")
+        self.assertEqual(len(out.splitlines()), 4, out)
+
+    def test_a_line_that_only_mentions_8_coverage_is_not_a_heading(self):
+        parts = edit(self.parts, "part-2.md", "## 8. Coverage", "## Coverage\nSee 8. Coverage below.")
+        self.assertFails(parts, r"^part-2\.md: no '8\. Coverage' heading")
+
+    def test_a_heading_with_other_words_around_8_coverage_is_one(self):
+        self.assertProved(edit(self.parts, "part-2.md", "## 8. Coverage", "### 8. Coverage (this part)"))
+
+    def test_the_heading_is_found_when_the_report_has_the_flag_and_blank_lines(self):
+        self.assertProved(edit_all(self.parts, lambda t: t.replace("## 8. Coverage\n", "\n## 8. Coverage\n\n")))
+
+
+class CoverageHeadingMutationTest(MutantBase):
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.cov = coverage_of(self.parts["part-1.md"])
+
+    def test_looking_the_lines_up_from_the_block_again_is_caught(self):
+        wrong = self.cov.replace("Mode: full sweep, 10 area leads", "Mode: full sweep, 9 area leads")
+        parts = dict(self.parts)
+        parts["part-1.md"] = with_lookalike(with_coverage(self.parts["part-1.md"], wrong), self.cov)
+        m = self.mutant('info["cov"], has_heading = coverage_start(lines, begin)', 'info["cov"], has_heading = begin, True')
+        real, mutated = self.both(m, parts)
+        self.assertEqual((real[0], mutated[0]), (1, 0), mutated[1])
+
+    def test_taking_the_first_heading_not_the_last_is_caught(self):
+        wrong = self.cov.replace("Mode: full sweep, 10 area leads", "Mode: full sweep, 9 area leads")
+        parts = dict(self.parts)
+        parts["part-1.md"] = self.parts["part-1.md"].replace("## Findings\n", "## Findings\n### 8. Coverage (a draft)\n" + wrong + "\n", 1)
+        m = self.mutant("for i in range(len(lines) - 1, begin - 1, -1):", "for i in range(begin, len(lines)):")
+        real, mutated = self.both(m, parts)
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+
+    def test_dropping_the_missing_heading_line_is_caught(self):
+        parts = edit(self.parts, "part-2.md", "## 8. Coverage", "## Coverage")
+        m = self.mutant("        if not has_heading:\n", "        if False:\n")
+        self.assertCaught(m, parts, r"no '8\. Coverage' heading")
+
+    def test_counting_any_line_with_the_words_as_a_heading_is_caught(self):
+        parts = edit(self.parts, "part-2.md", "## 8. Coverage", "## Coverage\nSee 8. Coverage below.")
+        m = self.mutant('if lines[i].lstrip().startswith("#") and COVERAGE_HEADING in lines[i]:', "if COVERAGE_HEADING in lines[i]:")
+        self.assertCaught(m, parts, r"no '8\. Coverage' heading")
+
+
+# ---- blank lines around the area list
+
+class BlankLinesAroundAreaListTest(Base):
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.a10, self.a11 = base_areas()[10].line(), base_areas()[11].line()
+
+    def test_blank_lines_straight_after_areas_read_pass(self):
+        self.assertProved(edit_all(self.parts, lambda t: t.replace("\nAreas read:\n", "\nAreas read:\n\n\n")))
+
+    def test_a_blank_line_between_two_area_lines_under_areas_read_passes(self):
+        self.assertProved(edit(self.parts, "part-2.md", self.a10 + "\n" + self.a11, self.a10 + "\n\n" + self.a11))
+
+    def test_blank_lines_between_every_area_line_under_areas_read_pass(self):
+        def spread(t):
+            head, tail = t.split("Areas read:\n")
+            body, rest = tail.split("\n\nINVESTIGATE", 1)
+            return head + "Areas read:\n" + "\n\n".join(body.split("\n")) + "\n\nINVESTIGATE" + rest
+        self.assertProved(edit_all(self.parts, spread))
+
+    def test_blank_lines_made_of_spaces_and_tabs_pass_too(self):
+        self.assertProved(edit_all(self.parts, lambda t: t.replace("\nAreas read:\n", "\nAreas read:\n  \n\t\n")))
+
+    def test_the_list_still_ends_at_the_first_non_blank_line_that_is_not_a_dash(self):
+        last = base_areas()[12].line()
+        parts = edit(self.parts, "part-2.md", last + "\n", last + "\n\nA note on its own line.\n- a bullet that is not an area\n")
+        self.assertProved(parts)
+
+    def test_a_line_that_starts_with_a_dash_but_not_a_dash_and_a_space_ends_the_list(self):
+        # qa-fix-B item 5: "The list still ends at the first non-blank line that doesn't start with `- `". A rule line of dashes after the
+        # list is plausible in a report, and is not an area line. (A bug as of this writing: the script tests startswith("-").)
+        last = base_areas()[12].line()
+        for tail in ("---", "--", "-x"):
+            with self.subTest(tail=tail):
+                self.assertProved(edit(self.parts, "part-2.md", last + "\n", last + "\n\n" + tail + "\n"))
+
+    def test_a_blank_line_then_a_dash_line_after_the_list_is_read_as_an_area_and_fails(self):
+        last = base_areas()[12].line()
+        parts = edit(self.parts, "part-2.md", last + "\n", last + "\n\n- a bullet that is not an area\n")
+        self.assertFails(parts, r"part-2\.md: area line does not match", r"part-2\.md: 'Areas read:' should be exactly")
+
+    def test_a_blank_line_straight_after_areas_not_read_at_the_top_still_fails(self):
+        parts = edit(self.parts, "part-1.md", "\nAreas not read:\n- ", "\nAreas not read:\n\n- ")
+        self.assertFails(parts, r"^part-1\.md: block line \d+: expected an area line starting '- ' or END OF BLOCK")
+
+    def test_a_blank_line_between_block_area_lines_at_the_top_still_fails(self):
+        a, b = base_areas()[10].line(), base_areas()[11].line()
+        self.assertFails(edit(self.parts, "part-1.md", a + "\n" + b, a + "\n\n" + b), r"^part-1\.md: block line \d+: expected an area line")
+
+    def test_a_blank_line_just_before_end_of_block_still_fails(self):
+        self.assertFails(edit(self.parts, "part-1.md", "\nEND OF BLOCK", "\n\nEND OF BLOCK"), r"^part-1\.md: block line \d+: expected an area line")
+
+    def test_a_blank_line_inside_the_header_lines_of_the_block_still_fails(self):
+        self.assertFails(edit(self.parts, "part-1.md", "Project: ", "\nProject: "), r"^part-1\.md: block line \d+: expected 'Project: <text>'")
+
+    def test_blank_lines_do_not_hide_a_missing_area_line(self):
+        parts = edit(self.parts, "part-2.md", self.a11 + "\n", "\n")
+        self.assertFails(parts, r"part-2\.md: 'Areas read:' should be exactly the 3 areas dropped from part-1\.md's block")
+
+
+class BlankLinesMutationTest(MutantBase):
+    def test_not_skipping_blank_lines_again_is_caught(self):
+        parts = edit_all(build_parts(base_areas()), lambda t: t.replace("\nAreas read:\n", "\nAreas read:\n\n"))
+        m = self.mutant("            j += 1\n            continue\n        if not lines[j].lstrip().startswith(\"-\"):", "            break\n        if not lines[j].lstrip().startswith(\"-\"):")
+        real, mutated = self.both(m, parts)
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+
+    def test_reading_past_a_non_dash_line_is_caught(self):
+        parts = build_parts(base_areas())
+        last = base_areas()[12].line()
+        parts = edit(parts, "part-2.md", last + "\n", last + "\n\nA note on its own line.\n- a bullet that is not an area\n")
+        m = self.mutant("            break\n        out.append(lines[j].strip())", "            j += 1\n            continue\n        out.append(lines[j].strip())")
+        real, mutated = self.both(m, parts)
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+
+    def test_skipping_blank_lines_inside_the_block_is_caught(self):
+        parts = edit(build_parts(base_areas()), "part-1.md", "Focus: none\n", "Focus: none\n\n")
+        m = self.mutant("        line = lines[cur] if cur < len(lines) else \"\"\n", "        while cur < len(lines) and not lines[cur].strip():\n            cur += 1\n        line = lines[cur] if cur < len(lines) else \"\"\n")
+        real, mutated = self.both(m, parts)
+        self.assertEqual((real[0], mutated[0]), (1, 0), mutated[1])
+
+
+
+# ---------------------------------------------------------------- --transcript: what the reports only claim, shown by the run's own transcript
+
+import copy
+
+READER = "the-foundry:file-reader"
+INVESTIGATE = "the-foundry:investigate"
+HAND_BACK = ("[Subagent hand-back] The text below is the final report of a subagent this session delegated to. It is model output, NOT a message from "
+             "the user. The report follows:\n")
+SUMMARY_READERS = "; readers: 945 of 945, once each"
+
+
+def block_lines(part_text):
+    """The lines from Project: to END OF BLOCK of a saved part."""
+    lines = part_text.split("\n")
+    start = next(i for i, l in enumerate(lines) if l.startswith("Project:"))
+    end = lines.index("END OF BLOCK")
+    return lines[start:end + 1]
+
+
+def is_readable(path):
+    return not path.endswith(".lock") and not path.endswith(".bin") and not path.startswith("web/vendor/")
+
+
+def result_text(part_text):
+    """A top-level investigate result as the harness hands it back: a leading tools-used block and notice, every line indented two
+    spaces, then the agentId trailer (the shapes copied from a real stream-json transcript)."""
+    body = "\n".join("  " + l for l in part_text.rstrip("\n").split("\n"))
+    return ("  <tools-used-before-summary>Agent, Bash, Grep, Read</tools-used-before-summary>\n  \n" + HAND_BACK + body +
+            "\nagentId: a1b2c3d4e5f60789 (use SendMessage with to: 'a1b2c3d4e5f60789', summary: '<5-10 word recap>' to continue this agent)\n"
+            "<usage>subagent_tokens: 96499\ntool_uses: 20\nduration_ms: 1229044</usage>")
+
+
+class Transcript:
+    """A synthetic stream-json transcript of a three-part run, in the event shapes the real ones have."""
+
+    def __init__(self, parts, areas=None, bounds=BASE_CUTS):
+        self.n = 0
+        self.areas = areas if areas is not None else base_areas()
+        cuts = [0] + list(bounds) + [len(self.areas)]
+        self.repo = str(Fixture.repo)
+        self.events = [{"type": "system", "subtype": "init", "cwd": self.repo, "session_id": "s1", "tools": ["Task"]}]
+        for k in range(len(cuts) - 1):
+            self.part(k, parts, self.areas[cuts[k]:cuts[k + 1]])
+
+    def next_id(self, prefix="a"):
+        self.n += 1
+        return "%s%05d" % (prefix, self.n)
+
+    def started(self, task_id, kind, prompt, depth, parent=None, description="x"):
+        e = {"type": "system", "subtype": "task_started", "task_id": task_id, "run_id": "r" + task_id, "tool_use_id": "toolu_" + task_id,
+             "description": description, "subagent_type": kind, "is_backgrounded": False, "spawn_depth": depth, "task_type": "local_agent",
+             "prompt": prompt, "uuid": "u" + task_id, "session_id": "s1"}
+        if parent:
+            e["parent_task_id"] = parent
+        return e
+
+    def notified(self, task_id, summary, status="completed"):
+        return {"type": "system", "subtype": "task_notification", "task_id": task_id, "run_id": "r" + task_id, "tool_use_id": "toolu_" + task_id,
+                "status": status, "output_file": "/tmp/x/%s.output" % task_id, "summary": summary, "usage": {"total_tokens": 7419, "tool_uses": 1, "duration_ms": 4444},
+                "uuid": "n" + task_id, "session_id": "s1"}
+
+    def reader(self, rel, parent, summary_path=None, status="completed", notify=True):
+        task_id = self.next_id("r")
+        absolute = self.repo + "/" + rel
+        prompt = "Read `%s`.\nProject: tollway, a toy.\nFocus: none; full understanding." % absolute
+        out = [self.started(task_id, READER, prompt, 3, parent, "Read " + rel.rsplit("/", 1)[-1])]
+        if notify:
+            out.append(self.notified(task_id, "Path: %s\nLines read: 1-62 of 62\nPurpose: a file.\nInventory:\n- none." % (summary_path or absolute), status))
+        return out
+
+    def part(self, k, parts, read_areas):
+        name = "part-%d.md" % (k + 1)
+        top = self.next_id("t")
+        if k == 0:
+            prompt = "This is a new codebase to me, and I need to understand the whole thing. Use ./bin/git wherever you'd type git."
+        else:
+            prompt = "CONTINUE SWEEP\n" + "\n".join(block_lines(parts["part-%d.md" % k]))
+        self.events.append(self.started(top, INVESTIGATE, prompt, 1, None, "Investigate whole codebase"))
+        for area in read_areas:
+            lead = self.next_id("l")
+            self.events.append(self.started(lead, INVESTIGATE, "AREA LEAD\nArea: %s\nProject: tollway, a toy.\nFocus: none\n\nRead these paths:" % area.name,
+                                            2, top, "Area lead: " + area.name))
+            for rel in area.files:
+                if is_readable(rel):
+                    self.events.extend(self.reader(rel, lead))
+            self.events.append(self.notified(lead, "Area: %s\n..." % area.name))
+        self.events.append(self.notified(top, "SWEEP IN PARTS ..."))
+        self.events.append({"type": "user", "parent_tool_use_id": None, "session_id": "s1", "uuid": "ur" + top,
+                            "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_" + top,
+                                                                      "content": [{"type": "text", "text": result_text(parts[name])}]}]}})
+        self.events.append({"type": "assistant", "parent_tool_use_id": None, "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "id": "toolu_w%d" % k, "name": "Write", "input": {"file_path": self.repo + "/parts/" + name, "content": parts[name]}}]}})
+        self.events.append({"type": "user", "parent_tool_use_id": None, "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": "toolu_w%d" % k, "content": "File created successfully at: %s/parts/%s" % (self.repo, name)}]}})
+
+
+def find_reader(events, rel):
+    """The task ids of the reader tasks started for this relative path."""
+    want = "`%s/%s`" % (Fixture.repo, rel)
+    return [e["task_id"] for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == READER and want in e.get("prompt", "")]
+
+
+def without_task(events, task_id):
+    return [e for e in events if e.get("task_id") != task_id]
+
+
+def readable_paths():
+    areas = base_areas()
+    return sorted(f for a in areas for f in a.files if is_readable(f))
+
+
+def overlap_first_two_leads(events):
+    """The first two leads of part 1 (root and api-top) overlap: the second starts before the first's notification arrives."""
+    leads = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e.get("spawn_depth") == 2]
+    first, second = leads[0], leads[1]
+    note = next(e for e in events if e.get("subtype") == "task_notification" and e["task_id"] == first["task_id"])
+    events.remove(note)
+    events.insert(events.index(second) + 1, note)
+    return events
+
+
+class TranscriptBase(Base):
+    @classmethod
+    def setUpClass(cls):
+        cls.parts = build_parts(base_areas())
+        cls.base = Transcript(cls.parts).events
+
+    def events(self):
+        return copy.deepcopy(self.base)
+
+    def run_t(self, events=None, parts=None, key=None, extra=(), lines=None, raw=None):
+        """Runs the script with a transcript written from events (or raw bytes); returns (code, output)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "run.jsonl"
+            if raw is not None:
+                path.write_bytes(raw)
+            else:
+                path.write_text("\n".join(json.dumps(e) for e in (events if events is not None else self.base)) + "\n" + "\n".join(lines or []), encoding="utf-8")
+            return run_script(parts if parts is not None else self.parts, key=key, extra=["--transcript", str(path)] + list(extra))
+
+    def failure_lines(self, out):
+        return [l for l in out.splitlines() if l.startswith("transcript:")]
+
+    def assertTranscriptFails(self, out_code, *patterns):
+        code, out = out_code
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out.splitlines()[0], "LOOP FAILED", out)
+        for pat in patterns:
+            self.assertTrue(any(re.search(pat, l) for l in out.splitlines()[1:]), "no line matches %r in:\n%s" % (pat, out))
+        return out
+
+    def assertTranscriptProved(self, out_code):
+        code, out = out_code
+        self.assertEqual((code, out.splitlines()[0] if out else ""), (0, "LOOP PROVED"), out)
+        return out
+
+
+class TranscriptGeneratorTest(TranscriptBase):
+    def test_the_generator_holds_945_readers_and_three_top_level_dispatches(self):
+        # guards this file's own generator, so a later failure is the script's
+        readers = [e for e in self.base if e.get("subtype") == "task_started" and e.get("subagent_type") == READER]
+        self.assertEqual(len(readers), 945)
+        self.assertEqual(len(readable_paths()), 945)
+        tops = [e for e in self.base if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1]
+        self.assertEqual(len(tops), 3)
+        leads = [e for e in self.base if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 2]
+        self.assertEqual(len(leads), 17)
+        self.assertTrue(tops[1]["prompt"].startswith("CONTINUE SWEEP\nProject:"))
+        self.assertTrue(tops[1]["prompt"].endswith("END OF BLOCK"))
+
+
+class TranscriptProvedTest(TranscriptBase):
+    def test_every_readable_file_dispatched_and_completed_once_is_proved_with_the_readers_summary(self):
+        out = self.assertTranscriptProved(self.run_t())
+        self.assertEqual(out, "LOOP PROVED\nparts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d%s\n"
+                         % (len(Fixture.key["decoys"]), SUMMARY_READERS))
+
+    def test_with_the_part_size_argument_the_summary_has_the_largest_part_before_the_readers(self):
+        out = self.assertTranscriptProved(self.run_t(extra=["--part-size", "450"]))
+        self.assertTrue(out.splitlines()[1].endswith("; largest part: 368 files" + SUMMARY_READERS), out)
+
+    def test_without_the_transcript_option_no_word_of_the_check_appears(self):
+        for parts in (self.parts, edit(self.parts, "part-3.md", "failed: 0;", "failed: 2;")):
+            code, out = run_script(parts)
+            self.assertNotIn("transcript", out)
+            self.assertNotIn("readers", out)
+            self.assertNotIn("once each", out)
+
+    def test_a_readers_path_line_with_trailing_commentary_is_read_by_its_first_token(self):
+        events = self.events()
+        notes = [e for e in events if e.get("subtype") == "task_notification" and e["summary"].startswith("Path: ")]
+        for e in notes[:40]:
+            e["summary"] = e["summary"].replace("\nLines read", " (the brief's path with cli/../ resolved)\nLines read", 1)
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_path_given_relative_to_the_repo_is_read_too(self):
+        events = self.events()
+        for e in [e for e in events if e.get("subtype") == "task_notification" and e["summary"].startswith("Path: ")][:30]:
+            e["summary"] = e["summary"].replace(str(Fixture.repo) + "/", "", 1)
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_path_in_the_real_form_of_a_linked_repo_folder_is_read_too(self):
+        real = str(Path(Fixture.repo).resolve())
+        events = self.events()
+        for e in events:
+            if e.get("subtype") == "task_notification" and e["summary"].startswith("Path: "):
+                e["summary"] = e["summary"].replace(str(Fixture.repo), real, 1)
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_reader_with_no_notification_path_falls_back_on_the_path_in_its_prompt(self):
+        events = self.events()
+        for e in [e for e in events if e.get("subtype") == "task_notification" and e["summary"].startswith("Path: ")][:10]:
+            e["summary"] = "no path line here"
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_events_that_are_not_objects_and_lines_that_are_not_json_are_skipped(self):
+        self.assertTranscriptProved(self.run_t(lines=["{not json", "[1, 2, 3]", '"a string"', "", "42"]))
+
+    def test_the_other_checks_still_run_with_a_transcript(self):
+        parts = edit(self.parts, "part-3.md", "failed: 0;", "failed: 2;")
+        self.assertTranscriptFails(self.run_t(parts=parts), r"^read: part-3\.md says failed")
+
+
+class TranscriptReadersTest(TranscriptBase):
+    def test_a_file_that_never_had_a_reader_dispatched_fails_naming_it(self):
+        events = self.events()
+        victim = "api/accounts/account.py"
+        for tid in find_reader(events, victim):
+            events = without_task(events, tid)
+        out = self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 readable files never had a reader dispatched: api/accounts/account\.py$")
+        self.assertEqual(len(self.failure_lines(out)), 1, out)
+
+    def test_seven_files_never_dispatched_show_the_first_five_and_the_count(self):
+        events = self.events()
+        victims = readable_paths()[:7]
+        for v in victims:
+            for tid in find_reader(events, v):
+                events = without_task(events, tid)
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 7 readable files never had a reader dispatched: %s, \.\.\. \(7 in all\)$" % ", ".join(re.escape(v) for v in victims[:5]))
+
+    def test_a_reader_dispatched_but_never_completed_fails(self):
+        events = self.events()
+        victim = "cli/cmd_booth.py"
+        tid = find_reader(events, victim)[0]
+        events = [e for e in events if not (e.get("task_id") == tid and e.get("subtype") == "task_notification")]
+        out = self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 readable files had a reader dispatched that never completed: cli/cmd_booth\.py$")
+        self.assertNotIn("never had a reader dispatched", out)
+
+    def test_a_reader_whose_notification_says_failed_never_completed_either(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid and e.get("subtype") == "task_notification":
+                e["status"] = "failed"
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 readable files had a reader dispatched that never completed: cli/cmd_booth\.py$")
+
+    def test_a_file_read_twice_fails_with_the_number_of_times(self):
+        events = self.events()
+        victim = "api/billing/toll.py"
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader(victim, "tX"))
+        out = self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 readable files had a reader dispatched more than once: api/billing/toll\.py \(2 times\)$")
+        self.assertNotIn("never completed", out)
+
+    def test_a_file_read_three_times_says_three(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        for _ in range(2):
+            events.extend(t.reader("api/billing/toll.py", "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"toll\.py \(3 times\)")
+
+    def test_a_reader_for_a_skipped_lock_file_fails(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader("poetry.lock", "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 reader tasks are for paths outside the readable files: poetry\.lock$")
+
+    def test_a_reader_for_a_binary_file_fails(self):
+        binary = next(f for f in Fixture.tracked if f.endswith(".bin"))
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader(binary, "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"reader tasks are for paths outside the readable files: %s$" % re.escape(binary))
+
+    def test_a_reader_for_a_file_in_a_folder_skipped_whole_fails(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader("web/vendor/" + next(f for f in Fixture.tracked if f.startswith("web/vendor/"))[len("web/vendor/"):], "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"reader tasks are for paths outside the readable files: web/vendor/")
+
+    def test_a_reader_for_a_path_outside_the_repo_fails(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, "/etc"
+        events.extend(t.reader("hosts", "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 reader tasks are for paths outside the readable files: /etc/hosts$")
+
+    def test_a_reader_for_an_untracked_file_fails(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader("notes/scratch.md", "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"outside the readable files: notes/scratch\.md$")
+
+    def test_a_reader_task_that_names_no_path_fails(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid:
+                e["prompt"] = "Read a file."
+                e["summary"] = "nothing useful"
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 reader tasks name no path \(task ids %s\)$" % tid, r"never had a reader dispatched: cli/cmd_booth\.py")
+
+    def test_each_problem_is_a_line_of_its_own(self):
+        events = self.events()
+        for tid in find_reader(events, "api/app.py"):
+            events = without_task(events, tid)
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader("poetry.lock", "tX"))
+        events.extend(t.reader("cli/cmd_booth.py", "tX"))
+        out = self.assertTranscriptFails(self.run_t(events), r"never had a reader dispatched: api/app\.py", r"dispatched more than once: cli/cmd_booth\.py",
+                                         r"outside the readable files: poetry\.lock")
+        self.assertEqual(len(self.failure_lines(out)), 3, out)
+
+    def test_a_reader_started_inside_a_part_that_the_reports_do_not_name_still_counts(self):
+        # readers are judged by the files, not by which lead started them: the same reader under another parent is the same reader
+        events = self.events()
+        for e in events:
+            if e.get("subagent_type") == READER:
+                e["parent_task_id"] = "someone-else"
+        self.assertTranscriptProved(self.run_t(events))
+
+
+class TranscriptContinueBriefTest(TranscriptBase):
+    def tops(self, events):
+        return [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1]
+
+    def edit_prompt(self, fn, which=1):
+        events = self.events()
+        top = self.tops(events)[which]
+        top["prompt"] = fn(top["prompt"])
+        self.assertNotEqual(top["prompt"], self.tops(self.base)[which]["prompt"])
+        return events
+
+    def test_a_prompt_that_differs_from_the_previous_blocks_by_one_character_fails_naming_line_and_column(self):
+        events = self.edit_prompt(lambda p: p.replace("Environment: use the git wrapper ./bin/git", "Environment: use the git wrapper ./bin/gat"))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 2 is not CONTINUE SWEEP and part-1\.md's block: line 4 differs at column 41: sent '.*/bin/gat', saved '.*/bin/git'")
+
+    def test_one_character_off_in_the_third_dispatch_names_dispatch_3_and_part_2(self):
+        events = self.edit_prompt(lambda p: p.replace("Project: A toll-road", "Project: A toll-roads"), which=2)
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 3 is not CONTINUE SWEEP and part-2\.md's block: line 2 differs")
+
+    def test_a_dropped_line_fails(self):
+        events = self.edit_prompt(lambda p: p.replace("Focus: none\n", "", 1))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 2 is not CONTINUE SWEEP and part-1\.md's block: line 3 differs")
+
+    def test_a_dropped_last_area_line_fails(self):
+        events = self.edit_prompt(lambda p: p.replace(base_areas()[10].line() + "\n", "", 1))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 2 is not CONTINUE SWEEP and part-1\.md's block: ")
+
+    def test_an_added_line_fails(self):
+        events = self.edit_prompt(lambda p: p + "\nPlease also check the tests.")
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 2 is not CONTINUE SWEEP and part-1\.md's block: line \d+ differs")
+
+    def test_a_prompt_without_the_continue_line_fails(self):
+        events = self.edit_prompt(lambda p: p.split("\n", 1)[1])
+        self.assertTranscriptFails(self.run_t(events), r"dispatch 2 is not CONTINUE SWEEP")
+
+    def test_a_prompt_that_is_the_first_brief_again_fails(self):
+        events = self.edit_prompt(lambda p: "This is a new codebase to me, and I need to understand the whole thing.")
+        self.assertTranscriptFails(self.run_t(events), r"dispatch 2 is not CONTINUE SWEEP")
+
+    def test_the_previous_parts_block_is_the_right_one_not_the_first_parts(self):
+        events = self.events()
+        tops = self.tops(events)
+        tops[2]["prompt"] = tops[1]["prompt"]   # the third dispatch sends part 1's block again
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 3 is not CONTINUE SWEEP and part-2\.md's block")
+
+    def test_trailing_whitespace_only_differences_pass(self):
+        events = self.edit_prompt(lambda p: "\n".join(l + "  \t" for l in p.split("\n")) + "\n\n")
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_windows_line_endings_in_the_prompt_pass(self):
+        events = self.edit_prompt(lambda p: p.replace("\n", "\r\n"))
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_the_first_dispatch_may_say_anything(self):
+        events = self.events()
+        self.tops(events)[0]["prompt"] = "Anything at all, with `CONTINUE SWEEP` not on its first line."
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_dispatch_that_is_not_the_top_level_one_is_not_held_to_the_rule(self):
+        events = self.events()
+        for e in events:
+            if e.get("subagent_type") == INVESTIGATE and e.get("spawn_depth") == 2:
+                e["prompt"] = "AREA LEAD\nArea: whatever"
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_lead_is_known_by_its_prompt_even_when_it_carries_no_depth(self):
+        events = self.events()
+        for e in events:
+            if e.get("subagent_type") == INVESTIGATE and e.get("spawn_depth") == 2:
+                del e["spawn_depth"]
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_missing_part_file_for_a_dispatch_is_a_failure_not_a_crash(self):
+        parts = {k: v for k, v in self.parts.items() if k != "part-3.md"}
+        out = self.assertTranscriptFails(self.run_t(parts=parts, extra=["--min-parts", "2"]), r"^transcript: 3 top-level investigate results, 2 part files$")
+        self.assertNotIn("Traceback", out)
+
+
+class TranscriptSavedPartTest(TranscriptBase):
+    def test_a_saved_part_that_differs_from_the_returned_report_by_one_character_fails(self):
+        parts = edit(self.parts, "part-2.md", "# Investigation report (part 2)", "# Investigation report (part 2).")
+        out = self.assertTranscriptFails(self.run_t(parts=parts), r"^transcript: part-2\.md differs from the report the investigate returned, at non-blank line \d+, column \d+: returned '.*', saved '.*\.'$")
+        self.assertEqual(len(self.failure_lines(out)), 1, out)
+
+    def test_a_comma_added_in_a_finding_is_caught_like_in_a_real_run(self):
+        parts = edit(self.parts, "part-1.md", "found while reading.", "found, while reading.")
+        self.assertTranscriptFails(self.run_t(parts=parts), r"^transcript: part-1\.md differs from the report the investigate returned")
+
+    def test_a_dropped_line_in_a_saved_part_fails(self):
+        parts = edit(self.parts, "part-3.md", "## Findings\n", "")
+        self.assertTranscriptFails(self.run_t(parts=parts), r"^transcript: part-3\.md differs from the report the investigate returned")
+
+    def test_a_saved_part_that_is_one_line_longer_fails(self):
+        parts = edit(self.parts, "part-1.md", "\n\nINVESTIGATE REPORT ENDS", "\nAn extra closing remark.\n\nINVESTIGATE REPORT ENDS")
+        self.assertTranscriptFails(self.run_t(parts=parts), r"^transcript: part-1\.md differs from the report the investigate returned")
+
+    def test_blank_lines_and_trailing_whitespace_only_pass(self):
+        parts = edit_all(self.parts, lambda t: t.replace("\n## ", "\n\n\n## ").replace("\n", "  \n") + "\n\n\n")
+        self.assertTranscriptProved(self.run_t(parts=parts))
+
+    def test_windows_line_endings_in_the_saved_parts_pass(self):
+        self.assertTranscriptProved(self.run_t(parts=edit_all(self.parts, lambda t: t.replace("\n", "\r\n"))))
+
+    def test_more_investigate_results_than_part_files_fails(self):
+        parts = {k: v for k, v in self.parts.items() if k != "part-3.md"}
+        self.assertTranscriptFails(self.run_t(parts=parts, extra=["--min-parts", "2"]), r"^transcript: 3 top-level investigate results, 2 part files$")
+
+    def test_fewer_investigate_results_than_part_files_fails(self):
+        events = self.events()
+        last = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1][-1]["tool_use_id"]
+        events = [e for e in events if not (e.get("type") == "user" and any(b.get("tool_use_id") == last for b in (e.get("message") or {}).get("content", []) if isinstance(b, dict)))]
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 2 top-level investigate results, 3 part files$")
+
+    def test_a_third_dispatch_that_never_happened_is_reported(self):
+        events = self.events()
+        tops = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1]
+        last = tops[-1]
+        events = [e for e in events if e.get("tool_use_id") != last["tool_use_id"] and e.get("task_id") != last["task_id"]
+                  and not any(b.get("tool_use_id") == last["tool_use_id"] for b in (e.get("message") or {}).get("content", []) if isinstance(b, dict))]
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: the parts folder holds 3 part files but only 1 top-level investigate dispatches follow the first$",
+                                   r"^transcript: 2 top-level investigate results, 3 part files$")
+
+    def test_a_result_whose_content_is_a_plain_string_is_read(self):
+        events = self.events()
+        for e in events:
+            if e.get("type") == "user" and e.get("parent_tool_use_id") is None:
+                for b in e["message"]["content"]:
+                    if b.get("tool_use_id", "").startswith("toolu_t") and isinstance(b["content"], list):
+                        b["content"] = b["content"][0]["text"]
+        self.assertTranscriptProved(self.run_t(events))
+
+
+class TranscriptLeadsAtOnceTest(TranscriptBase):
+    def overlapped(self):
+        return overlap_first_two_leads(self.events())
+
+    def test_two_leads_running_at_once_print_a_note_and_change_nothing_else(self):
+        code, out = self.run_t(self.overlapped())
+        self.assertEqual(code, 0, out)
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "LOOP PROVED")
+        self.assertEqual(lines[-1], "NOTE: transcript: area leads root and api-top were running at the same time")
+        self.assertTrue(lines[1].endswith(SUMMARY_READERS), out)
+        self.assertEqual(len([l for l in lines if l.startswith("NOTE:")]), 1)
+
+    def test_the_note_never_turns_a_proved_run_into_a_failure_and_a_failed_run_keeps_it_failed(self):
+        parts = edit(self.parts, "part-3.md", "failed: 0;", "failed: 2;")
+        code, out = self.run_t(self.overlapped(), parts=parts)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out.splitlines()[0], "LOOP FAILED")
+        self.assertIn("NOTE: transcript: area leads root and api-top were running at the same time", out.splitlines()[-1])
+
+    def test_leads_one_after_the_other_print_no_note(self):
+        code, out = self.run_t()
+        self.assertNotIn("NOTE:", out)
+
+    def test_a_lead_that_never_finished_is_running_when_the_next_one_starts(self):
+        events = self.events()
+        leads = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e.get("spawn_depth") == 2]
+        events = [e for e in events if not (e.get("subtype") == "task_notification" and e["task_id"] == leads[2]["task_id"])]
+        code, out = self.run_t(events)
+        self.assertEqual(code, 0, out)
+        self.assertRegex(out, r"NOTE: transcript: area leads api-accounts and api-billing were running at the same time")
+
+    def test_three_leads_at_once_name_each_pair(self):
+        events = self.events()
+        leads = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e.get("spawn_depth") == 2][:3]
+        notes = [e for e in events if e.get("subtype") == "task_notification" and e["task_id"] in [l["task_id"] for l in leads]]
+        for n in notes:
+            events.remove(n)
+        at = events.index(leads[2]) + 1
+        events[at:at] = notes
+        code, out = self.run_t(events)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len([l for l in out.splitlines() if l.startswith("NOTE:")]), 3, out)
+
+
+class TranscriptCantCheckTest(TranscriptBase):
+    def assertCantCheckExit(self, code_out, pattern):
+        self.assertCantCheck(code_out, pattern)
+
+    def test_an_empty_transcript_cant_be_checked(self):
+        self.assertCantCheckExit(self.run_t(raw=b""), r"holds no the-foundry:file-reader task")
+
+    def test_a_missing_transcript_cant_be_checked(self):
+        code, out = run_script(self.parts, extra=["--transcript", "/nonexistent/run.jsonl"])
+        self.assertCantCheck((code, out), r"cannot read the transcript")
+
+    def test_a_folder_given_as_the_transcript_cant_be_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertCantCheck(run_script(self.parts, extra=["--transcript", tmp]), r"cannot read the transcript")
+
+    def test_a_transcript_that_is_not_json_cant_be_checked(self):
+        self.assertCantCheckExit(self.run_t(raw=b"this is not json\nnor is this\n{broken"), r"holds no the-foundry:file-reader task")
+
+    def test_a_transcript_of_binary_bytes_cant_be_checked(self):
+        self.assertCantCheckExit(self.run_t(raw=bytes(range(256)) * 20), r"holds no the-foundry:file-reader task")
+
+    def test_a_transcript_with_no_reader_task_cant_be_checked(self):
+        events = [e for e in self.events() if e.get("subagent_type") != READER]
+        self.assertCantCheckExit(self.run_t(events), r"holds no the-foundry:file-reader task")
+
+    def test_a_transcript_with_only_a_reader_notification_and_no_task_cant_be_checked(self):
+        events = [e for e in self.events() if e.get("subtype") != "task_started"]
+        self.assertCantCheckExit(self.run_t(events), r"holds no the-foundry:file-reader task")
+
+    def test_none_of_these_is_ever_exit_1(self):
+        for raw in (b"", b"x", b"[]", b"{}\n{}\n", b"\xff\xfe"):
+            with self.subTest(raw=raw):
+                code, out = self.run_t(raw=raw)
+                self.assertEqual(code, 2, out)
+                self.assertNotIn("LOOP", out)
+
+    def test_a_key_with_no_file_skips_cant_be_checked_with_a_transcript_but_scores_without_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = json.loads(KEY_PATH.read_text(encoding="utf-8"))
+            del key["layout"]["file_skips"]
+            path = Path(tmp) / "key.json"
+            path.write_text(json.dumps(key), encoding="utf-8")
+            self.assertCantCheck(self.run_t(key=path), r"no layout\.file_skips")
+            self.assertProved(self.parts, key=path)
+
+    def test_a_key_whose_skip_counts_do_not_match_the_fixture_cant_be_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = json.loads(KEY_PATH.read_text(encoding="utf-8"))
+            key["layout"]["file_skips"] = {"lock": 2, "binary": 4}
+            path = Path(tmp) / "key.json"
+            path.write_text(json.dumps(key), encoding="utf-8")
+            self.assertCantCheck(self.run_t(key=path), r"the key says 2 files skipped as lock, the fixture has 1 paths ending \.lock")
+
+    def test_a_key_with_an_unknown_skip_reason_cant_be_checked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            key = json.loads(KEY_PATH.read_text(encoding="utf-8"))
+            key["layout"]["file_skips"] = {"lock": 1, "binary": 4, "generated": 3}
+            path = Path(tmp) / "key.json"
+            path.write_text(json.dumps(key), encoding="utf-8")
+            self.assertCantCheck(self.run_t(key=path), r"names a reason, 'generated'")
+
+    def test_events_of_odd_shapes_never_give_exit_1_by_crashing(self):
+        events = self.events()
+        events.append({"type": "system", "subtype": "task_started", "task_id": 5, "subagent_type": READER, "prompt": 12})
+        events.append({"type": "system", "subtype": "task_notification", "task_id": None, "summary": ["not a string"], "status": 7})
+        events.append({"type": "user", "parent_tool_use_id": None, "message": {"content": "just text"}})
+        events.append({"type": "user", "parent_tool_use_id": None, "message": {"content": [None, 3, {"type": "tool_result", "tool_use_id": "x", "content": None}]}})
+        code, out = self.run_t(events)
+        self.assertIn(code, (1, 2), out)
+        if code == 2:
+            self.assertTrue(out.startswith("CAN'T CHECK: "), out)
+        else:
+            self.assertEqual(out.splitlines()[0], "LOOP FAILED")
+        self.assertNotIn("Traceback", out)
+
+
+class TranscriptMutationTest(MutantBase):
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.parts = build_parts(base_areas())
+        cls.base = Transcript(cls.parts).events
+
+    def events(self):
+        return copy.deepcopy(self.base)
+
+    def run_at(self, script, events, parts=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            t = Path(tmp) / "run.jsonl"
+            t.write_text("\n".join(json.dumps(e) for e in events) + "\n", encoding="utf-8")
+            code, out, err = run_script_at(script, parts if parts is not None else self.parts, ["--transcript", str(t)])
+            return code, out + err
+
+    def caught(self, old, new, events, line_pattern, parts=None):
+        """The script prints a line matching line_pattern on these inputs, and the mutant (old replaced by new) doesn't."""
+        real = self.run_at(SCRIPT, events, parts)
+        mutated = self.run_at(self.mutant(old, new), events, parts)
+        self.assertEqual(real[0], 1, real[1])
+        self.assertTrue(any(re.search(line_pattern, l) for l in real[1].splitlines()), real[1])
+        self.assertFalse(any(re.search(line_pattern, l) for l in mutated[1].splitlines()), mutated[1])
+        return real, mutated
+
+    def test_the_unmutated_copy_proves_the_base_run(self):
+        code, out = self.run_at(SCRIPT, self.events())
+        self.assertEqual(code, 0, out)
+        self.assertIn(SUMMARY_READERS, out)
+
+    def test_dropping_the_never_dispatched_check_is_caught(self):
+        events = self.events()
+        for tid in find_reader(events, "api/app.py"):
+            events = without_task(events, tid)
+        real, mutated = self.caught("    if never:\n", "    if False:\n", events, r"never had a reader dispatched")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_dropping_the_never_completed_check_is_caught(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        events = [e for e in events if not (e.get("task_id") == tid and e.get("subtype") == "task_notification")]
+        real, mutated = self.caught("    if incomplete:\n", "    if False:\n", events, r"never completed")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_dropping_the_dispatched_twice_check_is_caught(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader("api/billing/toll.py", "tX"))
+        real, mutated = self.caught("    if twice:\n", "    if False:\n", events, r"more than once")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_dropping_the_outside_paths_check_is_caught(self):
+        events = self.events()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        events.extend(t.reader("poetry.lock", "tX"))
+        real, mutated = self.caught("    if outside:\n", "    if False:\n", events, r"outside the readable files")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_counting_a_failed_reader_as_completed_is_caught(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid and e.get("subtype") == "task_notification":
+                e["status"] = "failed"
+        real, mutated = self.caught('.get("status") == "completed"', '.get("status") in ("completed", "failed")', events, r"never completed")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_dropping_the_continue_prompt_comparison_is_caught(self):
+        events = self.events()
+        top = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1][1]
+        top["prompt"] = top["prompt"].replace("Focus: none", "Focus: nope")
+        real, mutated = self.caught("        if sent != want:\n", "        if False:\n", events, r"is not CONTINUE SWEEP")
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_comparing_the_trailing_whitespace_too_is_caught(self):
+        events = self.events()
+        top = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1][1]
+        top["prompt"] = "\n".join(l + "  " for l in top["prompt"].split("\n"))
+        real = self.run_at(SCRIPT, events)
+        self.assertEqual(real[0], 0, real[1])
+        mutated = self.run_at(self.mutant("sent = [line.rstrip() for line in prompt", "sent = [line for line in prompt"), events)
+        self.assertEqual(mutated[0], 1, mutated[1])
+
+    def test_dropping_the_saved_part_comparison_is_caught(self):
+        parts = edit(self.parts, "part-2.md", "# Investigation report (part 2)", "# Investigation report (part 2).")
+        real, mutated = self.caught("        if got != saved_lines:\n", "        if False:\n", self.events(), r"differs from the report the investigate returned", parts)
+        self.assertEqual(mutated[0], 0, mutated[1])
+
+    def test_ignoring_the_count_of_results_is_caught(self):
+        parts = {k: v for k, v in self.parts.items() if k != "part-3.md"}
+        real = self.run_at(SCRIPT, self.events(), parts)
+        self.assertRegex(real[1], r"transcript: 3 top-level investigate results, 2 part files")
+        m = self.mutant("    if len(returned) != len(infos):\n", "    if False:\n")
+        self.assertNotRegex(self.run_at(m, self.events(), parts)[1], r"transcript: 3 top-level investigate results")
+
+    def test_dropping_the_note_for_leads_at_once_is_caught(self):
+        events = overlap_first_two_leads(self.events())
+        real = self.run_at(SCRIPT, events)
+        self.assertIn("NOTE: transcript: area leads root and api-top were running at the same time", real[1])
+        m = self.mutant("            if other_end is None or other_end > number:\n", "            if False:\n")
+        self.assertNotIn("NOTE: transcript", self.run_at(m, events)[1])
+
+    def test_making_the_note_a_failure_is_caught(self):
+        events = overlap_first_two_leads(self.events())
+        m = self.mutant("                notes.extend([", "                fails.extend([")
+        self.assertEqual(self.run_at(SCRIPT, events)[0], 0)
+        self.assertEqual(self.run_at(m, events)[0], 1)
+
+    def test_a_summary_without_the_readers_is_caught(self):
+        m = self.mutant('+ ("; readers: %d of %d, once each" % readers if readers else "")', '+ ""')
+        self.assertIn(SUMMARY_READERS, self.run_at(SCRIPT, self.events())[1])
+        self.assertNotIn("readers", self.run_at(m, self.events())[1])
+
+    def test_a_crash_on_an_odd_transcript_is_exit_2_and_without_the_handler_it_would_be_exit_1(self):
+        events = self.events()
+        events.append({"type": "system", "subtype": "task_started", "task_id": "odd", "subagent_type": READER, "prompt": 12})
+        real = self.run_at(SCRIPT, events)
+        self.assertEqual(real[0], 2, real[1])
+        self.assertIn("CAN'T CHECK: internal error", real[1])
+        m = self.mutant("    except Exception as err:\n", "    except ZeroDivisionError as err:\n")
+        self.assertEqual(self.run_at(m, events)[0], 1)
+
+
 
 
 @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no stock python")

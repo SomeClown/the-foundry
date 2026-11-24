@@ -232,6 +232,130 @@ class BytesAndMarkerTest(Base):
         self.assertEqual(len(self.one("just a cut-off report")), 6)
 
 
+WRAPPER_TRAILER = "agentId: a1b2c3d4e5f6 (use SendMessage with to: 'a1b2c3d4e5f6' to continue this agent)\n<usage>total_tokens: 41230\ntool_uses: 12\nduration_ms: 91000</usage>"
+TOOLS_BLOCK = "<tools-used-before-summary>Read x12, Bash x3</tools-used-before-summary>"
+ENDS = (MARKER, "INVESTIGATE REPORT ENDS", "AREA REPORT ENDS")
+
+
+class WholeMeansTheLastLineTest(Base):
+    """`whole` only when the marker or a report-end line is the last non-blank line once the harness's wrapper is off."""
+
+    def nested(self, content):
+        events = [tool_use("top1"), tool_use("n1", agent="the-foundry:investigate", prompt="AREA LEAD\nArea: web"), tool_result("n1", content, parent="top1"),
+                  tool_result("top1", MARKER), final("done")]
+        result = self.transcript(events)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        row = self.rows(result)[0]
+        self.assertEqual(row[0], "nested")
+        return row
+
+    def test_each_end_line_counts_as_the_last_line_at_either_depth(self):
+        for end in ENDS:
+            with self.subTest(end=end, depth="top"):
+                self.assertEqual(self.one("report\n%s\n" % end)[4], "whole")
+            with self.subTest(end=end, depth="nested"):
+                self.assertEqual(self.nested("report\n%s\n" % end)[4], "whole")
+
+    def test_an_end_line_in_the_middle_of_a_cut_off_report_is_not_whole_at_either_depth(self):
+        for end in ENDS:
+            text = "part one\n%s\nthen the report goes on and is cut off mid-sent" % end
+            with self.subTest(end=end, depth="top"):
+                self.assertEqual(self.one(text)[4], "not-whole")
+            with self.subTest(end=end, depth="nested"):
+                self.assertEqual(self.nested(text)[4], "not-whole")
+
+    def test_a_cut_off_report_gets_its_preview_fields_and_a_whole_one_gets_none(self):
+        row = self.one("%s\nmore text after the marker" % MARKER)
+        self.assertEqual(row[4], "not-whole")
+        self.assertEqual(len(row), 6)
+        self.assertEqual(len(self.one("more\n%s" % MARKER)), 5)
+
+    def test_a_wrapper_trailer_after_the_last_line_does_not_hide_it(self):
+        for end in ENDS:
+            with self.subTest(end=end):
+                self.assertEqual(self.one("report\n%s\n%s" % (end, WRAPPER_TRAILER))[4], "whole")
+
+    def test_a_tools_used_block_in_the_trailer_does_not_hide_it_either(self):
+        self.assertEqual(self.one("report\n%s\n%s\n%s" % (MARKER, WRAPPER_TRAILER, TOOLS_BLOCK))[4], "whole")
+        self.assertEqual(self.one("report\n%s\n%s\n%s" % (MARKER, TOOLS_BLOCK, WRAPPER_TRAILER))[4], "whole")
+
+    def test_a_leading_tools_used_block_is_off_the_report_text_too(self):
+        text = "  %s\n  \n[Subagent hand-back] report\n%s\n%s" % (TOOLS_BLOCK, MARKER, WRAPPER_TRAILER)
+        self.assertEqual(self.one(text)[4], "whole")
+
+    def test_a_marker_that_only_the_wrapper_carries_is_not_whole(self):
+        self.assertEqual(self.one("cut off report\nagentId: x1\n%s" % MARKER)[4], "not-whole")
+        self.assertEqual(self.one("cut off report\n%s\n%s" % (WRAPPER_TRAILER, MARKER))[4], "not-whole")
+        self.assertEqual(self.one("cut off report\n<tools-used-before-summary>%s</tools-used-before-summary>" % MARKER)[4], "not-whole")
+
+    def test_a_cut_off_report_with_the_marker_mid_way_and_a_trailer_is_not_whole(self):
+        self.assertEqual(self.one("part one\n%s\ncut off here\n%s" % (MARKER, WRAPPER_TRAILER))[4], "not-whole")
+
+    def test_an_agent_id_that_is_not_at_the_start_of_a_line_is_not_a_wrapper(self):
+        self.assertEqual(self.one("see agentId: abc for details\n%s" % MARKER)[4], "whole")
+        self.assertEqual(self.one("%s\nthe line agentId: abc is quoted here" % MARKER)[4], "not-whole")
+
+    def test_the_byte_count_is_still_the_whole_results_bytes_wrapper_included(self):
+        text = "report \u2603\n%s\n%s" % (MARKER, WRAPPER_TRAILER)
+        row = self.one(text)
+        self.assertEqual(row[3], str(len(text.encode("utf-8"))))
+        self.assertGreater(int(row[3]), len(("report \u2603\n%s\n" % MARKER).encode("utf-8")))
+
+    def test_an_empty_result_and_a_wrapper_only_result_are_not_whole(self):
+        self.assertEqual(self.one("")[4], "not-whole")
+        self.assertEqual(self.one(WRAPPER_TRAILER)[4], "not-whole")
+
+    def test_the_output_gains_nothing_new(self):
+        row = self.one("report\n%s\n%s" % (MARKER, WRAPPER_TRAILER))
+        self.assertEqual(len(row), 5)
+        self.assertEqual(row[:3], ["top", "the-foundry:investigate", "Look at the repo."])
+
+
+class WholeMeansTheLastLineMutationTest(Base):
+    """A temp copy of the script with one piece broken must be caught by a test above."""
+
+    def mutant(self, old, new):
+        src = MEASURE.read_text(encoding="utf-8")
+        self.assertEqual(src.count(old), 1, "the script no longer has %r once; update this mutation" % old)
+        path = self.tmp / "mutant.py"
+        path.write_text(src.replace(old, new), encoding="utf-8")
+        return path
+
+    def verdict(self, script, content):
+        path = self.write_jsonl([tool_use("a1"), tool_result("a1", content), final("f")])
+        result = subprocess.run([sys.executable, str(script), "--transcript", str(path), "--marker", MARKER], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout.splitlines()[0].split("\t")[4]
+
+    def test_the_unmutated_copy_behaves_like_the_script(self):
+        same = self.mutant("return bool(lines) and lines[-1] in markers", "return bool(lines) and lines[-1] in markers")
+        for text in ("x\n%s" % MARKER, "%s\nmore" % MARKER, "x\n%s\n%s" % (MARKER, WRAPPER_TRAILER)):
+            self.assertEqual(self.verdict(same, text), self.verdict(MEASURE, text))
+
+    def test_counting_a_marker_anywhere_again_is_caught(self):
+        m = self.mutant("return bool(lines) and lines[-1] in markers", "return any(line in markers for line in lines)")
+        text = "part one\n%s\ncut off here" % MARKER
+        self.assertEqual(self.verdict(MEASURE, text), "not-whole")
+        self.assertEqual(self.verdict(m, text), "whole")
+
+    def test_not_taking_the_wrapper_off_is_caught(self):
+        m = self.mutant("    cut = AGENT_ID_LINE.search(text)\n", "    cut = None\n")
+        text = "report\n%s\n%s" % (MARKER, WRAPPER_TRAILER)
+        self.assertEqual(self.verdict(MEASURE, text), "whole")
+        self.assertEqual(self.verdict(m, text), "not-whole")
+
+    def test_not_taking_the_tools_used_block_off_is_caught(self):
+        m = self.mutant("    return TOOLS_USED.sub(\"\", text)\n", "    return text\n")
+        text = "report\n%s\n%s" % (MARKER, TOOLS_BLOCK)
+        self.assertEqual(self.verdict(MEASURE, text), "whole")
+        self.assertEqual(self.verdict(m, text), "not-whole")
+
+    def test_dropping_one_of_the_two_report_end_lines_is_caught(self):
+        m = self.mutant('REPORT_ENDS = ("INVESTIGATE REPORT ENDS", "AREA REPORT ENDS")', 'REPORT_ENDS = ("INVESTIGATE REPORT ENDS",)')
+        self.assertEqual(self.verdict(MEASURE, "x\nAREA REPORT ENDS"), "whole")
+        self.assertEqual(self.verdict(m, "x\nAREA REPORT ENDS"), "not-whole")
+
+
 class SavedFileTest(Base):
     def saved(self, body, name="saved.txt", data=None):
         path = self.tmp / name

@@ -325,11 +325,49 @@ class CountsAndLayoutTest(unittest.TestCase):
         for path in UNTRACKED:
             self.assertNotIn(path, Fixtures.tracked)
             self.assertTrue((Fixtures.a / path).is_file())
-        exclude = [l for l in (Fixtures.a / ".git" / "info" / "exclude").read_text(encoding="utf-8").splitlines()
-                   if l.strip() and not l.startswith("#")]
-        self.assertEqual(exclude, ["bin/"])
+        self.assertEqual(self.exclude_lines(Fixtures.a), ["bin/", "parts/"])
         self.assertFalse((Fixtures.a / ".gitignore").exists())
         self.assertEqual(git(Fixtures.a, "status", "--short").split("\n")[:-1].count("?? bin/"), 0)
+
+    @staticmethod
+    def exclude_lines(dest):
+        return [l for l in (Path(dest) / ".git" / "info" / "exclude").read_text(encoding="utf-8").splitlines()
+                if l.strip() and not l.startswith("#")]
+
+    def test_every_subset_build_excludes_bin_and_parts_too(self):
+        for n, dest in Fixtures.subsets.items():
+            with self.subTest(subset=n):
+                self.assertEqual(self.exclude_lines(dest), ["bin/", "parts/"])
+
+    def test_the_fixtures_commit_is_the_one_it_built_before_parts_was_excluded(self):
+        # .git/info/exclude is not part of any commit: adding parts/ to it must not move the fixture's one commit
+        self.assertEqual(git(Fixtures.a, "rev-parse", "HEAD").strip(), "d12b0aac5a683a846287ed4360e03a3bba53a964")
+
+    def test_a_parts_folder_made_in_a_built_fixture_does_not_show_as_untracked(self):
+        # the reports a session saves into parts/ must not change what a later part sees as untracked
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "fx"
+            dest.mkdir()
+            run_scaffold(dest)
+            before = git(dest, "ls-files", "--others", "--exclude-standard").split()
+            (dest / "parts").mkdir()
+            (dest / "parts" / "part-1.md").write_text("SWEEP IN PARTS: 2 areas not read\n", encoding="utf-8")
+            (dest / "parts" / "nested").mkdir()
+            (dest / "parts" / "nested" / "part-2.md").write_text("x\n", encoding="utf-8")
+            after = git(dest, "ls-files", "--others", "--exclude-standard").split()
+            self.assertEqual(before, UNTRACKED)
+            self.assertEqual(after, UNTRACKED)
+            self.assertNotIn("parts/", git(dest, "status", "--short"))
+
+    def test_a_folder_that_is_not_parts_still_shows_as_untracked(self):
+        # the exclude names parts/ and bin/ only: a stray report folder under another name is still seen
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = Path(tmp) / "fx"
+            dest.mkdir()
+            run_scaffold(dest)
+            (dest / "reports").mkdir()
+            (dest / "reports" / "part-1.md").write_text("x\n", encoding="utf-8")
+            self.assertEqual(git(dest, "ls-files", "--others", "--exclude-standard").split(), sorted(UNTRACKED + ["reports/part-1.md"]))
 
     def test_nothing_on_disk_is_hidden_except_bin_and_the_untracked_files(self):
         self.assertEqual(set(Fixtures.files) - set(Fixtures.tracked) - set(UNTRACKED), {"bin/git"})

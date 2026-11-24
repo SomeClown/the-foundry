@@ -10,8 +10,11 @@ result it prints one tab-separated line:
     depth (top|nested), subagent type, first line of the dispatch prompt,
     UTF-8 bytes of the result's text, whole|not-whole
 
-A result is `whole` when the marker (or INVESTIGATE REPORT ENDS, or AREA REPORT
-ENDS) is a line of its own in the text. A `not-whole` line adds the first 300
+A result is `whole` when the marker (or INVESTIGATE REPORT ENDS or AREA REPORT
+ENDS, at either depth) is the last non-blank line of the
+report text: the result with the harness's wrapper taken off, which is anything
+from a line starting `agentId:` on and a `<tools-used-before-summary>` block. A
+marker in the middle of a cut-off report doesn't count. A `not-whole` line adds the first 300
 characters of the text on one line, which is where a preview notice shows. When
 that text names a saved file ("Full output saved to: /path"), the line adds
 three more fields: the path, the file's size in UTF-8 bytes, and saved-whole
@@ -35,6 +38,8 @@ import sys
 from pathlib import Path
 
 REPORT_ENDS = ("INVESTIGATE REPORT ENDS", "AREA REPORT ENDS")
+AGENT_ID_LINE = re.compile(r"^agentId:", re.MULTILINE)
+TOOLS_USED = re.compile(r"<tools-used-before-summary>.*?</tools-used-before-summary>", re.DOTALL)
 SAVED_TO = re.compile(r"saved to:[ \t]*([^\r\n]*)", re.IGNORECASE)
 PREVIEW_CHARS = 300
 
@@ -50,6 +55,20 @@ def one_line(text):
 def has_marker_line(text, markers):
     """True when any marker is a whole line of the text (surrounding blanks ignored)."""
     return any(line.strip() in markers for line in text.splitlines())
+
+
+def report_text(text):
+    """The result's text without the harness's wrapper: from the `agentId:` line on, and any tools-used block."""
+    cut = AGENT_ID_LINE.search(text)
+    if cut:
+        text = text[:cut.start()]
+    return TOOLS_USED.sub("", text)
+
+
+def ends_with_marker(text, markers):
+    """True when the last non-blank line of the report text is one of the markers."""
+    lines = [line.strip() for line in report_text(text).splitlines() if line.strip()]
+    return bool(lines) and lines[-1] in markers
 
 
 def block_text(content):
@@ -113,7 +132,6 @@ def content_blocks(event):
 
 def analyse_transcript(path, marker):
     """Returns the output lines for a transcript; raises CantMeasure when there is no Agent result."""
-    markers = (marker,) + REPORT_ENDS
     events = read_events(path)
     dispatches = {}
     lines = []
@@ -136,14 +154,15 @@ def analyse_transcript(path, marker):
                 text = block_text(block.get("content"))
                 first = (prompt.splitlines() or [""])[0].replace("\t", " ")
                 fields = ["nested" if nested else "top", agent, first, str(len(text.encode("utf-8")))]
-                if has_marker_line(text, markers):
+                markers = (marker,) + REPORT_ENDS
+                if ends_with_marker(text, markers):
                     fields.append("whole")
                 else:
                     fields.append("not-whole")
                     fields.append(one_line(text)[:PREVIEW_CHARS])
                     path_named = saved_path(text)
                     if path_named:
-                        size, status = saved_status(path_named, markers)
+                        size, status = saved_status(path_named, (marker,) + REPORT_ENDS)
                         fields.extend([path_named, "-" if size is None else str(size), status])
                 lines.append("\t".join(fields))
     if not lines:

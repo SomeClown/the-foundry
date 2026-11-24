@@ -607,6 +607,6 @@ G="./bin/git -c user.name=Owner -c user.email=owner@example.com -c commit.gpgsig
 python3 -c "$GEN" build "$SUBSET"
 $G init -q -b main
 mkdir -p .git/info
-printf 'bin/\n' >> .git/info/exclude
+printf 'bin/\nparts/\n' >> .git/info/exclude
 $G add -A -- . ':!notes' ':!rules/r9999_draft.py' ':!zones/zz_todo.txt'
 GIT_AUTHOR_DATE="2026-11-23T09:00:00 +0000" GIT_COMMITTER_DATE="2026-11-23T09:00:00 +0000" $G commit -qm "tollway 3.9.0"

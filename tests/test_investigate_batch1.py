@@ -50,7 +50,7 @@ PINS = [
     ("1 failed lead restarted once", "Check Before You Compile", r"fails, returns no checklist, or comes back cut off: start it once more with the same brief"),
     ("1 second failure lists area files unread by path", "Check Before You Compile", r"list every file in its area by path as unread"),
     ("1 failed area unread in Coverage by path", "Check Before You Compile", r"in its area by path as unread in Coverage"),
-    ("1 failed area named in note after Mode line", "Check Before You Compile", r"name the area in a note on the line right after the `Mode:` line"),
+    ("1 failed area named in a note that goes with the mode line", "Check Before You Compile", r"name the area in a note that goes with the mode line \(see \"8\. Coverage\"\)"),
     ("1 failed lead is not a NOT A PER-FILE READ case", "Check Before You Compile", r"not a `NOT A PER-FILE READ` case"),
     # 2. what a reader actually read
     ("2 short Lines read is a gap", "Check Before You Compile", r"`Lines read:` stops short of the assigned range counts as a gap"),
@@ -96,7 +96,7 @@ PINS = [
     ("R4 no first-line flag after second refusal", "When You Can't Spawn", r"second refusal ends spawning, with no first-line flag"),
     ("R4 NOT A PER-FILE READ is for missing Agent", "When You Can't Spawn", r"`NOT A PER-FILE READ` stays for a missing `Agent`"),
     ("R4 unstarted files by path in Coverage", "When You Can't Spawn", r"not yet started as unread, by path, in Coverage"),
-    ("R4 count in note after Mode line", "When You Can't Spawn", r"say how many in the note after the `Mode:` line"),
+    ("R4 count in a note that goes with the mode line", "When You Can't Spawn", r"say how many in a note that goes with the mode line \(see \"8\. Coverage\"\)"),
     ("R7 untracked do not count toward the part size", "Build the File List", r"don't count toward the part size"),
     ("R7 untracked do not count in files listed", "Build the File List", r"or Coverage's \"files listed\""),
     ("R7 untracked get own Coverage line", "Build the File List", r"Coverage lists them on their own line"),

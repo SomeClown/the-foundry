@@ -1127,10 +1127,11 @@ and the eight gaps that read found are settled here):
 ### Amended (2026-11-23): the part size is 450 files
 
 Part 7's measurement is done, on today's definition, in live headless
-sessions and in the eval harness. Reports ran 11KB for 150 files, 20KB for
-320, and 27KB for the whole 645-file test repo, with every route and command
-written out in full. All of them reached the session whole, in the agent's
-result, with no preview. Previews start somewhere between 36KB and 54KB, and
+sessions and in the eval harness. Reports ran 11KB for 150 files with a
+plain brief, and 20KB for 320 files and 27KB for the whole 645-file test
+repo with every route and command written out in full. All of them reached
+the session whole, in the agent's result, with no preview. Previews start
+somewhere between 36KB and 54KB, and
 a preview's saved file could be read in a live session, so nothing measured
 came near being cut off. The earlier worry, 53.7KB for 191 files, was one
 run with `investigate` on Haiku; on Sonnet the same repo gave 17KB to 27KB.
@@ -1151,10 +1152,14 @@ What follows from it:
   hold at most 900 files, so the flat folder goes from 310 files to 610,
   which makes 950 after the whole-folder skip (my call).
 - The head-to-head's 181-file repo stays one report, as before.
-- The open item about dense repos stands. 450 files of this test repo make a
-  report of about 22KB. A repo twice as dense would land where previews
-  start, which costs the session a file read and nothing else. One much
-  denser than that is what the last line is there to catch.
+- The open item about dense repos stands. I first wrote here that 450 files
+  of this test repo make a report of about 22KB; that was my estimate, not a
+  measurement, and the loop runs corrected it (2026-11-24). Their eighteen
+  part reports ran 10KB to 29KB for 152 to 432 files: a 432-file part was
+  21KB, and the biggest, 29KB, held 340 files. So a full part of dense files
+  can land where previews start, which costs the session a file read and
+  nothing else. One much denser than that is what the last line is there to
+  catch.
 
 ### Amended (2026-11-23): what a report may quote from files it didn't read
 

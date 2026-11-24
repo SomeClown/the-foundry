@@ -227,7 +227,7 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
     def test_investigate_states_each_exact_value(self):
         flat = self.flat("investigate")
         for value in (
-            "Send 10 at a time",
+            "Send readers 10 at a time",
             "batches of 10",
             "about 150 files",
             "The part size is 450 files",
