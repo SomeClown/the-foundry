@@ -69,6 +69,125 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+# What the fix for thin inventories pinned: the committed answer key's facts and decoys as the first build wrote them.
+# The fix may move line numbers, never these.
+GOLDEN_FACTS = [
+    ('f01', 'gotcha', 'api/accounts/booth.py', 'ticket 1192'),
+    ('f02', 'route', 'api/accounts/plaza.py', '/v3/accounts/fleets/unlock'),
+    ('f03', 'route', 'api/app.py', '/v3/gateway/tows/assign'),
+    ('f04', 'gotcha', 'api/billing/entry.py', 'CHG6901825'),
+    ('f05', 'route', 'api/billing/fine.py', '/v3/billing/syncs/stage'),
+    ('f06', 'gotcha', 'api/plazas/account.py', '#10854'),
+    ('f07', 'route', 'api/plazas/speed.py', '/v3/plazas/tiers/assign'),
+    ('f08', 'gotcha', 'api/trips/deposit.py', 'runbook section 8.2'),
+    ('f09', 'route', 'api/trips/fine.py', '/v3/trips/vaults/recalc'),
+    ('f10', 'command', 'cli/cmd_fleet.py', 'twctl preview-lane'),
+    ('f11', 'command', 'cli/cmd_trailer.py', 'twctl sweep-booth'),
+    ('f12', 'gotcha', 'jobs/nightly/notice_close.py', 'TWY-1718'),
+    ('f13', 'command', 'jobs/runner.py', 'twctl redact-plate'),
+    ('f14', 'gotcha', 'main.py', 'TWY-8667'),
+    ('f15', 'gotcha', 'rules/r0001_vehicle.py', 'ticket 3533'),
+    ('f16', 'route', 'rules/r0029_span.py', '/v3/rules/incidents/rollup'),
+    ('f17', 'command', 'rules/r0057_tag.py', 'twctl recalc-commuter'),
+    ('f18', 'gotcha', 'rules/r0085_tow.py', 'CHG5378130'),
+    ('f19', 'route', 'rules/r0113_incident.py', '/v3/rules/lanes/rollup'),
+    ('f20', 'command', 'rules/r0141_queue.py', 'twctl escalate-span'),
+    ('f21', 'gotcha', 'rules/r0170_tag.py', '#43906'),
+    ('f22', 'route', 'rules/r0198_class.py', '/v3/rules/transponders/reopen'),
+    ('f23', 'command', 'rules/r0226_axle.py', 'twctl export-export'),
+    ('f24', 'gotcha', 'rules/r0254_lien.py', 'runbook section 2.5'),
+    ('f25', 'route', 'rules/r0282_account.py', '/v3/rules/transponders/reconcile'),
+    ('f26', 'command', 'rules/r0310_transponder.py', 'twctl notify-bridge'),
+    ('f27', 'command', 'scripts/export_ledger.py', 'twctl defer-bridge'),
+    ('f28', 'gotcha', 'tests/test_invoice.py', 'TWY-5116'),
+    ('f29', 'gotcha', 'web/session.py', 'ticket 8341'),
+    ('f30', 'route', 'web/views/invoice.py', '/v3/web/transponders/confirm'),
+    ('f31', 'route', 'zones/z04_batch.py', '/v3/zones/plates/archive'),
+    ('f32', 'command', 'zones/z11_deposit.py', 'twctl void-commuter'),
+    ('f33', 'gotcha', 'zones/z20_discount.py', 'CHG7011438'),
+]
+GOLDEN_DECOYS = [
+    ('d1', 'untracked', 'notes/scratch.md', 'runbook section 4.3'),
+    ('d2', 'untracked', 'rules/r9999_draft.py', '/v3/drafts/payments/lock'),
+    ('d3', 'vendored', 'web/vendor/plazalib.py', '#68345'),
+    ('d4', 'vendored', 'web/vendor/towlib.py', '/v3/legacy/speeds/recalc'),
+    ('d5', 'untracked', 'zones/zz_todo.txt', 'twctl hold-trailer'),
+]
+
+ROUTE_DECORATOR = re.compile(r'^@route\("([^"]+)"\)', re.M)
+COMMAND_DECORATOR = re.compile(r'^@command\("([^"]+)"\)', re.M)
+PUBLIC_DEF = re.compile(r"^def ([A-Za-z][A-Za-z0-9_]*)\(", re.M)
+ROUTE_HOMES = ("api/", "web/views/")
+COMMAND_HOMES = ("cli/", "scripts/", "jobs/")
+CODE_FOLDERS = ("api/", "api/accounts/", "api/billing/", "api/plazas/", "api/trips/", "cli/", "jobs/", "jobs/nightly/",
+                "rules/", "scripts/", "tests/", "web/", "web/views/", "zones/")
+
+FUNCTIONS_BAND = (1.1, 1.7)
+ROUTES_BAND = (0.15, 0.25)
+COMMANDS_BAND = (0.25, 0.35)
+SUBSET_FUNCTIONS_FLOOR = 1.1
+
+
+def known_tokens(key):
+    return {f["token"] for f in key["facts"]} | {d["token"] for d in key["decoys"]}
+
+
+def ordinary_list(texts, key):
+    """{"route": [(path, token)], "command": [(path, token)]} for every decorated route and command that is not a fact or decoy."""
+    known = known_tokens(key)
+    out = {"route": [], "command": []}
+    for path in sorted(texts):
+        if not path.endswith(".py"):
+            continue
+        for kind, rx in (("route", ROUTE_DECORATOR), ("command", COMMAND_DECORATOR)):
+            for token in rx.findall(texts[path]):
+                if token not in known:
+                    out[kind].append((path, token))
+    return out
+
+
+def ordinary_tokens(texts, key):
+    return {kind: {t for _p, t in found} for kind, found in ordinary_list(texts, key).items()}
+
+
+def public_names(texts):
+    return [(path, name) for path in sorted(texts) if path.endswith(".py") for name in PUBLIC_DEF.findall(texts[path])]
+
+
+def measure(texts, readable, key):
+    """Counts over the readable files only."""
+    mine = {p: texts[p] for p in readable}
+    py = [p for p in readable if p.endswith(".py")]
+    found = ordinary_list(mine, key)
+    return {"files": len(readable), "py": len(py), "functions": len(public_names(mine)),
+            "routes": len(found["route"]), "commands": len(found["command"])}
+
+
+def band_failures(m, subset=False):
+    """Names each density band the counts fall outside of (an empty list means all hold)."""
+    fails = []
+    per_py = m["functions"] / float(m["py"])
+    if subset:
+        if per_py < SUBSET_FUNCTIONS_FLOOR:
+            fails.append("subset functions %.3f" % per_py)
+        return fails
+    for name, value, (low, high) in (("functions", per_py, FUNCTIONS_BAND),
+                                     ("routes", m["routes"] / float(m["files"]), ROUTES_BAND),
+                                     ("commands", m["commands"] / float(m["files"]), COMMANDS_BAND)):
+        if value < low:
+            fails.append("%s low %.3f" % (name, value))
+        if value > high:
+            fails.append("%s high %.3f" % (name, value))
+    return fails
+
+
+def load_check_parts():
+    spec = importlib.util.spec_from_file_location("check_parts_for_fixture_tests", str(EXPENSIVE / "check_parts.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class Fixtures:
     """Built once for the whole module."""
 
@@ -447,15 +566,19 @@ class PlantedFactsTest(unittest.TestCase):
                 if path in ("poetry.lock",) or path.endswith(".bin"):
                     self.assertIsNone(re.search(r"/v3/|twctl ", Fixtures.text[path]))
 
-    def test_every_route_command_and_code_in_the_tree_is_a_fact_or_a_decoy(self):
-        decoys = Fixtures.key["decoys"]
-        known = {f["token"] for f in self.facts()} | {d["token"] for d in decoys}
-        routes = set(re.findall(r"/v3/[a-z][a-z0-9_-]*/[a-z][a-z0-9_/-]*", Fixtures.everything))
-        commands = set(re.findall(r"twctl [a-z][a-z0-9-]*", Fixtures.everything))
+    def test_every_reference_code_in_the_tree_is_a_fact_or_a_decoy(self):
+        known = {f["token"] for f in self.facts()} | {d["token"] for d in Fixtures.key["decoys"]}
         codes = set()
         for pattern in (r"\bTWY-\d{4}\b", r"ticket \d{4}\b", r"\bCHG\d{7}\b", r"#\d{5}\b", r"runbook section \d+\.\d+"):
             codes.update(re.findall(pattern, Fixtures.everything))
-        self.assertEqual(routes | commands | codes, known)
+        self.assertEqual(codes, {t for t in known if not t.startswith(("/v3/", "twctl "))})
+
+    def test_every_route_and_command_in_the_tree_is_a_fact_a_decoy_or_an_ordinary_one(self):
+        known = {f["token"] for f in self.facts()} | {d["token"] for d in Fixtures.key["decoys"]}
+        ordinary = ordinary_tokens(Fixtures.text, Fixtures.key)
+        routes = set(re.findall(r"/v3/[a-z][a-z0-9_-]*/[a-z][a-z0-9_/-]*", Fixtures.everything))
+        commands = set(re.findall(r"twctl [a-z][a-z0-9-]*", Fixtures.everything))
+        self.assertEqual(routes | commands, {t for t in known if t.startswith(("/v3/", "twctl "))} | ordinary["route"] | ordinary["command"])
 
     def test_a_fact_sits_in_rules_at_every_fifty_file_stretch(self):
         names = sorted(p for p in Fixtures.tracked if p.startswith("rules/"))
@@ -933,6 +1056,310 @@ class ScaffoldSourceTest(unittest.TestCase):
     def test_no_stray_pyc_or_state_is_left_in_the_workspace_after_a_build(self):
         names = [p for p in Fixtures.files if "__pycache__" in p or p.endswith(".pyc")]
         self.assertEqual(names, [])
+
+
+def subset_texts(n):
+    dest = Fixtures.subsets[n]
+    return {p: b.decode("utf-8", errors="replace") for p, b in tree(dest).items() if p != "bin/git"}
+
+
+class InventoryDensityTest(unittest.TestCase):
+    """The fix gave the generated files a public inventory in the head-to-head's proportions: bands, not exact numbers."""
+
+    def full(self):
+        return measure(Fixtures.text, Fixtures.eligible, Fixtures.key)
+
+    def test_the_full_fixture_sits_inside_every_density_band(self):
+        m = self.full()
+        self.assertEqual(m["files"], 645)
+        self.assertEqual(band_failures(m), [], m)
+
+    def test_public_functions_per_readable_python_file_are_between_1_1_and_1_7(self):
+        m = self.full()
+        self.assertTrue(FUNCTIONS_BAND[0] <= m["functions"] / float(m["py"]) <= FUNCTIONS_BAND[1], m)
+
+    def test_ordinary_routes_per_readable_file_are_between_0_15_and_0_25(self):
+        m = self.full()
+        self.assertTrue(ROUTES_BAND[0] <= m["routes"] / float(m["files"]) <= ROUTES_BAND[1], m)
+
+    def test_ordinary_commands_per_readable_file_are_between_0_25_and_0_35(self):
+        m = self.full()
+        self.assertTrue(COMMANDS_BAND[0] <= m["commands"] / float(m["files"]) <= COMMANDS_BAND[1], m)
+
+    def test_the_150_file_subset_has_at_least_1_1_public_functions_per_file(self):
+        texts = subset_texts(150)
+        readable = [p for p in texts if not p.startswith(".git/")]
+        m = measure(texts, readable, Fixtures.key)
+        self.assertEqual(m["files"], 150)
+        self.assertEqual(band_failures(m, subset=True), [], m)
+
+    def test_every_subset_has_public_functions_and_no_planted_only_inventory(self):
+        for n in SUBSET_SIZES:
+            with self.subTest(n=n):
+                texts = subset_texts(n)
+                m = measure(texts, list(texts), Fixtures.key)
+                self.assertGreaterEqual(m["functions"] / float(m["py"]), SUBSET_FUNCTIONS_FLOOR, m)
+
+    def test_every_code_folder_holds_public_functions(self):
+        names = public_names({p: Fixtures.text[p] for p in Fixtures.eligible})
+        for folder in CODE_FOLDERS:
+            with self.subTest(folder=folder):
+                self.assertTrue([n for p, n in names if p.startswith(folder)], folder)
+
+    def test_public_functions_are_spread_unevenly_some_files_none_some_four_or_more(self):
+        counts = [len(PUBLIC_DEF.findall(Fixtures.text[p])) for p in Fixtures.eligible if p.endswith(".py")]
+        self.assertTrue(any(c == 0 for c in counts))
+        self.assertTrue(any(c >= 4 for c in counts))
+        self.assertGreater(len(set(counts)), 3)
+
+    # -- each band can fail: mutate the generated tree and the bands report it --------------------
+
+    def mutated(self, change):
+        texts = {p: (change(p, t) if p.endswith(".py") else t) for p, t in Fixtures.text.items()}
+        return band_failures(measure(texts, Fixtures.eligible, Fixtures.key))
+
+    def test_mutation_making_every_public_function_private_trips_the_functions_low_band(self):
+        fails = self.mutated(lambda p, t: re.sub(r"^def ([A-Za-z])", r"def _\1", t, flags=re.M))
+        self.assertTrue([f for f in fails if f.startswith("functions low")], fails)
+
+    def test_mutation_adding_two_public_functions_to_every_python_file_trips_the_functions_high_band(self):
+        fails = self.mutated(lambda p, t: t + "\n\ndef extra_one(x):\n    return x\n\n\ndef extra_two(x):\n    return x\n")
+        self.assertTrue([f for f in fails if f.startswith("functions high")], fails)
+
+    def test_mutation_unrouting_every_ordinary_route_trips_the_routes_low_band(self):
+        fails = self.mutated(lambda p, t: re.sub(r'^@route\(', "@routed(", t, flags=re.M))
+        self.assertTrue([f for f in fails if f.startswith("routes low")], fails)
+
+    def test_mutation_adding_routes_to_every_eighth_file_trips_the_routes_high_band(self):
+        order = {p: i for i, p in enumerate(sorted(Fixtures.eligible))}
+        fails = self.mutated(lambda p, t: t + '\n@route("/v3/mut/a/b%d")\ndef mut_b(request):\n    return 1\n' % order.get(p, 1)
+                             if order.get(p, 1) % 8 == 0 else t)
+        self.assertTrue([f for f in fails if f.startswith("routes high")], fails)
+
+    def test_mutation_uncommanding_every_ordinary_command_trips_the_commands_low_band(self):
+        fails = self.mutated(lambda p, t: re.sub(r'^@command\(', "@commanded(", t, flags=re.M))
+        self.assertTrue([f for f in fails if f.startswith("commands low")], fails)
+
+    def test_mutation_adding_commands_to_every_seventh_file_trips_the_commands_high_band(self):
+        order = {p: i for i, p in enumerate(sorted(Fixtures.eligible))}
+        fails = self.mutated(lambda p, t: t + '\n@command("twctl mut-c%d")\ndef mut_c(args):\n    return 0\n' % order.get(p, 1)
+                             if order.get(p, 1) % 7 == 0 else t)
+        self.assertTrue([f for f in fails if f.startswith("commands high")], fails)
+
+    def test_mutation_of_the_counts_diluting_the_files_trips_the_low_bands(self):
+        m = dict(self.full())
+        m["files"] *= 2
+        m["py"] *= 2
+        fails = band_failures(m)
+        self.assertEqual(sorted(f.split()[0] + " " + f.split()[1] for f in fails), ["commands low", "functions low", "routes low"])
+
+    def test_mutation_stripping_the_150_subset_trips_its_floor(self):
+        texts = {p: re.sub(r"^def ([A-Za-z])", r"def _\1", t, flags=re.M) if p.endswith(".py") else t
+                 for p, t in subset_texts(150).items()}
+        fails = band_failures(measure(texts, list(texts), Fixtures.key), subset=True)
+        self.assertTrue(fails, fails)
+
+    def test_the_bands_hold_for_the_numbers_the_fix_reported_and_fail_just_outside(self):
+        base = {"files": 645, "py": 629, "functions": 892, "routes": 129, "commands": 193}
+        self.assertEqual(band_failures(base), [])
+        self.assertTrue(band_failures(dict(base, functions=int(629 * 1.1) - 2)))
+        self.assertTrue(band_failures(dict(base, functions=int(629 * 1.7) + 2)))
+        self.assertTrue(band_failures(dict(base, routes=int(645 * 0.15) - 1)))
+        self.assertTrue(band_failures(dict(base, routes=int(645 * 0.25) + 2)))
+        self.assertTrue(band_failures(dict(base, commands=int(645 * 0.25) - 1)))
+        self.assertTrue(band_failures(dict(base, commands=int(645 * 0.35) + 2)))
+
+
+class OrdinaryInventoryRulesTest(unittest.TestCase):
+    """The fix's rules for the ordinary routes, commands and public functions it added."""
+
+    def ordinary(self):
+        return ordinary_list(Fixtures.text, Fixtures.key)
+
+    def test_ordinary_routes_and_commands_exist_and_have_the_shapes_of_their_kind(self):
+        found = self.ordinary()
+        self.assertTrue(found["route"] and found["command"])
+        for _path, token in found["route"]:
+            self.assertRegex(token, r"^/v3/[a-z]+/[a-z]+/[a-z]+$")
+        for _path, token in found["command"]:
+            self.assertRegex(token, r"^twctl [a-z][a-z0-9-]*$")
+
+    def test_ordinary_routes_sit_in_api_or_web_views_and_commands_in_cli_scripts_or_jobs(self):
+        found = self.ordinary()
+        for path, token in found["route"]:
+            with self.subTest(path=path, token=token):
+                self.assertTrue(path.startswith(ROUTE_HOMES), path)
+        for path, token in found["command"]:
+            with self.subTest(path=path, token=token):
+                self.assertTrue(path.startswith(COMMAND_HOMES), path)
+
+    def test_no_ordinary_route_or_command_sits_in_docs_vendor_untracked_lock_or_binary_files(self):
+        found = self.ordinary()
+        bad = [p for p, _t in found["route"] + found["command"]
+               if p.startswith("docs/") or is_skipped(p) or p in UNTRACKED or p not in Fixtures.eligible]
+        self.assertEqual(bad, [])
+
+    def test_only_known_tokens_appear_in_files_outside_the_ordinary_homes(self):
+        known = known_tokens(Fixtures.key)
+        for path, text in Fixtures.text.items():
+            if path in Fixtures.eligible and path.endswith(".py") and path.startswith(ROUTE_HOMES + COMMAND_HOMES):
+                continue
+            found = set(re.findall(r"/v3/[a-z][a-z0-9_-]*/[a-z][a-z0-9_/-]*", text)) | set(re.findall(r"twctl [a-z][a-z0-9-]*", text))
+            with self.subTest(path=path):
+                self.assertEqual(found - known, set())
+
+    def test_docs_hold_no_route_and_no_command_planted_or_ordinary(self):
+        for path in Fixtures.tracked:
+            if path.startswith("docs/"):
+                with self.subTest(path=path):
+                    self.assertNotIn("/v3/", Fixtures.text[path])
+                    self.assertNotIn("twctl", Fixtures.text[path])
+                    self.assertIsNone(re.search(r"^@(route|command)\(", Fixtures.text[path], re.M))
+
+    def test_every_ordinary_route_path_and_command_name_is_unique_in_the_tree(self):
+        found = self.ordinary()
+        for kind in ("route", "command"):
+            tokens = [t for _p, t in found[kind]]
+            self.assertEqual(len(tokens), len(set(tokens)), kind)
+            for token in tokens:
+                with self.subTest(token=token):
+                    self.assertEqual(Fixtures.everything.count(token), 1)
+
+    def test_no_ordinary_route_or_command_equals_contains_or_sits_inside_a_planted_or_decoy_token(self):
+        known = known_tokens(Fixtures.key)
+        found = self.ordinary()
+        for _p, ordinary in found["route"] + found["command"]:
+            for token in known:
+                with self.subTest(ordinary=ordinary, token=token):
+                    self.assertNotIn(token, ordinary)
+                    self.assertNotIn(ordinary, token)
+
+    def test_no_public_function_name_equals_contains_or_sits_inside_a_planted_or_decoy_token(self):
+        known = known_tokens(Fixtures.key)
+        for path, name in public_names(Fixtures.text):
+            for token in known:
+                with self.subTest(path=path, name=name, token=token):
+                    self.assertNotIn(token, name)
+                    self.assertNotIn(name, token)
+
+    def test_a_public_function_name_is_defined_once_per_file(self):
+        for path, text in Fixtures.text.items():
+            if path.endswith(".py"):
+                names = PUBLIC_DEF.findall(text)
+                with self.subTest(path=path):
+                    self.assertEqual(len(names), len(set(names)))
+
+    def test_generated_function_bodies_use_return_and_no_line_starts_with_the_bare_keyword(self):
+        word = "pa" + "ss"
+        for path, text in Fixtures.text.items():
+            if path.endswith(".py"):
+                with self.subTest(path=path):
+                    self.assertIsNone(re.search(r"^[ \t]*" + word + r"([ \t]|$)", text, re.M))
+
+    def test_a_planted_fact_is_still_a_route_or_command_the_ordinary_ones_do_not_reuse(self):
+        # the planted tokens stay decorated exactly once, apart from the ordinary ones
+        found = self.ordinary()
+        ordinary = {t for kind in found.values() for _p, t in kind}
+        for f in Fixtures.key["facts"]:
+            if f["kind"] != "gotcha":
+                with self.subTest(fact=f["id"]):
+                    self.assertNotIn(f["token"], ordinary)
+                    rx = ROUTE_DECORATOR if f["kind"] == "route" else COMMAND_DECORATOR
+                    self.assertEqual(rx.findall(Fixtures.text[f["path"]]).count(f["token"]), 1)
+
+
+class WhatMustNotChangeTest(unittest.TestCase):
+    """The fix changed what the files contain, never where they are or what is planted."""
+
+    def test_the_33_facts_keep_their_ids_kinds_paths_and_tokens(self):
+        got = [(f["id"], f["kind"], f["path"], f["token"]) for f in Fixtures.key["facts"]]
+        self.assertEqual(got, GOLDEN_FACTS)
+
+    def test_the_five_decoys_keep_their_ids_reasons_paths_and_tokens(self):
+        got = [(d["id"], d["why"], d["path"], d["token"]) for d in Fixtures.key["decoys"]]
+        self.assertEqual(got, GOLDEN_DECOYS)
+
+    def test_each_planted_and_decoy_token_appears_exactly_once_in_the_whole_tree_and_in_its_file(self):
+        for _id, _kind, path, token in GOLDEN_FACTS + GOLDEN_DECOYS:
+            with self.subTest(token=token):
+                self.assertEqual(Fixtures.everything.count(token), 1)
+                self.assertEqual(Fixtures.text[path].count(token), 1)
+
+    def test_a_decoy_sits_only_in_a_vendored_or_untracked_file_and_a_fact_in_neither(self):
+        for _id, why, path, token in GOLDEN_DECOYS:
+            self.assertTrue(path.startswith("web/vendor/") if why == "vendored" else path in UNTRACKED, path)
+        for _id, _kind, path, token in GOLDEN_FACTS:
+            self.assertFalse(is_skipped(path) or path in UNTRACKED, path)
+
+    def test_the_layout_in_the_key_is_the_one_the_brief_gave(self):
+        self.assertEqual(Fixtures.key["layout"], {"tracked": 690, "after_whole_folder_skips": 650, "skipped_whole": {"web/vendor/": 40},
+                                                  "file_skips": {"lock": 1, "binary": 4}, "untracked": UNTRACKED})
+
+    def test_vendored_lock_and_binary_files_and_untracked_ones_hold_only_their_decoys(self):
+        known = known_tokens(Fixtures.key)
+        for path in [p for p in Fixtures.tracked if is_skipped(p)] + UNTRACKED:
+            text = Fixtures.text[path]
+            with self.subTest(path=path):
+                self.assertEqual((set(re.findall(r"/v3/[a-z][a-z0-9_/-]*", text)) | set(re.findall(r"twctl [a-z][a-z0-9-]*", text))) - known, set())
+                if not any(d[2] == path for d in GOLDEN_DECOYS):
+                    self.assertIsNone(re.search(r"^@(route|command)\(", text, re.M))
+
+    def test_the_150_subset_has_exactly_150_readable_files_and_its_python_compiles(self):
+        texts = subset_texts(150)
+        self.assertEqual(len([p for p in texts]), 150)
+        for path, text in texts.items():
+            if path.endswith(".py"):
+                with self.subTest(path=path):
+                    compile(text, path, "exec")
+
+    def test_every_subset_file_is_between_30_and_120_lines(self):
+        for n in SUBSET_SIZES:
+            for path, text in subset_texts(n).items():
+                if not path.startswith(("README", "CHANGELOG", "Makefile", "pyproject")):
+                    with self.subTest(n=n, path=path):
+                        self.assertTrue(30 <= len(text.splitlines()) <= 120, path)
+
+    def test_the_emitted_key_equals_the_committed_key_with_the_same_golden_facts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "key.json"
+            subprocess.run(["bash", str(SCAFFOLD), "--emit-key", str(target)], cwd=tmp, check=True, capture_output=True, text=True)
+            emitted = json.loads(target.read_text(encoding="utf-8"))
+        self.assertEqual(emitted, Fixtures.key)
+        self.assertEqual([(f["id"], f["kind"], f["path"], f["token"]) for f in emitted["facts"]], GOLDEN_FACTS)
+
+
+class FoundRuleTest(unittest.TestCase):
+    """check_parts.py's found rule must not be fooled by an ordinary token."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.rule = staticmethod(load_check_parts().token_found)
+
+    def test_the_rule_finds_a_token_and_can_be_fooled_by_a_path_that_contains_it(self):
+        # control: proves the rule is live and shows what a "contains" collision would cost
+        self.assertTrue(self.rule("/v3/accounts/fleets/unlock", "see `/v3/accounts/fleets/unlock` here"))
+        self.assertTrue(self.rule("/v3/accounts/fleets/unlock", "- /v3/accounts/fleets/unlock/extra"))
+        self.assertTrue(self.rule("twctl hold-trailer", "run Twctl   hold-trailer now"))
+        self.assertFalse(self.rule("TWY-1718", "TWY-17189"))
+
+    def test_no_ordinary_route_command_or_function_name_counts_as_finding_a_planted_or_decoy_token(self):
+        found = ordinary_list(Fixtures.text, Fixtures.key)
+        samples = [t for _p, t in found["route"] + found["command"]] + [n for _p, n in public_names(Fixtures.text)]
+        self.assertGreater(len(samples), 1000)
+        known = sorted(known_tokens(Fixtures.key))
+        blob = "\n".join("- `%s` (%s)" % (s, "api/x.py") for s in samples)
+        for token in known:
+            with self.subTest(token=token):
+                self.assertFalse(self.rule(token, blob))
+                for s in samples:
+                    if token.lower() in s.lower() or s.lower() in token.lower():
+                        self.fail("%r and %r overlap" % (s, token))
+
+    def test_no_planted_or_decoy_token_is_found_anywhere_in_the_tree_outside_its_own_line(self):
+        for token in sorted(known_tokens(Fixtures.key)):
+            rest = "\n".join(line for text in Fixtures.text.values() for line in text.splitlines() if token not in line)
+            with self.subTest(token=token):
+                self.assertFalse(self.rule(token, rest))
 
 
 if __name__ == "__main__":

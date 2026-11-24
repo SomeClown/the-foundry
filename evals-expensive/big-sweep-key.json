@@ -11,217 +11,217 @@
    "id": "f02",
    "kind": "route",
    "path": "api/accounts/plaza.py",
-   "line": 27,
+   "line": 7,
    "token": "/v3/accounts/fleets/unlock"
   },
   {
    "id": "f03",
    "kind": "route",
    "path": "api/app.py",
-   "line": 37,
+   "line": 31,
    "token": "/v3/gateway/tows/assign"
   },
   {
    "id": "f04",
    "kind": "gotcha",
    "path": "api/billing/entry.py",
-   "line": 26,
+   "line": 19,
    "token": "CHG6901825"
   },
   {
    "id": "f05",
    "kind": "route",
    "path": "api/billing/fine.py",
-   "line": 7,
+   "line": 37,
    "token": "/v3/billing/syncs/stage"
   },
   {
    "id": "f06",
    "kind": "gotcha",
    "path": "api/plazas/account.py",
-   "line": 6,
+   "line": 12,
    "token": "#10854"
   },
   {
    "id": "f07",
    "kind": "route",
    "path": "api/plazas/speed.py",
-   "line": 19,
+   "line": 7,
    "token": "/v3/plazas/tiers/assign"
   },
   {
    "id": "f08",
    "kind": "gotcha",
    "path": "api/trips/deposit.py",
-   "line": 6,
+   "line": 7,
    "token": "runbook section 8.2"
   },
   {
    "id": "f09",
    "kind": "route",
    "path": "api/trips/fine.py",
-   "line": 27,
+   "line": 7,
    "token": "/v3/trips/vaults/recalc"
   },
   {
    "id": "f10",
    "kind": "command",
    "path": "cli/cmd_fleet.py",
-   "line": 7,
+   "line": 12,
    "token": "twctl preview-lane"
   },
   {
    "id": "f11",
    "kind": "command",
    "path": "cli/cmd_trailer.py",
-   "line": 13,
+   "line": 29,
    "token": "twctl sweep-booth"
   },
   {
    "id": "f12",
    "kind": "gotcha",
    "path": "jobs/nightly/notice_close.py",
-   "line": 6,
+   "line": 12,
    "token": "TWY-1718"
   },
   {
    "id": "f13",
    "kind": "command",
    "path": "jobs/runner.py",
-   "line": 19,
+   "line": 13,
    "token": "twctl redact-plate"
   },
   {
    "id": "f14",
    "kind": "gotcha",
    "path": "main.py",
-   "line": 6,
+   "line": 36,
    "token": "TWY-8667"
   },
   {
    "id": "f15",
    "kind": "gotcha",
    "path": "rules/r0001_vehicle.py",
-   "line": 26,
+   "line": 36,
    "token": "ticket 3533"
   },
   {
    "id": "f16",
    "kind": "route",
    "path": "rules/r0029_span.py",
-   "line": 27,
+   "line": 19,
    "token": "/v3/rules/incidents/rollup"
   },
   {
    "id": "f17",
    "kind": "command",
    "path": "rules/r0057_tag.py",
-   "line": 7,
+   "line": 37,
    "token": "twctl recalc-commuter"
   },
   {
    "id": "f18",
    "kind": "gotcha",
    "path": "rules/r0085_tow.py",
-   "line": 12,
+   "line": 6,
    "token": "CHG5378130"
   },
   {
    "id": "f19",
    "kind": "route",
    "path": "rules/r0113_incident.py",
-   "line": 19,
+   "line": 7,
    "token": "/v3/rules/lanes/rollup"
   },
   {
    "id": "f20",
    "kind": "command",
    "path": "rules/r0141_queue.py",
-   "line": 7,
+   "line": 45,
    "token": "twctl escalate-span"
   },
   {
    "id": "f21",
    "kind": "gotcha",
    "path": "rules/r0170_tag.py",
-   "line": 18,
+   "line": 47,
    "token": "#43906"
   },
   {
    "id": "f22",
    "kind": "route",
    "path": "rules/r0198_class.py",
-   "line": 37,
+   "line": 7,
    "token": "/v3/rules/transponders/reopen"
   },
   {
    "id": "f23",
    "kind": "command",
    "path": "rules/r0226_axle.py",
-   "line": 13,
+   "line": 79,
    "token": "twctl export-export"
   },
   {
    "id": "f24",
    "kind": "gotcha",
    "path": "rules/r0254_lien.py",
-   "line": 36,
+   "line": 18,
    "token": "runbook section 2.5"
   },
   {
    "id": "f25",
    "kind": "route",
    "path": "rules/r0282_account.py",
-   "line": 27,
+   "line": 7,
    "token": "/v3/rules/transponders/reconcile"
   },
   {
    "id": "f26",
    "kind": "command",
    "path": "rules/r0310_transponder.py",
-   "line": 13,
+   "line": 37,
    "token": "twctl notify-bridge"
   },
   {
    "id": "f27",
    "kind": "command",
    "path": "scripts/export_ledger.py",
-   "line": 27,
+   "line": 44,
    "token": "twctl defer-bridge"
   },
   {
    "id": "f28",
    "kind": "gotcha",
    "path": "tests/test_invoice.py",
-   "line": 36,
+   "line": 12,
    "token": "TWY-5116"
   },
   {
    "id": "f29",
    "kind": "gotcha",
    "path": "web/session.py",
-   "line": 6,
+   "line": 26,
    "token": "ticket 8341"
   },
   {
    "id": "f30",
    "kind": "route",
    "path": "web/views/invoice.py",
-   "line": 7,
+   "line": 32,
    "token": "/v3/web/transponders/confirm"
   },
   {
    "id": "f31",
    "kind": "route",
    "path": "zones/z04_batch.py",
-   "line": 7,
+   "line": 20,
    "token": "/v3/zones/plates/archive"
   },
   {
    "id": "f32",
    "kind": "command",
    "path": "zones/z11_deposit.py",
-   "line": 13,
+   "line": 47,
    "token": "twctl void-commuter"
   },
   {

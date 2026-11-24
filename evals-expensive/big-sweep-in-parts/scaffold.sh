@@ -31,6 +31,7 @@ NOUNS = ("toll lane booth gantry plaza transponder tag receipt invoice ledger ac
 VERBS = ("hold release reassign void approve escalate reconcile recalc archive flag split merge export preview refresh "
          "retry cancel confirm defer expedite audit notify quote verify tag lock unlock reopen assign rebook "
          "reprice trace purge redact sweep rollup stage freeze thaw").split()
+PUBLIC_COUNTS = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 2, 3, 5]
 PW = "zone weight rate window limit tier band offset margin factor bucket span share floor cap".split()
 SEGS = ["gateway", "rules", "zones", "web", "jobs"]
 
@@ -152,6 +153,8 @@ class World:
         self.untracked = {}
         self.vendor = []
         self.gotcha_n = 0
+        self.ordinary = {}
+        self.publics = {}
 
     # ---- tokens -----------------------------------------------------------
 
@@ -286,6 +289,47 @@ class World:
         self.decoy("notes/scratch.md", "gotcha", "untracked")
         self.decoy("zones/zz_todo.txt", "command", "untracked")
 
+        self.inventory()
+
+    def spread(self, pool, total, cap, kind, segs):
+        """Hand `total` ordinary routes or commands to files drawn from `pool`, unevenly, at most `cap` to a file."""
+        rng = self.rng
+        given = {}
+        for _i in range(total):
+            while True:
+                path = rng.choice(pool)
+                if given.get(path, 0) < cap:
+                    break
+            given[path] = given.get(path, 0) + 1
+            self.ordinary.setdefault(path, []).append(self.new(kind, segs(path)))
+
+    def inventory(self):
+        """Ordinary public inventory: routes in api/ and web/views/, commands in cli/, scripts/ and jobs/, plain public functions in every code folder."""
+        rng = self.rng
+        api = [p for p in self.py if p.startswith("api/") and not p.endswith("__init__.py")]
+        views = [p for p in self.py if p.startswith("web/views/")]
+        self.spread(api, 90, 4, "route", lambda p: p.split("/")[1] if p.count("/") == 2 else "gateway")
+        self.spread(views, 39, 3, "route", lambda p: "web")
+        cmds = [p for p in self.py if p.startswith(("cli/cmd_", "scripts/"))] * 3
+        cmds += [p for p in self.py if p.startswith("jobs/") and not p.endswith("__init__.py")]
+        self.spread(cmds, 193, 8, "command", lambda p: None)
+        for path in self.py:
+            if not path.startswith("web/vendor/"):
+                self.publics[path] = rng.choice(PUBLIC_COUNTS)
+
+    def public_block(self, rng, used):
+        while True:
+            name = "%s_%s" % (rng.choice(VERBS), rng.choice(NOUNS))
+            if name not in used:
+                used.add(name)
+                break
+        out = ["", "", "def %s(record, limit=%d):" % (name, rng.randint(2, 99)),
+               '    """Return the %s figure for one %s."""' % (rng.choice(NOUNS), rng.choice(NOUNS)), "    t0 = record * limit"]
+        for i in range(1, rng.randint(2, 5)):
+            out.append("    t%d = t%d * %d + %d" % (i, i - 1, rng.randint(2, 9), rng.randint(1, 40)))
+        out.append("    return t%d" % (len(out) - 5))
+        return out
+
     # ---- rendering --------------------------------------------------------
 
     def block(self, spec):
@@ -303,20 +347,29 @@ class World:
         title = stem.replace("_", " ")
         lines = ['"""%s: %s"""' % (title.capitalize(), rng.choice(SENTENCES).format(d=rng.choice(AREAS), n=rng.choice(NOUNS))), ""]
         specs = self.plants.get(path, [])
-        kinds = set(s["kind"] for s in specs)
+        ordinary = self.ordinary.get(path, [])
+        kinds = set(s["kind"] for s in specs + ordinary)
         if "route" in kinds:
             lines.append("from tollway.web import route")
         if "command" in kinds:
             lines.append("from tollway.cli import command")
         if kinds:
             lines.append("")
-        used = set()
+        used = set("%s_%s" % (s["verb"], s["noun"]) for s in specs + ordinary if s["kind"] != "gotcha")
+        blocks = [self.block(s) for s in specs + ordinary]
+        room = 100 - len(lines) - sum(len(b) for b in blocks)
+        for _i in range(self.publics.get(path, 0)):
+            block = self.public_block(rng, used)
+            if len(block) <= room:
+                room -= len(block)
+                blocks.append(block)
+        rng.shuffle(blocks)
         pre = rng.choice([0, 0, 6, 12, 20, 30])
-        if pre:
-            fill(rng, lines, len(lines) + pre, used)
-        for spec in specs:
-            lines.extend(self.block(spec))
-        return pad_normal(rng, lines, used)
+        if pre and pre <= room:
+            fill(rng, lines, len(lines) + pre, set())
+        for block in blocks:
+            lines.extend(block)
+        return pad_normal(rng, lines, set())
 
     def render_vendor(self, path):
         rng = self.rng
