@@ -1123,3 +1123,35 @@ and the eight gaps that read found are settled here):
 - A scoped read needs no such line, since its follow-up sends the original
   brief again. The session's side doesn't change: it already copies every
   line from `Project:` to `END OF BLOCK`.
+
+### Amended (2026-11-23): the part size is 450 files
+
+Part 7's measurement is done, on today's definition, in live headless
+sessions and in the eval harness. Reports ran 11KB for 150 files, 20KB for
+320, and 27KB for the whole 645-file test repo, with every route and command
+written out in full. All of them reached the session whole, in the agent's
+result, with no preview. Previews start somewhere between 36KB and 54KB, and
+a preview's saved file could be read in a live session, so nothing measured
+came near being cut off. The earlier worry, 53.7KB for 191 files, was one
+run with `investigate` on Haiku; on Sonnet the same repo gave 17KB to 27KB.
+
+By the plan's rule that made three areas' worth the answer, not the two that
+300 assumed, so the number went back to the owner, as Part 7 says it must.
+
+**Owner decision (2026-11-23), fourth round, A:** the part size is 450
+files. The other options were 300 (more runs for the same repo, further from
+the edge) and 600 (fewer runs, nearer to it).
+
+What follows from it:
+
+- "About 300" in Part 2 reads 450 from here on. Nothing else in Parts 1 to 6
+  changes: areas stay at about 150 files, and a part is still whole areas
+  only, never fewer than one.
+- The test repo grows so the proof still needs three parts. Two parts of 450
+  hold at most 900 files, so the flat folder goes from 310 files to 610,
+  which makes 950 after the whole-folder skip (my call).
+- The head-to-head's 181-file repo stays one report, as before.
+- The open item about dense repos stands. 450 files of this test repo make a
+  report of about 22KB. A repo twice as dense would land where previews
+  start, which costs the session a file read and nothing else. One much
+  denser than that is what the last line is there to catch.
