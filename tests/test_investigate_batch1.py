@@ -85,7 +85,6 @@ PINS = [
     ("10 notes about ignored notices come after", "When You Can't Spawn", r"note about a notice you ignored.{0,60}goes after them, never on the first line"),
     # 11. small gaps
     ("11 orientation names entry point", "How to Orient Yourself", r"name the entry point: the file or command the project starts from"),
-    ("11 STOPPED reply has no Coverage", "8. Coverage", r"`STOPPED BEFORE READING` reply carries no Coverage section"),
     ("11 known codebase whole-thing is full sweep", "Pick a Mode", r"known codebase whose brief asks for the whole thing gets a full sweep"),
     ("11 focus alone does not make scoped", "Pick a Mode", r"a focus alone doesn't make a read scoped"),
     # fix round 1 rulings
@@ -98,7 +97,7 @@ PINS = [
     ("R4 NOT A PER-FILE READ is for missing Agent", "When You Can't Spawn", r"`NOT A PER-FILE READ` stays for a missing `Agent`"),
     ("R4 unstarted files by path in Coverage", "When You Can't Spawn", r"not yet started as unread, by path, in Coverage"),
     ("R4 count in note after Mode line", "When You Can't Spawn", r"say how many in the note after the `Mode:` line"),
-    ("R7 untracked do not count toward 500 stop", "Build the File List", r"don't count toward the 500-file stop"),
+    ("R7 untracked do not count toward the part size", "Build the File List", r"don't count toward the part size"),
     ("R7 untracked do not count in files listed", "Build the File List", r"or Coverage's \"files listed\""),
     ("R7 untracked get own Coverage line", "Build the File List", r"Coverage lists them on their own line"),
     # qa test-only findings (B4), agents/investigate.md side

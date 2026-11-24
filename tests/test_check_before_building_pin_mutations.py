@@ -21,6 +21,7 @@ import test_structure  # noqa: E402
 COPIED = ["agents", "skills", "docs/orchestrator.md", "docs/walkthrough.md", "evals/run-plan-decisions", "evals/README.md", "CONTRIBUTING.md"]
 PINS = test_structure.CheckBeforeBuildingPinsTest
 NO_COST = test_structure.NoCostGatesPinsTest
+NO_STOP = test_structure.NoStopBeforeReadingTest
 
 
 def flat_sub(text, phrase, new="", count=1):
@@ -41,7 +42,7 @@ def run_pins(root):
         p.start()
     try:
         result = unittest.TestResult()
-        for cls in (PINS, NO_COST):
+        for cls in (PINS, NO_COST, NO_STOP):
             unittest.defaultTestLoader.loadTestsFromTestCase(cls).run(result)
     finally:
         for p in patches:
@@ -333,7 +334,7 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
         # Not mutations that should be caught: the opposite. These additions must leave every pin green.
         for rel, addition in ((self.EVALS_README, "What it cost: about $4 on 2026-11-20."),
                               (self.CONTRIB, "Pushing waits for the user."),
-                              ("agents/investigate.md", "STOPPED BEFORE READING (over 500 files): ask the owner."),
+                              ("agents/investigate.md", "Read the saved output when a report arrives as a preview."),
                               (self.RUN, "Spec-check when it earns its cost.")):
             with self.subTest(file=rel, addition=addition):
                 path = self.tmp / rel
@@ -345,6 +346,22 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
                     path.write_text(original, encoding="utf-8")
                 failed = [str(t) for t, _ in result.failures + result.errors if "NoCostGates" in str(t)]
                 self.assertEqual(failed, [])
+                if rel == "agents/investigate.md":
+                    # the new LEFT_ALONE line leaves every pin green, the no-stop pin included
+                    self.assertEqual([str(t) for t, _ in result.failures + result.errors], [])
+
+    # No stop before reading (design section 4): the old stop, put back by mutation
+    NOSTOP = "test_no_agent_or_skill_file_keeps_the_stop_in_any_spelling"
+
+    def test_the_old_stop_sentence_appended_to_investigate_is_caught(self):
+        self.assertCaught("agents/investigate.md",
+                          lambda t: t.rstrip("\n") + "\n\nSTOPPED BEFORE READING (over 500 files): ask the owner.\n", self.NOSTOP)
+
+    def test_each_removed_stop_sentence_put_back_is_caught_by_the_no_stop_pin(self):
+        for old in NO_STOP.REMOVED:
+            for rel in ("agents/investigate.md", "agents/implement.md", "skills/run-plan/SKILL.md"):
+                with self.subTest(file=rel, old=old[:50]):
+                    self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\n" + old + "\n", self.NOSTOP)
 
 
 if __name__ == "__main__":

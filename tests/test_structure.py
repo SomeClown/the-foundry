@@ -230,7 +230,7 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
             "Send 10 at a time",
             "batches of 10",
             "about 150 files",
-            "exceeds 500 files",
+            "The part size is 450 files",
             "over about 1,000 lines",
             "lines 1-800, 751-1550, 1501-2300",
         ):
@@ -281,7 +281,16 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
         text = self.text("investigate")
         for token in (
             "NOT A PER-FILE READ: <why>",
-            "STOPPED BEFORE READING: <N> files",
+            "SWEEP IN PARTS: <n> areas not read",
+            "SWEEP IN PARTS: <n> files not read",
+            "CONTINUE SWEEP",
+            "END OF BLOCK",
+            "INVESTIGATE REPORT ENDS",
+            "AREA REPORT ENDS",
+            "Areas not read:",
+            "Areas read:",
+            "Whole repo:",
+            "Files listed: <n>; read: <n>; skipped: <n>; re-dispatched: <n>; failed: <n>; unread: <n>",
             "Mode: full sweep, <N> area leads",
             "Mode: full sweep, no area leads",
             "Mode: scoped",
@@ -295,6 +304,71 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
         text = self.text("investigate")
         at = text.index("### 8. Coverage")
         self.assertIn("Never omitted", text[at : at + 200])
+
+    def test_continue_sweep_sits_alone_on_a_template_line(self):
+        # The continuing brief's template: the marker is the whole of line 1, inside a fence.
+        text = self.text("investigate")
+        self.assertIn("```\nCONTINUE SWEEP\nProject: <copied from the block>\n", text)
+
+    def test_the_continue_section_sits_after_the_area_lead_section_and_before_orientation_and_modes(self):
+        text = self.text("investigate")
+        heads = [text.index(h) for h in (
+            "\n## If You're an Area Lead\n",
+            "\n## If Your Brief Continues a Sweep\n",
+            "\n## How to Orient Yourself\n",
+            "\n## Pick a Mode\n",
+        )]
+        self.assertEqual(heads, sorted(heads))
+        self.assertEqual(text.count("## If Your Brief Continues a Sweep"), 1)
+
+    def test_the_description_holds_both_tokens_and_the_dispatch_rule(self):
+        description = front_matter(AGENTS / "investigate.md")["description"]
+        self.assertIn("`SWEEP IN PARTS`", description)
+        self.assertIn("`CONTINUE SWEEP`", description)
+        self.assertIn("until it says 0 areas not read", description)
+
+    BLOCK_LINES = [
+        "SWEEP IN PARTS: 3 areas not read",
+        "To read the rest, dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first line, then every line from `Project:` to `END OF BLOCK`, copied as it stands.",
+        "Project: <a sentence or two>",
+        'Focus: <the task\'s focus, or "none">',
+        "Environment: <anything the brief said about the environment, such as a git wrapper>",
+        'Instructions: <anything else the brief asked of the report, or "none">',
+        "Areas not read:",
+        '- <one line per area, as in "Areas", in order>',
+        "END OF BLOCK",
+    ]
+
+    @staticmethod
+    def fences(text):
+        return re.findall(r"^```[^\n]*\n(.*?)^```$", text, flags=re.M | re.S)
+
+    def block_template_in_one_fence(self, text):
+        want = self.BLOCK_LINES
+        for body in self.fences(text):
+            lines = body.split("\n")
+            if want[0] in lines:
+                at = lines.index(want[0])
+                return lines[at : at + len(want)] == want
+        return False
+
+    def test_the_block_template_lines_appear_in_order_inside_one_fence(self):
+        self.assertTrue(self.block_template_in_one_fence(self.text("investigate")))
+
+    def test_the_block_template_check_fails_when_a_line_is_dropped_swapped_or_split_across_fences(self):
+        text = self.text("investigate")
+        at = text.index(self.BLOCK_LINES[0] + "\n")
+        for line in self.BLOCK_LINES:
+            with self.subTest(dropped=line[:40]):
+                cut = text.index(line + "\n", at)
+                self.assertFalse(self.block_template_in_one_fence(text[:cut] + text[cut + len(line) + 1 :]))
+        head, tail = text[:at], text[at:]
+        swapped = head + tail.replace("Environment: <anything", "@@E@@", 1).replace("Instructions: <anything", "Environment: <anything", 1).replace("@@E@@", "Instructions: <anything", 1)
+        self.assertNotEqual(swapped, text)
+        self.assertFalse(self.block_template_in_one_fence(swapped))
+        split = head + tail.replace("Areas not read:\n- <one line", "Areas not read:\n```\n\n```\n- <one line", 1)
+        self.assertNotEqual(split, text)
+        self.assertFalse(self.block_template_in_one_fence(split))
 
 
 class SkillFilesTest(unittest.TestCase):
@@ -740,7 +814,7 @@ class NoCostGatesPinsTest(unittest.TestCase):
     """The owner's direction (2026-11-23): the Foundry doesn't gate work on what it costs and doesn't ask
     before spending. No agent or skill file, no CONTRIBUTING and no evals/README says to get an OK, ask
     first, park a finding or hold back because something costs money. Measured figures, the model tiers,
-    investigate's 500-file stop, 'when it earns its cost' (fit, not money) and every ask that isn't about
+    'when it earns its cost' (fit, not money) and every ask that isn't about
     cost (pushes, production, secrets) are untouched: the patterns below don't match them."""
 
     PATTERNS = {
@@ -765,7 +839,7 @@ class NoCostGatesPinsTest(unittest.TestCase):
     LEFT_ALONE = [
         "Pushing waits for the user.",
         "Stop and ask before: dropping/deleting data, force-pushing, rotating credentials, changing DNS.",
-        "STOPPED BEFORE READING (over 500 files): ask the owner.",
+        "Read the saved output when a report arrives as a preview.",
         "Spec-check when it earns its cost.",
         "Override the model only to downshift a small review: model: \"sonnet\".",
         "What it cost: the head-to-head took about $4 on 2026-11-20.",
@@ -811,6 +885,99 @@ class NoCostGatesPinsTest(unittest.TestCase):
         self.assertIn("would be a stop under section 5", body)
         self.assertNotIn("irreversible", body)
         self.assertNotIn("production", body)
+
+
+class NoStopBeforeReadingTest(unittest.TestCase):
+    """The stop above 500 files is gone (design section 4): a repo too big for one report is read in parts.
+    No agent or skill file says STOPPED BEFORE READING, names a 500-file limit, quotes a rough cost, or
+    waits for an approved reading. Each sentence that was taken out is shown to match the pattern."""
+
+    PATTERN = r"(?i)STOPPED BEFORE READING|500-file|\b500 files|rough cost|approved reading"
+    REMOVED = [
+        "Reply with a first line of `STOPPED BEFORE READING: <N> files`, then the area breakdown.",
+        "**Above 500 files.** If the list, after skips, exceeds 500 files and your brief doesn't say the user approved reading that many, read no more file contents.",
+        "The 500-file stop, the 150-file split, the gap check, and Coverage's \"files listed\" all count the current mode's list.",
+        "They don't count toward the 500-file stop or Coverage's \"files listed\".",
+        "Don't build a list, apply the 500-file stop, or split further.",
+        "The first-line flags (`STOPPED BEFORE READING`, `NOT A PER-FILE READ`) stay the first line.",
+        "Never omitted, except that a `STOPPED BEFORE READING` reply carries no Coverage section, since nothing was read.",
+        "then the area breakdown and a rough cost: the number of readers, each a short Haiku session.",
+        "If the brief says the user gave an approved reading of that size, go on.",
+        "and the list-building and 500-file parts of \"Build the File List\".",
+    ]
+
+    def files(self):
+        return sorted(p for root in (AGENTS, SKILLS) for p in root.rglob("*") if p.is_file())
+
+    def test_no_agent_or_skill_file_keeps_the_stop_in_any_spelling(self):
+        self.assertGreater(len(self.files()), 10)
+        for path in self.files():
+            text = " ".join(path.read_text(encoding="utf-8").split())
+            with self.subTest(file=str(path.relative_to(ROOT))):
+                m = re.search(self.PATTERN, text)
+                self.assertIsNone(m, m.group(0) if m else "")
+
+    def test_the_pattern_catches_every_sentence_that_was_taken_out(self):
+        for old in self.REMOVED:
+            with self.subTest(old=old[:50]):
+                self.assertIsNotNone(re.search(self.PATTERN, " ".join(old.split())), old)
+
+    def test_the_pattern_leaves_alone_the_part_size_and_the_sweep_in_parts_lines(self):
+        for kept in (
+            "The part size is 450 files.",
+            "`SWEEP IN PARTS: <n> areas not read`",
+            "Areas of at most about 150 files.",
+            "Read the saved output when a report arrives as a preview.",
+        ):
+            with self.subTest(kept=kept):
+                self.assertIsNone(re.search(self.PATTERN, kept))
+
+
+class InvestigateInstructionsLineTest(unittest.TestCase):
+    """The block's `Instructions:` line (design section 4, last amendment): each rule is pinned in "The Block"
+    and shown able to fail by deleting the matched phrase."""
+
+    HEADING = "### The Block"
+    PINS = [
+        ("what it holds", r"`Instructions:` holds everything the first brief asked of the report beyond project, focus and environment"),
+        ("the brief's words", r"in the brief's words, on one line, never shortened"),
+        ("several requests joined", r"with several requests joined by \"; \""),
+        ("nothing to carry reads none", r"With nothing to carry it reads `Instructions: none`"),
+        ("mode words go nowhere", r"Words that only pick the mode .{0,60}go nowhere"),
+        ("environment words go on Environment", r"`Environment:` carries the git wrapper, or the find command outside git, and whatever else the brief said about the environment"),
+        ("left-out folder is a whole-folder skip in part 1", r"A folder the brief says to leave out becomes a whole-folder skip in part 1, counted with the brief as its reason"),
+        ("a continuing run follows the line", r"A continuing run follows the `Instructions:` line as part of its brief"),
+        ("it copies the four lines as received", r"copies `Project:`, `Focus:`, `Environment:` and `Instructions:` into its own block as received, never rewritten"),
+        ("a brief without the line is none", r"A brief without the line is carried on as `Instructions: none`"),
+        ("the fixed rules win", r"The fixed rules win over the line: the block, the last line, never trimming an inventory, reading only your areas"),
+        ("a set-aside request gets one Coverage line", r"A request you set aside gets one line in Coverage"),
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        text = (AGENTS / "investigate.md").read_text(encoding="utf-8")
+        at = text.index("\n" + cls.HEADING + "\n")
+        end = text.index("\n### ", at + 5)
+        cls.body = " ".join(text[at:end].split())
+
+    def test_each_instructions_rule_is_stated_in_the_block_section(self):
+        for item, pattern in self.PINS:
+            with self.subTest(item=item):
+                self.assertIsNotNone(re.search(pattern, self.body), item)
+
+    def test_each_instructions_rule_is_stated_once_and_fails_when_its_phrase_is_deleted(self):
+        for item, pattern in self.PINS:
+            with self.subTest(item=item):
+                m = re.search(pattern, self.body)
+                mutated = self.body[: m.start()] + self.body[m.end():]
+                self.assertIsNone(re.search(pattern, mutated), "the pin still holds with its phrase removed")
+
+    def test_the_instructions_line_sits_between_environment_and_areas_not_read_in_the_template(self):
+        text = (AGENTS / "investigate.md").read_text(encoding="utf-8")
+        at = text.index("SWEEP IN PARTS: 3 areas not read\n")
+        block = text[at : text.index("END OF BLOCK\n", at)]
+        self.assertLess(block.index("\nEnvironment:"), block.index("\nInstructions:"))
+        self.assertLess(block.index("\nInstructions:"), block.index("\nAreas not read:"))
 
 
 class RetroTest(unittest.TestCase):

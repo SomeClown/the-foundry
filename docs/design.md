@@ -1155,3 +1155,39 @@ What follows from it:
   report of about 22KB. A repo twice as dense would land where previews
   start, which costs the session a file read and nothing else. One much
   denser than that is what the last line is there to catch.
+
+### Amended (2026-11-23): what a report may quote from files it didn't read
+
+Found in the measurement runs. `investigate` greps the whole tree for its
+own cross-area checks, and the full-repo reports then quoted what the grep
+turned up in the vendored folder and in untracked files: a vendored route
+listed in the route inventory, a line from an untracked draft, each marked
+"not read". One report is the place that could be argued either way. A sweep
+in parts isn't, because a part that quotes files outside its areas says
+things about the repo that no reader checked and no later part will correct.
+
+**Calls I made** (not the owner's; cold-read by the Task 5 spec check, and
+the four gaps that read found are settled here):
+
+- **It applies to full sweeps,** in one report or in parts. A scoped read is
+  as it was: its coupling search covers the whole repo, since finding what
+  else shares a file is what it's for, and an untracked file its brief names
+  is read like any other.
+- **On a full sweep, the report holds nothing drawn from the contents of a
+  folder skipped whole or of an untracked file.** `investigate` may still
+  search the whole tree for its own checks. A hit in one of those places is
+  dropped: not quoted, not listed in an inventory, not described in a gotcha
+  or the Coupling Map.
+- **What the report does say of them** is what Coverage already asks: a
+  folder skipped whole is counted, with its reason, and untracked files are
+  listed by path. Neither is listed file by file anywhere else.
+- **A hit in an area not yet read** is a different thing, and the non-goal
+  above already covers it: a reference into an unread area is listed as a
+  reference, not checked. A later part reads that area.
+- An area lead's own checks stay inside its area, as they do today.
+- The scorer already holds a part to this: it fails on any token planted in
+  a vendored or untracked file.
+
+What it costs: a route that lives only in vendored code no longer shows up
+in a report. That fits §1's rule that a skipped file is counted, not
+described.
