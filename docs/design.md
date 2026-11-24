@@ -830,6 +830,7 @@ unread, with both numbers, and left out of the block.
   Project: <a sentence or two>
   Focus: <the task's focus, or "none">
   Environment: <anything the brief said about the environment, such as a git wrapper>
+  Instructions: <anything else the brief asked of the report, or "none">
   Areas not read:
   - <one line per area, as in Part 3, in order>
   END OF BLOCK
@@ -862,6 +863,7 @@ CONTINUE SWEEP
 Project: <copied from the block>
 Focus: <copied from the block>
 Environment: <copied from the block>
+Instructions: <copied from the block>
 Areas not read:
 <the block's area lines, copied as given>
 END OF BLOCK
@@ -1048,6 +1050,8 @@ case still works, not that parts do.
   repo, which is fine, and about 35KB at 80,000 files, where it would crowd
   the report and no longer fit a preview. The sweep still runs at that size,
   through the saved output, but nothing has been tried anywhere near it.
+- Nobody checks coupling across parts (non-goals). If a real sweep shows that
+  losing something, it comes back as its own change.
 
 ### Amended (2026-11-23): what "reaches the session" means
 
@@ -1068,5 +1072,54 @@ part would cost 40KB or more, and the saved file is a path it can hand on.
 The eval sandbox couldn't read a saved file the one time it was tried, so
 the loop is proved in headless live sessions, and the harness run is
 recorded beside them for what it shows.
-- Nobody checks coupling across parts (non-goals). If a real sweep shows that
-  losing something, it comes back as its own change.
+
+### Amended (2026-11-23): the block carries what else the brief asked for
+
+Found while measuring, before the agent's wording was written. The
+head-to-head's brief asks for every route's full path on its own line. The
+first sweeps of the new test repo didn't ask, and `investigate` grouped
+routes under a shared prefix, which is a fair way to write them. But it
+showed a gap in Part 4. The block carries the project, the focus and the
+environment, and a first brief can ask for more than those: a layout,
+something to quote, something to leave out. A continuing run starts cold and
+would never hear of it, so part 2 would be laid out differently from part 1.
+
+**Calls I made** (not the owner's; cold-read before any builder was briefed,
+and the eight gaps that read found are settled here):
+
+- The block gets one more line, `Instructions:`, between `Environment:` and
+  `Areas not read:`. The templates in Parts 4 and 5 above now show it.
+- **What goes on it:** everything the first brief asked of the report beyond
+  the project, the focus and the environment, in the brief's own words: a
+  layout, something to quote, a way of naming things. It is one line, never
+  shortened, with several requests joined by "; ". With nothing to carry it
+  reads `Instructions: none`.
+- **What doesn't:** words that only pick the mode ("a new codebase", "the
+  whole thing") go nowhere, since `CONTINUE SWEEP` decides the mode. What
+  the brief says about the environment, a git wrapper included, goes on
+  `Environment:`.
+- **A request about what to read** ("skip the tests folder") is settled in
+  part 1, where a folder the brief says to leave out becomes a whole-folder
+  skip, counted with the brief as its reason. It is then in no area, so no
+  later part has to decide it again.
+- A continuing run treats the `Instructions:` line as part of its brief, and
+  follows it as it would have in a first run.
+- **The agent's fixed rules win over the line:** the block, the last line,
+  never trimming an inventory, reading only its areas. A run that sets a
+  request aside says so in one line of Coverage. The line still carries the
+  brief's words unchanged.
+- A continuing run copies the `Project:`, `Focus:`, `Environment:` and
+  `Instructions:` lines into its own block as it received them. It doesn't
+  rewrite them after its own orientation, so they reach the last part as
+  they left the first. A brief that arrives without an `Instructions:` line
+  is carried on as `Instructions: none`. One the session has edited is
+  copied as received.
+- The scorer checks that those four lines are the same in every part.
+- Area leads are briefed as before. That covers requests about layout,
+  which the top level applies when it writes the report. A request that
+  needs something a lead never collected isn't covered, and it isn't
+  covered in a one-report sweep today either; it's parked as its own
+  change.
+- A scoped read needs no such line, since its follow-up sends the original
+  brief again. The session's side doesn't change: it already copies every
+  line from `Project:` to `END OF BLOCK`.
