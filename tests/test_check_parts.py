@@ -1347,6 +1347,435 @@ class OutputTest(Base):
         self.assertEqual(code, 2, out)
 
 
+# ---------------------------------------------------------------- --part-size
+
+SMALL_PARTS = (4, 6, 9, 10, 11, 12, 13, 14)   # nine parts of 90, 80, 76, 122, 122, 122, 122, 122 (one area each), 94 files
+
+
+def run_script_at(script, parts, extra=(), python=None):
+    """Like run_script, for a copy of the script (a mutant) or another interpreter; returns (code, stdout, stderr)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        pdir = Path(tmp) / "parts"
+        pdir.mkdir()
+        for name, text in parts.items():
+            (pdir / name).write_bytes(text.encode("utf-8"))
+        proc = subprocess.run([python or sys.executable, str(script), "--key", str(KEY_PATH), "--repo", str(Fixture.repo),
+                               "--parts", str(pdir)] + list(extra), capture_output=True, text=True, cwd=tmp)
+        return proc.returncode, proc.stdout, proc.stderr
+
+
+class PartSizeBase(Base):
+    def sized(self, n, parts=None, **kw):
+        return run_script(parts if parts is not None else build_parts(base_areas()), extra=["--part-size", str(n)], **kw)
+
+    def size_lines(self, out):
+        return [l for l in out.splitlines() if l.startswith("part size:")]
+
+    def note_lines(self, out):
+        return [l for l in out.splitlines() if l.startswith("NOTE:")]
+
+
+class PartSizeBoundaryTest(PartSizeBase):
+    def test_a_sum_exactly_the_part_size_passes(self):
+        code, out = self.sized(368)
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
+
+    def test_a_sum_one_over_the_part_size_fails(self):
+        code, out = self.sized(367)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(out.splitlines()[0], "LOOP FAILED")
+        self.assertEqual(len(self.size_lines(out)), 1, out)
+
+    def test_the_part_size_equal_to_the_largest_part_passes_and_one_less_fails(self):
+        self.assertEqual(self.sized(368)[0], 0)
+        self.assertEqual(self.sized(367)[0], 1)
+        self.assertEqual(self.sized(450)[0], 0)
+
+    def test_a_huge_part_size_passes(self):
+        self.assertEqual(self.sized(10 ** 9)[0], 0)
+
+    def test_part_size_1_fails_every_multi_area_part_and_nothing_crashes(self):
+        code, out = self.sized(1)
+        self.assertEqual(code, 1, out)
+        self.assertEqual(len(self.size_lines(out)), 3, out)
+
+    def test_part_size_1_passes_a_split_of_single_area_parts(self):
+        parts = build_parts(base_areas(), cuts=tuple(range(1, 17)))
+        code, out = self.sized(1, parts)
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
+        self.assertIn("largest part: 122 files", out)
+
+
+class PartSizeOneAreaTest(PartSizeBase):
+    def test_a_part_of_exactly_one_area_over_the_part_size_passes(self):
+        # four parts hold one 122-file area each, over 121; the others are 90, 80, 76 and 94
+        code, out = self.sized(121, build_parts(base_areas(), cuts=SMALL_PARTS))
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
+        self.assertEqual(self.size_lines(out), [])
+
+    def test_a_part_of_two_areas_over_the_part_size_fails_even_if_each_area_alone_fits(self):
+        # r1 and r2 together: 244 files in 2 areas, over 121
+        cuts = (4, 6, 9, 11, 12, 13, 14)
+        out = self.assertFails(build_parts(base_areas(), cuts=cuts), r"^part size: part-4\.md holds 244 files in 2 areas, over the part size of 121",
+                               extra=["--part-size", "121"])
+        self.assertEqual(len(self.size_lines(out)), 1, out)
+
+    def test_the_one_area_exemption_leaves_the_other_checks_running(self):
+        parts = edit(build_parts(base_areas(), cuts=SMALL_PARTS), "part-1.md", "Mode: full sweep, 4 area leads", "Mode: full sweep, 9 area leads")
+        self.assertFails(parts, r"part-1\.md: Mode says 9", extra=["--part-size", "121"])
+
+
+class PartSizeMessageTest(PartSizeBase):
+    def test_the_failure_names_the_part_the_sum_the_areas_and_the_part_size(self):
+        self.assertFails(build_parts(base_areas()),
+                         r"^part size: part-1\.md holds 368 files in 10 areas, over the part size of 367$", extra=["--part-size", "367"])
+
+    def test_the_message_reports_the_part_size_given(self):
+        self.assertFails(build_parts(base_areas()), r"in 3 areas, over the part size of 300$", extra=["--part-size", "300"])
+
+    def test_every_over_size_part_is_reported_not_just_the_first(self):
+        out = self.assertFails(build_parts(base_areas()), r"part-1\.md holds 368 files in 10 areas", r"part-2\.md holds 366 files in 3 areas",
+                               extra=["--part-size", "300"])
+        self.assertEqual(len(self.size_lines(out)), 2, out)
+        self.assertNotIn("part-3.md holds", out)
+
+    def test_all_three_parts_reported_when_all_are_over(self):
+        out = self.assertFails(build_parts(base_areas()), r"part-3\.md holds 216 files in 4 areas, over the part size of 100",
+                               extra=["--part-size", "100"])
+        self.assertEqual(len(self.size_lines(out)), 3, out)
+
+    def test_size_failures_come_with_the_other_failures(self):
+        parts = edit(build_parts(base_areas()), "part-3.md", "failed: 0;", "failed: 2;")
+        self.assertFails(parts, r"part-3\.md: Files listed", r"part size: part-1\.md", extra=["--part-size", "300"])
+
+
+class PartSizeNoteTest(PartSizeBase):
+    def test_a_note_names_the_part_its_sum_and_the_area_it_left(self):
+        code, out = self.sized(490)
+        self.assertEqual(code, 0, out)
+        notes = self.note_lines(out)
+        self.assertEqual(len(notes), 2, out)
+        self.assertRegex(notes[0], r"^NOTE: part-1\.md holds 368 files and left its next area, rules-2, ")
+        self.assertRegex(notes[1], r"^NOTE: part-2\.md holds 366 files and left its next area, rules-5, ")
+
+    def test_a_note_is_one_line_each(self):
+        out = self.sized(10 ** 6)[1]
+        self.assertEqual(len(self.note_lines(out)), 2)
+        self.assertEqual(len(out.splitlines()), 4, out)
+
+    def test_a_note_never_changes_the_exit_code_or_the_verdict_word(self):
+        code, out = self.sized(490)
+        self.assertEqual(code, 0)
+        self.assertEqual(out.splitlines()[0], "LOOP PROVED")
+        self.assertNotIn("LOOP FAILED", out)
+
+    def test_no_note_when_the_next_area_would_not_have_fit(self):
+        # 368 + 122 = 490 and 366 + 122 = 488, both over 487
+        code, out = self.sized(487)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.note_lines(out), [])
+
+    def test_the_note_boundary_is_exact_one_part_at_a_time(self):
+        self.assertEqual(len(self.note_lines(self.sized(490)[1])), 2)
+        only_part_2 = self.note_lines(self.sized(489)[1])
+        self.assertEqual(len(only_part_2), 1)
+        self.assertIn("part-2.md", only_part_2[0])
+        self.assertEqual(len(self.note_lines(self.sized(488)[1])), 1)
+        self.assertEqual(self.note_lines(self.sized(487)[1]), [])
+
+    def test_no_note_at_the_part_size_the_loop_uses(self):
+        out = self.sized(450)[1]
+        self.assertEqual(self.note_lines(out), [])
+        self.assertEqual(len(out.strip().splitlines()), 2, out)
+
+    def test_the_last_part_never_gets_a_note(self):
+        out = self.sized(10 ** 6)[1]
+        self.assertNotIn("part-3.md holds", out)
+        two = build_parts(base_areas(), cuts=(9,))
+        notes = self.note_lines(self.sized(10 ** 6, two)[1])
+        self.assertEqual(len(notes), 1)
+        self.assertIn("part-1.md", notes[0])
+        one = build_parts(base_areas(), cuts=())
+        code, out = run_script(one, extra=["--part-size", "100000", "--min-parts", "1"])
+        self.assertEqual(self.note_lines(out), [])
+
+    def test_a_note_with_failures_still_prints_every_failure_and_exit_stays_1(self):
+        # cuts (10, 12): parts of 368, 244, 338. At 367 part 1 fails; part 2 (244) could have held r4 (122): 366 is at most 367
+        parts = build_parts(base_areas(), cuts=(10, 12))
+        code, out = self.sized(367, parts)
+        lines = out.splitlines()
+        self.assertEqual((code, lines[0]), (1, "LOOP FAILED"), out)
+        self.assertEqual(len(self.size_lines(out)), 1, out)
+        self.assertEqual(len(self.note_lines(out)), 1, out)
+        self.assertRegex(self.note_lines(out)[0], r"^NOTE: part-2\.md holds 244 files and left its next area, rules-4, ")
+        self.assertLess(lines.index(self.size_lines(out)[0]), lines.index(self.note_lines(out)[0]))
+
+    def test_a_note_with_another_failure_hides_nothing(self):
+        parts = edit(build_parts(base_areas()), "part-1.md", "Mode: full sweep, 10 area leads", "Mode: full sweep, 7 area leads")
+        code, out = self.sized(490, parts)
+        self.assertEqual((code, out.splitlines()[0]), (1, "LOOP FAILED"), out)
+        self.assertIn("part-1.md: Mode says 7", out)
+        self.assertEqual(len(self.note_lines(out)), 2, out)
+
+    def test_a_note_is_not_a_failure_line_count(self):
+        # LOOP PROVED has the verdict, the summary and the notes only
+        out = self.sized(490)[1]
+        self.assertEqual(out.splitlines()[1].split(";")[0], "parts: 3")
+        self.assertTrue(all(l.startswith("NOTE:") for l in out.splitlines()[2:]))
+
+
+class PartSizeOutputTest(PartSizeBase):
+    OLD_SUMMARY = "parts: 3; areas: 17; files covered: 950 of 950; facts found: 33 of 33; decoys found: 0 of %d"
+
+    def old_summary(self):
+        return self.OLD_SUMMARY % len(Fixture.key["decoys"])
+
+    def test_without_the_argument_the_output_is_the_old_two_lines_exactly(self):
+        code, out = run_script(build_parts(base_areas()))
+        self.assertEqual(code, 0)
+        self.assertEqual(out, "LOOP PROVED\n" + self.old_summary() + "\n")
+
+    def test_without_the_argument_no_largest_part_and_no_note_ever(self):
+        for parts in (build_parts(base_areas()), build_parts(base_areas(), cuts=(9,)), build_parts(base_areas(), cuts=SMALL_PARTS)):
+            out = run_script(parts)[1]
+            self.assertNotIn("largest part", out)
+            self.assertNotIn("NOTE:", out)
+            self.assertNotIn("part size", out)
+
+    def test_without_the_argument_a_huge_part_passes_whatever_its_size(self):
+        self.assertProved(build_parts(base_areas(), cuts=()), extra=["--min-parts", "1"])
+
+    def test_without_the_argument_a_failing_run_prints_no_part_size_line_and_the_same_failures_as_with_a_roomy_one(self):
+        parts = edit(build_parts(base_areas()), "part-3.md", "failed: 0;", "failed: 2;")
+        plain = run_script(parts)
+        roomy = run_script(parts, extra=["--part-size", "450"])
+        self.assertEqual(plain[0], 1)
+        self.assertEqual(plain, roomy)
+
+    def test_with_the_argument_the_summary_gains_the_largest_part_and_nothing_else_changes(self):
+        out = self.sized(450)[1]
+        self.assertEqual(out, "LOOP PROVED\n" + self.old_summary() + "; largest part: 368 files\n")
+
+    def test_the_largest_part_is_the_biggest_not_the_first_or_last(self):
+        out = self.sized(1000, build_parts(base_areas(), cuts=(2, 12)))[1]
+        areas = base_areas()
+        sums = [sum(a.count for a in areas[lo:hi]) for lo, hi in ((0, 2), (2, 12), (12, 17))]
+        self.assertEqual(max(sums), sums[1])
+        self.assertIn("largest part: %d files" % sums[1], out)
+
+    def test_the_summary_counts_stated_file_counts(self):
+        out = self.sized(1000, build_parts(base_areas(), cuts=(9,)))[1]
+        self.assertEqual(out.splitlines()[0], "LOOP PROVED")
+        self.assertIn("largest part: %d files" % sum(a.count for a in base_areas()[9:]), out)
+
+    def test_with_the_argument_the_stock_python_prints_the_same(self):
+        stock = "/usr/bin/python3"
+        if not Path(stock).exists():
+            self.skipTest("no stock python")
+        for n in (450, 490, 300):
+            parts = build_parts(base_areas())
+            mine = run_script_at(SCRIPT, parts, ["--part-size", str(n)])
+            theirs = run_script_at(SCRIPT, parts, ["--part-size", str(n)], python=stock)
+            self.assertEqual(mine, theirs, n)
+            self.assertEqual(theirs[2], "")
+
+
+class PartSizeBadValueTest(PartSizeBase):
+    def check(self, value):
+        code, out = run_script(build_parts(base_areas()), extra=["--part-size", value])
+        self.assertEqual(code, 2, out)
+        self.assertNotIn("Traceback", out)
+        self.assertNotIn("LOOP PROVED", out)
+        self.assertNotIn("LOOP FAILED", out)
+        self.assertIn("part-size", out)
+
+    def test_zero_is_exit_2(self):
+        self.check("0")
+
+    def test_a_negative_number_is_exit_2(self):
+        self.check("-5")
+
+    def test_a_word_is_exit_2(self):
+        self.check("abc")
+
+    def test_an_empty_value_is_exit_2(self):
+        self.check("")
+
+    def test_a_decimal_is_exit_2(self):
+        self.check("1.5")
+
+    def test_a_missing_value_is_exit_2(self):
+        code, out = run_script(build_parts(base_areas()), extra=["--part-size"])
+        self.assertEqual(code, 2, out)
+        self.assertNotIn("Traceback", out)
+
+    def test_a_bad_value_is_never_exit_1(self):
+        for v in ("0", "-5", "abc", "", "1e3", "0x10"):
+            self.assertEqual(run_script(build_parts(base_areas()), extra=["--part-size", v])[0], 2, v)
+
+
+class PartSizeUnparsedAreaTest(PartSizeBase):
+    """A part whose area lines don't parse is already failing elsewhere; the size check must not crash on it."""
+
+    def broken(self, name, old, new):
+        return edit(build_parts(base_areas()), name, old, new)
+
+    def run_broken(self, parts, size=450):
+        code, out = run_script(parts, extra=["--part-size", str(size)])
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+        self.assertEqual(out.splitlines()[0], "LOOP FAILED")
+        return out
+
+    def test_a_garbled_area_line_in_the_middle_part(self):
+        out = self.run_broken(self.broken("part-2.md", "- rules-3: ", "- rules-3 = "))
+        self.assertIn("part-2.md: area line does not match", out)
+
+    def test_a_garbled_area_line_in_the_first_part(self):
+        self.run_broken(self.broken("part-1.md", "- api-top: `api/` (direct) (4 files)", "- api-top: `api/` (direct) (four files)"), 300)
+
+    def test_a_garbled_area_line_in_the_last_part_with_a_small_part_size(self):
+        self.run_broken(self.broken("part-3.md", "- tests: `tests/` (36 files)", "- tests: `tests/` (36 files"), 100)
+
+    def test_a_garbled_first_area_in_the_next_part_while_the_note_looks_at_it(self):
+        # part-2's first area line is what part 1's note reads
+        out = self.run_broken(self.broken("part-2.md", "- rules-2: ", "rules-2: "), 10 ** 6)
+        self.assertNotIn("Traceback", out)
+
+    def test_every_read_line_garbled(self):
+        parts = edit_all(build_parts(base_areas()), lambda t: re.sub(r"^- ([^:\n]+): (.*) \((\d+) files\)$",
+                                                                    r"\1 \3", t, flags=re.M))
+        code, out = run_script(parts, extra=["--part-size", "450"])
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+
+    def test_an_empty_areas_read_list(self):
+        parts = build_parts(base_areas())
+        text = parts["part-2.md"]
+        head, _, tail = text.partition("Areas read:\n")
+        tail = tail[tail.index("\nINVESTIGATE REPORT ENDS"):]
+        parts = dict(parts, **{"part-2.md": head + "Areas read:\n" + tail})
+        code, out = run_script(parts, extra=["--part-size", "450"])
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+
+    def test_a_part_with_no_areas_read_line_at_all(self):
+        parts = build_parts(base_areas())
+        text = parts["part-2.md"]
+        parts["part-2.md"] = text[:text.index("Areas read:")] + "\nINVESTIGATE REPORT ENDS\n"
+        code, out = run_script(parts, extra=["--part-size", "450"])
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+
+    def test_a_missing_part_does_not_crash_the_size_check(self):
+        parts = build_parts(base_areas())
+        del parts["part-2.md"]
+        code, out = run_script(parts, extra=["--part-size", "450"])
+        self.assertIn(code, (1, 2), out)
+        self.assertNotIn("Traceback", out)
+
+    def test_the_same_garbled_run_gives_the_same_verdict_with_and_without_the_argument(self):
+        parts = self.broken("part-2.md", "- rules-3: ", "- rules-3 = ")
+        plain = run_script(parts)
+        sized = run_script(parts, extra=["--part-size", "10000"])
+        self.assertEqual(plain[0], sized[0])
+        self.assertEqual(plain[1].splitlines()[:2], sized[1].splitlines()[:2])
+
+
+class PartSizeMutationTest(PartSizeBase):
+    """Each new check has to be shown to fail: a temp copy of the script with one piece broken must be caught by a test."""
+
+    SIZE_IF = "if sum(counts) > args.part_size and len(counts) > 1:"
+    FIT_IF = "if sum(counts) + nxt[0] <= args.part_size:"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = SCRIPT.read_text(encoding="utf-8")
+        cls.tmp = tempfile.TemporaryDirectory()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def mutant(self, name, old, new):
+        self.assertEqual(self.src.count(old), 1, "the script no longer has %r once; update this mutation" % old)
+        path = Path(self.tmp.name) / (name + ".py")
+        path.write_text(self.src.replace(old, new), encoding="utf-8")
+        return path
+
+    def mutant_on(self, path, old, new):
+        text = path.read_text(encoding="utf-8")
+        self.assertEqual(text.count(old), 1, old)
+        path.write_text(text.replace(old, new), encoding="utf-8")
+        return path
+
+    def both(self, mutant, parts, extra):
+        real = run_script_at(SCRIPT, parts, extra)
+        mutated = run_script_at(mutant, parts, extra)
+        return real, mutated
+
+    def test_the_unmutated_copy_behaves_as_the_script_does(self):
+        copy = Path(self.tmp.name) / "same.py"
+        copy.write_text(self.src, encoding="utf-8")
+        parts = build_parts(base_areas())
+        self.assertEqual(run_script_at(copy, parts, ["--part-size", "367"]), run_script_at(SCRIPT, parts, ["--part-size", "367"]))
+
+    def test_dropping_the_size_check_is_caught(self):
+        m = self.mutant("nosize", self.SIZE_IF, "if False:")
+        real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "367"])
+        self.assertEqual(real[0], 1)
+        self.assertEqual(mutated[0], 0)  # the mutant proves a part of 368 under 367: the boundary tests above catch it
+
+    def test_dropping_the_one_area_exemption_is_caught(self):
+        m = self.mutant("noexempt", " and len(counts) > 1:", ":")
+        real, mutated = self.both(m, build_parts(base_areas(), cuts=SMALL_PARTS), ["--part-size", "121"])
+        self.assertEqual(real[0], 0)
+        self.assertEqual(mutated[0], 1)
+
+    def test_making_the_note_a_failure_is_caught(self):
+        m = self.mutant("notefail", "notes.append(", "fails.append(")
+        real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "490"])
+        self.assertEqual(real[0], 0)
+        self.assertEqual(mutated[0], 1)
+
+    def test_an_off_by_one_in_the_size_boundary_is_caught(self):
+        m = self.mutant("ge", "sum(counts) > args.part_size", "sum(counts) >= args.part_size")
+        real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "368"])
+        self.assertEqual((real[0], mutated[0]), (0, 1))
+
+    def test_an_off_by_one_in_the_note_boundary_is_caught(self):
+        m = self.mutant("lt", self.FIT_IF, "if sum(counts) + nxt[0] < args.part_size:")
+        real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "490"])
+        self.assertEqual(len([l for l in real[1].splitlines() if l.startswith("NOTE:")]), 2)
+        self.assertEqual(len([l for l in mutated[1].splitlines() if l.startswith("NOTE:")]), 1)  # 366 + 122 = 488 still fits under 490
+
+    def test_dropping_the_note_is_caught(self):
+        m = self.mutant("nonote", self.FIT_IF, "if False:")
+        real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "490"])
+        self.assertNotEqual(real[1], mutated[1])
+        self.assertNotIn("NOTE:", mutated[1])
+
+    def test_a_note_for_the_last_part_is_caught(self):
+        # let the note loop pair every part with a wrapped successor: the last part would get a note
+        # the note loop pairs every part with a wrapped successor and stops skipping the last part
+        m = self.mutant("lastnote", 'if counts is None or nxt is None or i["n"] == 0:', "if counts is None or nxt is None:")
+        m = self.mutant_on(m, "zip(counted, counted[1:])", "zip(counted, counted[1:] + counted[:1])")
+        real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "10000"])
+        self.assertEqual(len([l for l in real[1].splitlines() if l.startswith("NOTE:")]), 2)
+        self.assertEqual(len([l for l in mutated[1].splitlines() if l.startswith("NOTE:")]), 3)
+
+    def test_a_summary_with_the_largest_part_even_without_the_argument_is_caught(self):
+        m = self.mutant("alwayslargest", 'if sizes else ""', 'if True else ""')
+        code, out, err = run_script_at(m, build_parts(base_areas()), [])
+        self.assertTrue(code != 0 or "largest part" in out, "the mutant should misbehave without the argument")
+        self.assertNotEqual((code, out), run_script_at(SCRIPT, build_parts(base_areas()), [])[:2])
+
+    def test_a_note_without_the_argument_is_caught_by_the_exact_output_pin(self):
+        m = self.mutant("sizeless", "if args.part_size is not None:", "if True:")
+        code, out, err = run_script_at(m, build_parts(base_areas()), [])
+        self.assertNotEqual(out, run_script_at(SCRIPT, build_parts(base_areas()), [])[1])
+
+
 @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no stock python")
 class StockPythonTest(Base):
     def test_the_script_runs_on_the_stock_interpreter_and_agrees(self):

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Scores a sweep read in parts: did part-1.md, part-2.md, ... cover the test repo exactly once and find every planted fact?
 
-    check_parts.py --key KEY --repo FIXTURE_DIR --parts DIR [--min-parts N]
+    check_parts.py --key KEY --repo FIXTURE_DIR --parts DIR [--min-parts N] [--part-size N]
 
 Reads DIR/part-<n>.md in number order and checks, against the key and the fixture's tracked files:
   1. count          at least --min-parts part files
@@ -12,8 +12,11 @@ Reads DIR/part-<n>.md in number order and checks, against the key and the fixtur
   5. exactly once   the areas read hold every tracked file outside the whole-folder skips, once each
   6. coverage       the Mode, Files listed, Areas not read and Whole repo lines
   7. facts          every key fact is found in some part, and no decoy appears in any
+  8. part size      only with --part-size N: the stated counts of each part's "Areas read:" lines add up to at most N
+                    (a part with one area passes whatever its count); also prints a NOTE: line, never a failure, when a
+                    part that isn't the last could have held the next area too
 
-Exit 0 prints LOOP PROVED and a summary; exit 1 prints LOOP FAILED and one line per failure; exit 2 prints
+Exit 0 prints LOOP PROVED and a summary (with --part-size, the summary gives the largest part's file count); exit 1 prints LOOP FAILED and one line per failure; exit 2 prints
 CAN'T CHECK: <why> (a missing file, an unreadable key, a crash). Standard library only, Python 3.9.
 
 Tolerant of harmless whitespace (trailing spaces, Windows line endings, a blank line after the block), and
@@ -228,12 +231,34 @@ def short(items, limit=5):
     return shown + (", ... (%d in all)" % len(items) if len(items) > limit else "")
 
 
+def positive_int(text):
+    try:
+        value = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a whole number" % text)
+    if value < 1:
+        raise argparse.ArgumentTypeError("%r is not a positive whole number" % text)
+    return value
+
+
+def stated_counts(read):
+    """The stated file counts of a part's 'Areas read:' lines, or None when a line doesn't parse."""
+    counts = []
+    for line in read:
+        m = AREA_RE.match(line.strip())
+        if not m:
+            return None
+        counts.append(int(m.group(3)))
+    return counts
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--key", required=True)
     ap.add_argument("--repo", required=True)
     ap.add_argument("--parts", required=True)
     ap.add_argument("--min-parts", type=int, default=2)
+    ap.add_argument("--part-size", type=positive_int, default=None)
     args = ap.parse_args(argv)
 
     facts, decoys, layout = load_key(args.key)
@@ -409,6 +434,24 @@ def main(argv):
             if named:
                 fails.append("%s: a later part must name no untracked path; found %s" % (name, ", ".join(named)))
 
+    # part size
+    notes = []
+    sizes = []
+    if args.part_size is not None:
+        counted = [(i, stated_counts(i["read"])) for i in infos if i["shape"] is not None and i["read"]]
+        for i, counts in counted:
+            if counts is None:
+                continue
+            sizes.append(sum(counts))
+            if sum(counts) > args.part_size and len(counts) > 1:
+                fails.append("part size: %s holds %d files in %d areas, over the part size of %d" % (i["name"], sum(counts), len(counts), args.part_size))
+        for (i, counts), (j, nxt) in zip(counted, counted[1:]):
+            if counts is None or nxt is None or i["n"] == 0:
+                continue
+            if sum(counts) + nxt[0] <= args.part_size:
+                notes.append("NOTE: %s holds %d files and left its next area, %s, which would have fit (%d + %d is at most %d); a refused spawn can end a part early"
+                             % (i["name"], sum(counts), AREA_RE.match(j["read"][0].strip()).group(1), sum(counts), nxt[0], args.part_size))
+
     # facts
     alltext = "\n".join(p[2] for p in parts)
     missing_facts = [f for f in facts if not token_found(f["token"], alltext)]
@@ -421,12 +464,15 @@ def main(argv):
 
     if fails:
         print("LOOP FAILED")
-        for line in fails:
+        for line in fails + notes:
             print(line)
         return 1
     print("LOOP PROVED")
     print("parts: %d; areas: %d; files covered: %d of %d; facts found: %d of %d; decoys found: 0 of %d"
-          % (len(parts), read_area_count, len(covered), len(expected), len(facts) - len(missing_facts), len(facts), len(decoys)))
+          % (len(parts), read_area_count, len(covered), len(expected), len(facts) - len(missing_facts), len(facts), len(decoys))
+          + ("; largest part: %d files" % max(sizes) if sizes else ""))
+    for line in notes:
+        print(line)
     return 0
 
 
