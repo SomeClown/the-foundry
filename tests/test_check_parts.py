@@ -29,6 +29,8 @@ UNTRACKED = ["notes/scratch.md", "rules/r9999_draft.py", "zones/zz_todo.txt"]
 WHOLE_1 = ("Whole repo: 690 tracked files; 40 in folders skipped whole (web/vendor/: 40, vendored); "
            "3 untracked (%s)" % ", ".join(UNTRACKED))
 WHOLE_LATER = "Whole repo: given in part 1."
+INSTRUCTIONS = ("Instructions: In the route inventory, give every route its full path on its own line, never grouped under a prefix; "
+                "give every CLI subcommand as `twctl <name>`")
 
 
 # ---------------------------------------------------------------- fixture and a small independent evaluator
@@ -132,7 +134,7 @@ def is_file_skip(path):
     return path.endswith(".lock") or path.endswith(".bin")
 
 
-def build_parts(areas, cuts=BASE_CUTS, reads=None, blocks=None):
+def build_parts(areas, cuts=BASE_CUTS, reads=None, blocks=None, instructions=INSTRUCTIONS):
     """A dict {'part-1.md': text, ...}. reads/blocks default from the cuts; pass lists of lists of Areas to override."""
     bounds = [0] + list(cuts) + [len(areas)]
     if reads is None:
@@ -149,7 +151,7 @@ def build_parts(areas, cuts=BASE_CUTS, reads=None, blocks=None):
         lines = ["SWEEP IN PARTS: %d areas not read" % n]
         if n:
             lines += [CONTINUE, "Project: A toll-road back office, a fixture repo.", "Focus: none",
-                      "Environment: use the git wrapper ./bin/git", "Areas not read:"]
+                      "Environment: use the git wrapper ./bin/git", instructions, "Areas not read:"]
             lines += [a.line() for a in block]
             lines += ["END OF BLOCK"]
         lines += ["", "# Investigation report (part %d)" % (i + 1), "", "## Findings"]
@@ -561,7 +563,7 @@ class ShapeTest(Base):
 
     def test_the_block_missing_the_areas_not_read_header(self):
         parts = edit(self.parts, "part-1.md", "Areas not read:\n- jobs", "- jobs")
-        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Areas not read:'")
+        self.assertFails(parts, r"part-1\.md: block line 7: expected 'Areas not read:'")
 
     def test_the_block_with_its_lines_in_the_wrong_order(self):
         text = self.parts["part-1.md"]
@@ -593,11 +595,11 @@ class ShapeTest(Base):
 
     def test_the_areas_not_read_header_with_other_case(self):
         parts = edit(self.parts, "part-1.md", "\nAreas not read:\n", "\nAreas Not Read:\n")
-        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Areas not read:'")
+        self.assertFails(parts, r"part-1\.md: block line 7: expected 'Areas not read:'")
 
     def test_a_non_area_line_inside_the_block(self):
         parts = edit(self.parts, "part-1.md", "Areas not read:\n", "Areas not read:\nsome commentary\n")
-        self.assertFails(parts, r"part-1\.md: block line 7: expected an area line starting '- '")
+        self.assertFails(parts, r"part-1\.md: block line 8: expected an area line starting '- '")
 
     def test_the_last_part_with_nothing_under_the_line_passes_and_text_under_it_fails(self):
         for stray, label in (("To read the rest, dispatch again.", "sentence"), ("END OF BLOCK", "end"), ("Project: x", "project"),
@@ -674,6 +676,146 @@ class OrderTest(Base):
         parts = dict(self.parts)
         del parts["part-3.md"]
         self.assertFails(parts, r"part-2\.md: the last part must say 0 areas not read, found 4")
+
+
+class InstructionsLineTest(Base):
+    """The block's Instructions: line, and the check that the four head lines are the same in every part."""
+
+    def setUp(self):
+        self.parts = build_parts(base_areas())
+        self.ins = INSTRUCTIONS
+
+    def test_the_correct_split_carries_a_real_looking_instructions_line(self):
+        self.assertIn(self.ins + "\nAreas not read:", self.parts["part-1.md"])
+        self.assertNotIn("Instructions: none", self.parts["part-1.md"])
+        self.assertProved(self.parts)
+
+    def test_instructions_none_is_accepted(self):
+        self.assertProved(build_parts(base_areas(), instructions="Instructions: none"))
+
+    def test_instructions_missing(self):
+        parts = edit(self.parts, "part-2.md", self.ins + "\n", "")
+        self.assertFails(parts, r"part-2\.md: block line 6: expected 'Instructions: <text>', found 'Areas not read:'")
+
+    def test_instructions_missing_in_every_part(self):
+        parts = edit_all(self.parts, lambda t: t.replace(self.ins + "\n", ""))
+        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Instructions: <text>'", r"part-2\.md: block line 6: expected 'Instructions: <text>'")
+
+    def test_instructions_empty(self):
+        parts = edit(self.parts, "part-1.md", self.ins, "Instructions:")
+        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Instructions: <text>', found 'Instructions:'")
+
+    def test_instructions_with_only_spaces(self):
+        parts = edit(self.parts, "part-1.md", self.ins, "Instructions:    ")
+        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Instructions: <text>'")
+
+    def test_instructions_before_environment(self):
+        env = "Environment: use the git wrapper ./bin/git"
+        parts = edit(self.parts, "part-1.md", env + "\n" + self.ins + "\n", self.ins + "\n" + env + "\n")
+        self.assertFails(parts, r"part-1\.md: block line 5: expected 'Environment: <text>', found 'Instructions:")
+
+    def test_instructions_after_areas_not_read(self):
+        parts = edit(self.parts, "part-1.md", self.ins + "\nAreas not read:\n", "Areas not read:\n" + self.ins + "\n")
+        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Instructions: <text>', found 'Areas not read:'")
+
+    def test_instructions_duplicated(self):
+        parts = edit(self.parts, "part-1.md", self.ins + "\n", self.ins + "\n" + self.ins + "\n")
+        self.assertFails(parts, r"part-1\.md: block line 7: expected 'Areas not read:', found 'Instructions:")
+
+    def test_instructions_misspelled(self):
+        for bad in ("Instruction:", "Instructions", "INSTRUCTIONS:", "instructions:", "Instructons:"):
+            with self.subTest(bad=bad):
+                parts = edit(self.parts, "part-1.md", "Instructions:", bad)
+                self.assertFails(parts, r"part-1\.md: block line 6: expected 'Instructions: <text>'")
+
+    def test_instructions_with_a_leading_dash(self):
+        parts = edit(self.parts, "part-1.md", self.ins, "- " + self.ins)
+        self.assertFails(parts, r"part-1\.md: block line 6: expected 'Instructions: <text>'")
+
+    def test_instructions_under_the_zero_line_of_the_last_part(self):
+        parts = edit(self.parts, "part-3.md", "SWEEP IN PARTS: 0 areas not read\n", "SWEEP IN PARTS: 0 areas not read\n" + self.ins + "\n")
+        self.assertFails(parts, r"part-3\.md: the last part says 0 areas not read, so nothing may sit under the line")
+
+    # ---- the same four lines
+
+    def reword(self, part, old, new):
+        return edit(self.parts, part, old, new)
+
+    def test_each_of_the_four_lines_reworded_in_part_2(self):
+        cases = [("Project:", "Project: A toll-road back office, a fixture repo.", "Project: A toll-road back office."),
+                 ("Focus:", "Focus: none", "Focus: the api"),
+                 ("Environment:", "Environment: use the git wrapper ./bin/git", "Environment: use git"),
+                 ("Instructions:", self.ins, "Instructions: none")]
+        for label, old, new in cases:
+            with self.subTest(label=label):
+                out = self.assertFails(self.reword("part-2.md", old, new),
+                                       r"^part-2\.md: the %s line differs from part-1\.md: expected %s, found %s$" % (re.escape(label), re.escape(repr(old)), re.escape(repr(new))))
+                self.assertEqual(len([l for l in out.splitlines() if "differs" in l]), 1)
+
+    def test_part_3_has_no_head_lines_so_a_three_part_split_with_a_three_block_run_is_checked_in_parts_1_and_2(self):
+        # part 3 (0 areas not read) carries none; only parts 1 and 2 are compared
+        self.assertProved(self.parts)
+
+    def test_each_of_the_four_lines_reworded_in_part_3_only(self):
+        # a four-part split so that part 3 still has a block
+        parts = build_parts(base_areas(), cuts=(6, 10, 13))
+        self.assertProved(parts)
+        cases = [("Project:", "Project: A toll-road back office, a fixture repo.", "Project: Another."),
+                 ("Focus:", "Focus: none", "Focus: web"),
+                 ("Environment:", "Environment: use the git wrapper ./bin/git", "Environment: plain git"),
+                 ("Instructions:", self.ins, "Instructions: none")]
+        for label, old, new in cases:
+            with self.subTest(label=label):
+                out = self.assertFails(edit(parts, "part-3.md", old, new),
+                                       r"^part-3\.md: the %s line differs from part-1\.md: expected %s, found %s$" % (re.escape(label), re.escape(repr(old)), re.escape(repr(new))))
+                self.assertNotIn("part-2.md: the", out)
+
+    def test_parts_2_and_3_agreeing_with_each_other_but_not_with_part_1(self):
+        parts = build_parts(base_areas(), cuts=(6, 10, 13))
+        parts = edit(parts, "part-1.md", "Focus: none", "Focus: the api")
+        out = self.assertFails(parts, r"^part-2\.md: the Focus: line differs from part-1\.md: expected 'Focus: the api', found 'Focus: none'$",
+                               r"^part-3\.md: the Focus: line differs from part-1\.md: expected 'Focus: the api', found 'Focus: none'$")
+        self.assertNotIn("part-3.md: the Focus: line differs from part-2", out)
+
+    def test_two_lines_differing_in_one_part_are_both_named(self):
+        parts = edit(self.parts, "part-2.md", "Focus: none", "Focus: web")
+        parts = edit(parts, "part-2.md", self.ins, "Instructions: none")
+        self.assertFails(parts, r"part-2\.md: the Focus: line differs", r"part-2\.md: the Instructions: line differs")
+
+    def test_a_difference_in_trailing_whitespace_only_passes(self):
+        parts = edit(self.parts, "part-2.md", "Focus: none", "Focus: none   ")
+        parts = edit(parts, "part-2.md", self.ins, self.ins + "\t ")
+        parts = edit(parts, "part-2.md", "Project: A toll-road back office, a fixture repo.", "Project: A toll-road back office, a fixture repo. ")
+        parts = edit(parts, "part-2.md", "Environment: use the git wrapper ./bin/git", "Environment: use the git wrapper ./bin/git  ")
+        self.assertProved(parts)
+
+    def test_a_difference_in_case_fails(self):
+        parts = edit(self.parts, "part-2.md", "Focus: none", "Focus: None")
+        self.assertFails(parts, r"part-2\.md: the Focus: line differs from part-1\.md: expected 'Focus: none', found 'Focus: None'")
+
+    def test_a_difference_in_inner_spacing_fails(self):
+        parts = edit(self.parts, "part-2.md", "use the git wrapper", "use  the git wrapper")
+        self.assertFails(parts, r"part-2\.md: the Environment: line differs from part-1\.md")
+
+    def test_a_difference_in_leading_spacing_fails(self):
+        parts = edit(self.parts, "part-2.md", "\nFocus: none", "\n Focus: none")
+        self.assertFails(parts, r"part-2\.md: block line 4: expected 'Focus: <text>'")
+
+    def test_the_last_part_with_no_lines_is_not_compared(self):
+        self.assertNotIn("Focus:", self.parts["part-3.md"].split("# Investigation")[0])
+        self.assertProved(self.parts)
+
+    def test_a_part_whose_block_is_unreadable_is_not_compared_and_is_reported_once(self):
+        parts = edit(self.parts, "part-2.md", self.ins + "\n", "")
+        out = self.assertFails(parts, r"part-2\.md: block line 6")
+        self.assertNotIn("differs", out)
+
+    def test_the_failure_line_gives_part_1s_text_against_the_found_text(self):
+        parts = edit(self.parts, "part-2.md", self.ins, "Instructions: something else")
+        code, out = run_script(parts)
+        self.assertEqual(code, 1)
+        line = [l for l in out.splitlines() if "differs" in l][0]
+        self.assertEqual(line, "part-2.md: the Instructions: line differs from part-1.md: expected %r, found %r" % (self.ins, "Instructions: something else"))
 
 
 # ---------------------------------------------------------------- coverage lines

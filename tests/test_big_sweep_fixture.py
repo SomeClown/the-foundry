@@ -852,7 +852,10 @@ class CaseFilesTest(unittest.TestCase):
             "When you're finished, reply with one line per saved file: its path and the report's first line.")
         want_brief = (
             'Brief for the agent: "This is a new codebase to me, and I need to understand the whole thing. In this sandbox the plain '
-            '`git` command is blocked: use `./bin/git` wherever you\'d type `git`, and tell any agent you brief to do the same."')
+            '`git` command is blocked: use `./bin/git` wherever you\'d type `git`, and tell any agent you brief to do the same. '
+            'In the route inventory, give every route its full path on its own line, never grouped under a prefix. '
+            'Give every CLI subcommand as `twctl <name>`. When a gotcha\'s source cites a ticket, incident, change number, '
+            'or named event, quote that reference word for word next to the gotcha."')
         self.assertEqual(body.split("\n\n"), [want_intro, want_brief])
 
     def test_the_prompt_names_a_real_agent_and_no_planted_token(self):
@@ -909,6 +912,75 @@ class CaseFilesTest(unittest.TestCase):
         self.assertTrue(re.search(pattern, "SWEEP IN PARTS: 0 areas not read"))
         self.assertIsNone(re.search(pattern, "SWEEP IN PARTS: 3 areas not read"))
         self.assertIsNone(re.search(pattern, "SWEEP IN PARTS: 10 areas not read"))
+
+
+THREE_SENTENCES = (
+    "In the route inventory, give every route its full path on its own line, never grouped under a prefix. "
+    "Give every CLI subcommand as `twctl <name>`. When a gotcha's source cites a ticket, incident, change number, "
+    "or named event, quote that reference word for word next to the gotcha.")
+REPLY_PROMPTS = [EXPENSIVE / ("reply-size-" + n) / "prompt.md" for n in ("150", "230", "320", "400", "450", "full")]
+
+
+class BriefRequestsTest(unittest.TestCase):
+    """The three requests (full route paths, `twctl <name>`, quote the reference) in the seven eval prompts."""
+
+    def test_each_reply_size_prompt_holds_the_three_sentences_once_in_place(self):
+        before = "tell any agent you brief to do the same. "
+        after = " The user approved reading every file"
+        for path in REPLY_PROMPTS:
+            with self.subTest(prompt=path.parent.name):
+                text = path.read_text(encoding="utf-8")
+                self.assertEqual(text.count(THREE_SENTENCES), 1)
+                self.assertEqual(text.count("never grouped under a prefix"), 1)
+                self.assertIn(before + THREE_SENTENCES + after, text)
+                self.assertLess(text.index("tell any agent you brief"), text.index("never grouped"))
+                self.assertLess(text.index("quote that reference word for word"), text.index("The user approved reading every file"))
+
+    def test_the_tail_mark_sentence_is_still_last_in_each_reply_size_prompt(self):
+        for path in REPLY_PROMPTS:
+            with self.subTest(prompt=path.parent.name):
+                text = path.read_text(encoding="utf-8").rstrip("\n")
+                self.assertTrue(text.endswith("Make the last line of your report exactly `TAIL-MARK-6620`.\""), text[-120:])
+                self.assertGreater(text.rindex("TAIL-MARK-6620"), text.index("quote that reference word for word"))
+                self.assertEqual(text.rindex("TAIL-MARK-6620"), text.index("exactly `TAIL-MARK-6620`") + len("exactly `"))
+
+    def test_the_big_sweep_prompt_holds_the_three_sentences_once_inside_the_quoted_brief(self):
+        text = (CASE / "prompt.md").read_text(encoding="utf-8")
+        self.assertEqual(text.count(THREE_SENTENCES), 1)
+        self.assertEqual(text.count("never grouped under a prefix"), 1)
+        brief = text.split('Brief for the agent: "', 1)[1]
+        self.assertTrue(brief.rstrip("\n").endswith(THREE_SENTENCES + '"'), brief[-200:])
+        self.assertEqual(brief.count('"'), 1)   # the quote opens before it and closes once, after the sentences
+        self.assertIn("tell any agent you brief to do the same. " + THREE_SENTENCES, brief)
+
+    def test_none_of_the_seven_prompts_says_fxctl_and_all_say_twctl(self):
+        for path in REPLY_PROMPTS + [CASE / "prompt.md"]:
+            with self.subTest(prompt=str(path.relative_to(EXPENSIVE))):
+                text = path.read_text(encoding="utf-8")
+                self.assertNotIn("fxctl", text)
+                self.assertEqual(text.count("`twctl <name>`"), 1)
+
+    def test_the_sentences_add_no_cost_or_permission_wording(self):
+        low = THREE_SENTENCES.lower()
+        for word in ("cost", "price", "ask", "approve", "permission", "ok "):
+            self.assertNotIn(word, low)
+
+    def test_sync_check_catches_a_hand_edit_to_each_reply_size_prompt(self):
+        for path in REPLY_PROMPTS:
+            with self.subTest(prompt=path.parent.name), tempfile.TemporaryDirectory() as tmp:
+                dest = Path(tmp) / "evals-expensive"
+                shutil.copytree(str(CASE), str(dest / "big-sweep-in-parts"), ignore=shutil.ignore_patterns("__pycache__"))
+                for folder in EXPENSIVE.glob("reply-size-*"):
+                    shutil.copytree(str(folder), str(dest / folder.name))
+                shutil.copy(str(KEY_PATH), str(dest / "big-sweep-key.json"))
+                shutil.copy(str(SYNC), str(dest / "sync_big_sweep.py"))
+                run = lambda: subprocess.run([sys.executable, str(dest / "sync_big_sweep.py"), "--check"], capture_output=True, text=True)
+                self.assertEqual(run().returncode, 0)
+                target = dest / path.parent.name / "prompt.md"
+                target.write_text(target.read_text(encoding="utf-8").replace("never grouped under a prefix", "grouped under a prefix"), encoding="utf-8")
+                result = run()
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn("differs: evals-expensive/%s/prompt.md" % path.parent.name, result.stdout)
 
 
 class SyncScriptTest(unittest.TestCase):

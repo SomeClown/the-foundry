@@ -164,7 +164,7 @@ def area_lines_after(lines, i):
     return out, j
 
 
-def check_shape(name, lines, fails):
+def check_shape(name, lines, fails, heads=None):
     """Returns (n, block area lines, index where the report's sections begin) or None when the block can't be read."""
     at = 0
     while at < len(lines) and not lines[at].strip():
@@ -183,10 +183,10 @@ def check_shape(name, lines, fails):
         fails.append("%s: expected the last non-blank line to be %r, found %r (the report was cut off?)" % (name, LAST_LINE, last[-1] if last else ""))
     if n == 0:
         nxt = next((line for line in lines[at + 1:] if line.strip()), "")
-        if nxt.startswith(("To read the rest", "Project:", "Areas not read:", "END OF BLOCK")):
+        if nxt.startswith(("To read the rest", "Project:", "Instructions:", "Areas not read:", "END OF BLOCK")):
             fails.append("%s: the last part says 0 areas not read, so nothing may sit under the line; found %r" % (name, nxt))
         return 0, [], at + 1
-    expect = [("sentence", CONTINUE_SENTENCE), ("Project:", None), ("Focus:", None), ("Environment:", None), ("Areas not read:", "Areas not read:")]
+    expect = [("sentence", CONTINUE_SENTENCE), ("Project:", None), ("Focus:", None), ("Environment:", None), ("Instructions:", None), ("Areas not read:", "Areas not read:")]
     cur = at + 1
     for label, exact in expect:
         line = lines[cur] if cur < len(lines) else ""
@@ -197,6 +197,8 @@ def check_shape(name, lines, fails):
         elif not line.startswith(label) or not line[len(label):].strip():
             fails.append("%s: block line %d: expected '%s <text>', found %r" % (name, cur + 1, label, line))
             return None
+        if heads is not None and exact is None:
+            heads[label] = line
         cur += 1
     areas = []
     while cur < len(lines) and lines[cur] != "END OF BLOCK":
@@ -253,8 +255,9 @@ def main(argv):
     validated = {}   # area line text -> first place seen
     area_total = 0
     for number, name, text, lines in parts:
-        shape = check_shape(name, lines, fails)
-        info = {"name": name, "text": text, "lines": lines, "shape": shape, "read": [], "read_idx": None}
+        heads = {}
+        shape = check_shape(name, lines, fails, heads)
+        info = {"name": name, "text": text, "lines": lines, "shape": shape, "read": [], "read_idx": None, "heads": heads}
         infos.append(info)
         if shape is None:
             continue
@@ -289,6 +292,15 @@ def main(argv):
             fails.append("%s: the last part must say 0 areas not read, found %d" % (shaped[-1]["name"], shaped[-1]["n"]))
         if infos[-1]["shape"] is None:
             fails.append("%s: the last part's block is unreadable, so the loop can't be shown to end" % infos[-1]["name"])
+
+    # same four lines in every part that has them
+    withheads = [i for i in infos if i["heads"] and len(i["heads"]) == 4]
+    for cur in withheads[1:]:
+        first = withheads[0]
+        for label in ("Project:", "Focus:", "Environment:", "Instructions:"):
+            if cur["heads"][label] != first["heads"][label]:
+                fails.append("%s: the %s line differs from %s: expected %r, found %r"
+                             % (cur["name"], label, first["name"], first["heads"][label], cur["heads"][label]))
 
     # notation and the rebuilt sets
     covered = {}  # path -> list of area names

@@ -42,7 +42,10 @@ REPLY_PROMPT = (
     "END-OF-REPORT. Don't read the code yourself.\n\n"
     "Brief for the agent: \"This is a new codebase to me, and I need to understand the whole thing. In this "
     "sandbox the plain `git` command is blocked: use `./bin/git` wherever you'd type `git`, and tell any "
-    "agent you brief to do the same. The user approved reading every file, whatever the count. Make the "
+    "agent you brief to do the same. In the route inventory, give every route its full path on its own line, "
+    "never grouped under a prefix. Give every CLI subcommand as `twctl <name>`. When a gotcha's source cites a "
+    "ticket, incident, change number, or named event, quote that reference word for word next to the gotcha. "
+    "The user approved reading every file, whatever the count. Make the "
     "last line of your report exactly `TAIL-MARK-6620`.\"\n"
 )
 
