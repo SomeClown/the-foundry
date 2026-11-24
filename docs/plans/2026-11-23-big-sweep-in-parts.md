@@ -698,6 +698,21 @@ Baseline on 1f4c8dc, after the rebase (2026-11-23): Ran 950, OK on `python3` 3.1
 - Density fix (Task 1's fixture): complete (from 5070ded; gate: Ran 1330, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; the full fixture now holds 892 public functions (1.38 a readable file), 129 ordinary routes (0.20) and 193 ordinary commands (0.30), against the head-to-head's 1.38, 0.19 and 0.30; layout, counts and the 33 facts unchanged; adversarial: 40 tests added, one out-of-date pin replaced, no bugs, no fix rounds)
 - Task 3, live series on the dense fixture (today's definition, headless sessions, `--plugin-dir` this worktree, Sonnet; the briefs did not yet ask for full paths): 150 files, 10,978 bytes, whole in the result, 425 s; 230 files, 14,898 bytes, whole, 669 s (5 leads, returns of 7.9KB to 13.4KB); 320 files, 16,983 bytes, whole, 992 s (4 leads, 8.4KB to 16.6KB); 450 files, 14,232 bytes, whole, 1,118 s (5 leads, 5.8KB to 13.7KB). No preview and no saved output at any of these sizes. The full repo, 645 readable files of 690 tracked: 17,701 bytes, whole in the result, 1,837 s (5 leads, returns of 11.1KB to 15.2KB). Its report lists all 140 routes, as the last two path segments under a shared prefix, and 199 of the 202 commands by bare name; scored by whole token it holds 13 of 13 gotchas, 6 of 11 planted routes and 0 of 9 planted commands, which is the brief not asking for full paths, not anything left out.
 - Prompt and scorer fix: complete (from 0c9a267; gate: Ran 1360, OK on python3 3.14.7 (1 skip) and /usr/bin/python3 3.9.6 (5 skips), validates 0/0/0; the seven eval briefs ask for full route paths, `twctl <name>` and quoted references; `check_parts.py` requires the `Instructions:` line and checks the four carried lines are the same in every part; adversarial: 30 tests added and 97 out-of-date pins brought up, no bugs, no fix rounds)
+- Task 3, live series with the full-path brief (same setup): 320 files, 19,575 bytes, whole in the result, 1,064 s (4 leads, returns of 9.4KB to 15.5KB); the full repo, 645 readable files, 27,266 bytes, whole in the result, 1,840 s (7 leads, 8.3KB to 14.4KB), with 33 of 33 planted facts found by whole token. No run at any size came back as a preview, and none lost its last line. Three decoy tokens are in that report: the top level grepped the tree for its cross-area checks and quoted a vendored comment, a vendored route (listed in the route inventory with its `web/vendor/` path) and a line of an untracked file, each marked as found by grep and not read.
+- Task 3, the table (live headless sessions, today's definition, `investigate` on Sonnet, readers on Haiku):
+
+  | Files read | Brief | Report | Reached the session | Seconds |
+  |---|---|---|---|---|
+  | 150 | plain | 11.0KB | whole, in the result | 425 |
+  | 230 | plain | 14.9KB | whole, in the result | 669 |
+  | 320 | plain | 17.0KB | whole, in the result | 992 |
+  | 450 | plain | 14.2KB | whole, in the result | 1,118 |
+  | 645 | plain | 17.7KB | whole, in the result | 1,837 |
+  | 320 | full paths | 19.6KB | whole, in the result | 1,064 |
+  | 645 | full paths | 27.3KB | whole, in the result | 1,840 |
+
+  Beside it: in this live session a 9KB agent reply arrived whole and a 56KB one as a 2KB preview with a readable saved file; in the eval harness on 2026-11-05 a 35.6KB report arrived whole and a 53.7KB one as a preview whose saved file the sandbox blocked. So previews start somewhere between 36KB and 54KB, about twice the biggest report measured here. Lead returns ran 5.8KB to 16.6KB and all arrived. Not run yet: the harness series and the in-session confirmation.
+- Task 3, the rule: the biggest report whose full text reached the session with its last line is the 645-file one, so k = 3 (645 is at least 3 x 200). k isn't 2, so this is the plan's stop: the part size goes to the owner with the table. Stopped 2026-11-23; Tasks 5 on wait for the answer.
 
 ### Decisions made during the build
 - Ruling (before Task 1): the branch was cut from `main` at 2.1.1, not from `foundry-self-improve` as the task said, so it was fast-forwarded to `foundry-self-improve` (5b8148b) before anything was written, then rebased onto `main` at 9e48675 once 2.2.0 shipped. Why: the notes file and the tests this work changes weren't on `main` at 2.1.1. If wrong: nothing; the branch holds only this project's commits on top of `main`.
@@ -716,6 +731,7 @@ Baseline on 1f4c8dc, after the rebase (2026-11-23): Ran 950, OK on `python3` 3.1
 - Not run: an earlier try at measuring reply size, by having a Sonnet agent echo a 90KB and a 150KB file, was stopped by the model's safeguards before it produced anything. Not retried.
 
 ### Parked
+- From Task 3: today's `investigate` greps the whole tree for its cross-area checks and quotes what it finds in vendored and untracked files, marked as not read. `check_parts.py` fails a part that holds any decoy token, so Task 7 will meet this; it gets a ruling there (the agent's text, or the scorer's rule).
 - Prompt fix: `sync_big_sweep.py --check` doesn't cover `big-sweep-in-parts/prompt.md`, which is hand-written; a test pins its body verbatim, so a hand edit still fails the gate.
 - From the `Instructions:` cold read, left: a request that needs something a lead never collected isn't carried to leads (true of a one-report sweep today too); the `reply-size-*` prompts ask for a last line of `TAIL-MARK-6620` and say the user approved the count, which suits today's definition and will clash with `INVESTIGATE REPORT ENDS` once Task 5 lands, so those cases measure the old definition only unless they're reworked.
 - Density fix: `--subset 150` falls wholly inside `api/`, so it has 80 ordinary routes and no commands; the 1-in-5 and 3-in-10 mix holds only for the full fixture and the big subsets. Left: the series measures bytes, whatever they're made of.
@@ -724,3 +740,9 @@ Baseline on 1f4c8dc, after the rebase (2026-11-23): Ran 950, OK on `python3` 3.1
 - Task 2, from the adversarial round, all left: `measure_reply.py` gives no saved fields when the path sits on the line after "saved to:", and takes trailing text after a path as part of it; harness bytes understate when the `keep-report` evidence is itself truncated; `sync_big_sweep.py --check` ignores stray files in a reply-size folder. No mutation was run against `measure_reply.py`.
 - Task 1, from the spec check, all left: `scaffold.sh --subset N` with N above 645 ends in a Python traceback (nothing in the plan asks for one; ran by qa); `sync_big_sweep.py --check` doesn't notice a stray extra grader file, which the next write would delete (by reading). Not covered by any test: the `llm` grader's behaviour and the harness loading `case.yaml`, which need a model run (Task 7).
 - `run-plan`'s brief command breaks when the skill is loaded with an argument: `$0` in the `awk` block is replaced by the argument's text. Found here, not fixed here; it's a follow-up of its own.
+
+### Retro
+
+- architect [missed]: specified the test repo's file counts and layout but not what the files hold, so its reports came out a fifth the size of real ones; should have matched the head-to-head generator's public functions, routes and commands (Task 3, first live runs)
+- architect [missed]: left the head-to-head's three brief requests out of the new cases, so routes came back grouped under a prefix where the scorer wants the whole path; should have copied them (Task 3, the full-repo run)
+- brainstorm [missed]: built the design's size worry on "53.7KB for 191 files" without checking which run that was; it was the one arm with investigate on Haiku, and Sonnet's reports for the same repo were 17KB to 27KB (Task 3, the stored 2026-11-05 results)
