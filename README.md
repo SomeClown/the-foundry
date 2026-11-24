@@ -291,8 +291,10 @@ version, so you don't have to take my word for it:
   leads, and the one-level bound on leads holds at Claude Code's default nesting
   depth; a raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, `claude --agent`, or
   running `investigate` as an agent-team teammate leaves only the instructions.
-  It stops above 500 files so your session can ask you first. That costs more than
-  one agent reading everything: on one test repo of 191 files, one full sweep
+  A repo above 450 tracked files is read in parts: each report covers whole areas
+  and says which areas are left, and your session sends the next brief
+  without asking you. A per-file sweep costs more than one agent reading
+  everything: on one test repo of 191 files, one full sweep
   with the readers on Haiku cost about $2.31 and about 710 seconds a run (the
   mean of three eval runs, judge cost included), against about $0.47 and 109
   seconds for 1.7.6's single-agent read (the mean of three eval runs, labeled

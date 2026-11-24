@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tests"))
 import test_structure  # noqa: E402
 
-COPIED = ["agents", "skills", "docs/orchestrator.md", "docs/walkthrough.md", "evals/run-plan-decisions", "evals/README.md", "CONTRIBUTING.md"]
+COPIED = ["agents", "skills", "docs/orchestrator.md", "docs/walkthrough.md", "evals/run-plan-decisions", "evals/README.md", "CONTRIBUTING.md", "README.md", "PRIVACY.md"]
 PINS = test_structure.CheckBeforeBuildingPinsTest
 NO_COST = test_structure.NoCostGatesPinsTest
 NO_STOP = test_structure.NoStopBeforeReadingTest
@@ -362,6 +362,19 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
             for rel in ("agents/investigate.md", "agents/implement.md", "skills/run-plan/SKILL.md"):
                 with self.subTest(file=rel, old=old[:50]):
                     self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\n" + old + "\n", self.NOSTOP)
+
+    NOSTOP_DOCS = "test_no_doc_file_keeps_the_stop_in_any_spelling"
+
+    def test_each_removed_stop_sentence_put_back_into_each_doc_is_caught(self):
+        for old in NO_STOP.REMOVED:
+            for rel in NO_STOP.DOC_FILES:
+                with self.subTest(file=rel, old=old[:50]):
+                    self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\n" + old + "\n", self.NOSTOP_DOCS)
+
+    def test_a_removed_stop_sentence_wrapped_across_lines_in_a_doc_is_still_caught(self):
+        for rel in NO_STOP.DOC_FILES:
+            with self.subTest(file=rel):
+                self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\nSTOPPED\nBEFORE READING: 600 files\n", self.NOSTOP_DOCS)
 
 
 if __name__ == "__main__":

@@ -917,6 +917,19 @@ class NoStopBeforeReadingTest(unittest.TestCase):
                 m = re.search(self.PATTERN, text)
                 self.assertIsNone(m, m.group(0) if m else "")
 
+    # The docs that describe investigate's behavior to a reader. CHANGELOG.md and docs/design.md are
+    # history: they still say the stop existed (2.2.0 and the 1.x entries; design sections 1 and 4 quote
+    # it), so they stay out of this pin on purpose.
+    DOC_FILES = ["README.md", "docs/orchestrator.md", "evals/README.md", "CONTRIBUTING.md", "PRIVACY.md"]
+
+    def test_no_doc_file_keeps_the_stop_in_any_spelling(self):
+        for rel in self.DOC_FILES:
+            text = " ".join((ROOT / rel).read_text(encoding="utf-8").split())
+            with self.subTest(file=rel):
+                self.assertGreater(len(text), 500)
+                m = re.search(self.PATTERN, text)
+                self.assertIsNone(m, m.group(0) if m else "")
+
     def test_the_pattern_catches_every_sentence_that_was_taken_out(self):
         for old in self.REMOVED:
             with self.subTest(old=old[:50]):

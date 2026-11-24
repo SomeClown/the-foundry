@@ -4,6 +4,54 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+`investigate` no longer stops above 500 files to have your session ask you
+first. A repo too big for one report is read in parts, and the session carries
+on without asking.
+
+### Changed
+- The stop above 500 files, its rough cost and the `STOPPED BEFORE READING`
+  reply are gone, at any size. Nobody asks the user before a sweep or between
+  parts (design §4).
+- Above 450 tracked files (after whole folders skipped by rule), `investigate`
+  returns one part: the first areas, whole areas only and never fewer than
+  one, with every inventory untrimmed. The report opens with
+  `SWEEP IN PARTS: <n> areas not read` and a block that is the whole next
+  brief, ending at `END OF BLOCK`. The session sends it back with
+  `CONTINUE SWEEP` on its first line, one run at a time, until a report says
+  `0 areas not read`. A scoped read above 450 files says
+  `SWEEP IN PARTS: <n> files not read` instead, and the session sends the
+  original brief again with the unread paths.
+- Every report now ends with `INVESTIGATE REPORT ENDS` (an area lead's return
+  with `AREA REPORT ENDS`), so a cut-off report shows. A part with no last
+  line, or naming the same areas unread again, gets one retry, then the
+  session stops and says which areas are unread. A report that arrives as a
+  preview is read from its saved output.
+- A lead that fails twice has its files listed unread by path, and the top
+  level doesn't read them itself. That rule now holds in every sweep, small
+  ones included.
+- On a full sweep the report holds nothing quoted from a folder skipped whole
+  or from an untracked file, even when a search of the tree turned it up.
+- `docs/orchestrator.md` has the loop for the session, and `brainstorm`'s
+  recon line says a sweep can come back in parts.
+
+### Added
+- `evals-expensive/big-sweep-in-parts`: a generated test repo of 990 tracked
+  files (950 after its skipped folder, 945 readable) with planted facts in
+  every part, and a case that has a session read it part after part.
+- Six `reply-size-*` cases (150, 230, 320, 400, 450 and the whole repo) that
+  measured how big a report can be and still reach the session whole. They
+  asked for the old definition's last line and say the user approved the
+  count, so they're the record of how the part size was set, not a check to
+  re-run.
+- `evals-expensive/sync_big_sweep.py` (writes the answer key and the cases'
+  generated files; `--check` exits 1 naming files that differ),
+  `evals-expensive/measure_reply.py` (bytes of each agent result and whether
+  it kept its last line) and `evals-expensive/check_parts.py` (scores a sweep
+  read in parts: every file once, every planted fact, nobody asked). All three
+  run by hand, stay local and use no network.
+
 ## [2.2.1] — 2026-11-23
 
 A docs-only patch. The README's manual-install section now describes the

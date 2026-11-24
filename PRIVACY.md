@@ -41,9 +41,11 @@ Code session; the plugin adds no other destination.
 covers that part.
 
 The skills ship no scripts: `run-plan` and `debug` give your session commands
-that run through its own Bash. On the `main` branch, `evals-expensive/compare.py` and
-`evals-expensive/sync_case.py` run only when you run them by hand, stay local,
-use no network, and read result JSON; the eval scaffold writes a `bin/git`
+that run through its own Bash. On the `main` branch, `evals-expensive/compare.py`,
+`evals-expensive/sync_case.py`, `evals-expensive/sync_big_sweep.py`,
+`evals-expensive/measure_reply.py` and `evals-expensive/check_parts.py` run
+only when you run them by hand, stay local, use no network, and read result
+JSON, transcripts or saved reports; the eval scaffold writes a `bin/git`
 wrapper into its scratch fixture.
 
 The README's "What it runs, sends, and fetches" section has the full list. If
