@@ -796,6 +796,10 @@ class SyncScriptTest(unittest.TestCase):
         out = {"big-sweep-key.json": KEY_PATH.read_text(encoding="utf-8")}
         for p in (CASE / "graders").glob("*.md"):
             out["big-sweep-in-parts/graders/" + p.name] = p.read_text(encoding="utf-8")
+        for folder in sorted(EXPENSIVE.glob("reply-size-*")):
+            for p in folder.rglob("*"):
+                if p.is_file() and "__pycache__" not in p.parts:
+                    out[str(p.relative_to(EXPENSIVE))] = p.read_text(encoding="utf-8")
         return out
 
     def copy_of_the_case(self, tmp):
@@ -820,6 +824,7 @@ class SyncScriptTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             written = {str(p.relative_to(tmp)): p.read_text(encoding="utf-8") for p in Path(tmp).rglob("*") if p.is_file()}
             self.assertEqual(written, self.committed())
+            self.assertEqual(len(written), 43, sorted(written))
 
     def test_out_does_not_write_into_the_repo(self):
         before = sorted(str(p) for p in EXPENSIVE.rglob("*") if "__pycache__" not in p.parts)
@@ -904,6 +909,7 @@ class SyncScriptTest(unittest.TestCase):
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         self.assertEqual(module.expected(), self.committed())
+        self.assertEqual(len(module.expected()), 43)
 
     @unittest.skipUnless(os.access(STOCK_PYTHON, os.X_OK), "no /usr/bin/python3")
     def test_the_sync_check_also_passes_under_the_stock_python(self):
