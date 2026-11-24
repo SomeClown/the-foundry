@@ -511,7 +511,10 @@ one of `Mode: full sweep, <N> area leads`, `Mode: full sweep, no area leads`,
 Coverage counts carry no mode line. Then every top-level report gives the counts as
 one line:
 `Files listed: <n>; read: <n>; skipped: <n>; re-dispatched: <n>; failed: <n>; unread: <n>`.
-Files listed = read + skipped + failed + unread. Skip reasons follow on the next line.
+Files listed = read + skipped + failed + unread. Add counts with a command, never in
+your head: `echo $((122 + 36 + 30 + 20))`. That goes for the `<m>` on the
+`Areas not read:` line, for `Files listed:` and the numbers after it, and for any total
+you give of routes, commands or files. Skip reasons follow on the next line.
 Then every file left unread, by path, with two exceptions. Areas this run never
 started are named by their one line in the block, never file by file. Untracked files
 on a full sweep are listed by path, except in a sweep in parts, where they go under
@@ -528,7 +531,8 @@ front of `Areas read:` or `Areas not read:`:
   changed. The parentheses hold the count alone, as in "Areas". The mode line's N is the
   number of these area lines: it counts areas, not restarts.
 - `Areas not read: <n> areas, <m> files; see SWEEP IN PARTS at the top.`, on the line
-  straight after the last area line. The `<n>` is the same as on line 1.
+  straight after the last area line. The `<n>` is the same as on line 1. The `<m>` is the
+  sum of the block's area counts.
 - After it, a note on its own line, never starting with `-`, for each rebuilt area
   that changed: `Count changed: <name>: found <n>, the brief said <m>.` or
   `Area dropped: <name>: now <n> files, the brief said <m>; not read.`

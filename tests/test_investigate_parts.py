@@ -13,6 +13,7 @@ Nothing here starts a model session; the files are read as text. Standard librar
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -193,6 +194,10 @@ PINS = [
     ("the Areas not read line", "8. Coverage", r"`Areas not read: <n> areas, <m> files; see SWEEP IN PARTS at the top\.`"),
     ("the Areas not read line comes straight after the last area line", "8. Coverage", r"on the line straight after the last area line"),
     ("the Areas not read n is the same as line 1's", "8. Coverage", r"The `<n>` is the same as on line 1"),
+    ("counts are added with a command, never in your head", "8. Coverage", r"Add counts with a command, never in your head: `echo \$\(\(\d+(?: \+ \d+)+\)\)`"),
+    ("the command rule names the Areas not read m and Files listed", "8. Coverage", r"That goes for the `<m>` on the `Areas not read:` line, for `Files listed:` and the numbers after it"),
+    ("the command rule covers any total of routes, commands or files", "8. Coverage", r"and for any total you give of routes, commands or files"),
+    ("the Areas not read m is the sum of the block's area counts", "8. Coverage", r"The `<m>` is the sum of the block's area counts"),
     ("a note goes on its own line, never starting with a dash", "8. Coverage", r"a note on its own line, never starting with `-`"),
     ("the Count changed line", "8. Coverage", r"`Count changed: <name>: found <n>, the brief said <m>\.`"),
     ("the Area dropped line", "8. Coverage", r"`Area dropped: <name>: now <n> files, the brief said <m>; not read\.`"),
@@ -346,6 +351,20 @@ class PartsPinsTest(unittest.TestCase):
         self.assertNotIn("<P>", self.text)
         self.assertEqual(sorted(set(re.findall(r"\b(?:300|450|500|600)\b", self.text))), ["450"])
         self.assertEqual(len(re.findall(r"\b450\b", " ".join(self.text.split()))), 2)
+
+    def test_the_sum_example_in_coverage_is_real_shell_arithmetic_under_bash_and_zsh(self):
+        found = re.findall(r"`(echo \$\(\([^`]*\)\))`", self.body_raw("### 8. Coverage"))
+        self.assertEqual(len(found), 1, found)
+        command = found[0]
+        numbers = [int(n) for n in re.findall(r"\d+", command)]
+        self.assertGreaterEqual(len(numbers), 2)
+        shells = [["bash", "-c"]]
+        if shutil.which("zsh"):
+            shells.append(["zsh", "-f", "-c"])
+        for shell in shells:
+            with self.subTest(shell=shell[0]):
+                proc = subprocess.run(shell + [command], capture_output=True, text=True, timeout=30)
+                self.assertEqual((proc.returncode, proc.stdout.strip()), (0, str(sum(numbers))), proc.stderr)
 
     # ------------------------------------------------------------ the fence
 

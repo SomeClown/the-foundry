@@ -917,6 +917,28 @@ class CoverageTest(Base):
         parts = edit(self.parts, "part-1.md", "Areas not read: 7 areas, %d files;" % total, "Areas not read: 7 areas, %d files;" % (total - 1))
         self.assertFails(parts, r"part-1\.md: Coverage says 7 areas, %d files not read; the block holds 7 areas, %d files" % (total - 1, total))
 
+    # ---- the real run's wrong sum: four areas of 122, 36, 30 and 20 files added up in the model's head as 204
+
+    def real_run_split(self):
+        """Part 2's block holds four areas of 122, 36, 30 and 20 files (208); parts 1 and 2 read the rest."""
+        base = {a.name: a for a in base_areas()}
+        rules = select("rules/")
+        cuts = [0, 122, 244, 366, 468, 590, 610]
+        piece = [rules_range("rules-%d" % (i + 1), rules[cuts[i]], rules[cuts[i + 1] - 1]) for i in range(6)]
+        head = [base[n] for n in ("root", "api-top", "api-accounts", "api-billing", "api-plazas", "api-trips", "cli", "docs", "jobs", "scripts-zones")]
+        areas = head + piece[:4] + [piece[4], piece[5], base["tests"], base["web"]]
+        self.assertEqual([a.count for a in areas[-4:]], [122, 20, 36, 30])
+        return build_parts(areas, cuts=(11, 14))
+
+    def test_the_real_runs_four_areas_summing_to_208_pass_with_208(self):
+        self.assertIn("Areas not read: 4 areas, 208 files;", self.real_run_split()["part-2.md"])
+        self.assertProved(self.real_run_split())
+
+    def test_the_real_runs_wrong_sum_of_204_fails_naming_the_part_both_counts_and_both_totals(self):
+        parts = edit(self.real_run_split(), "part-2.md", "Areas not read: 4 areas, 208 files;", "Areas not read: 4 areas, 204 files;")
+        out = self.assertFails(parts, r"^part-2\.md: Coverage says 4 areas, 204 files not read; the block holds 4 areas, 208 files$")
+        self.assertEqual(sum(1 for line in out.splitlines() if "Coverage says" in line), 1, out)
+
     def test_coverage_areas_not_read_line_missing_in_a_part_with_a_block(self):
         parts = edit(self.parts, "part-2.md", "Areas not read: 4 areas", "Areas left: 4 areas")
         self.assertFails(parts, r"part-2\.md: no line 'Areas not read: <n> areas, <m> files; see SWEEP IN PARTS at the top\.'")
