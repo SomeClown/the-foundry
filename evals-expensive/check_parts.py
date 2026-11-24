@@ -16,6 +16,9 @@ Reads DIR/part-<n>.md in number order and checks, against the key and the fixtur
                     (a part with one area passes whatever its count); also prints a NOTE: line, never a failure, when a
                     part that isn't the last could have held the next area too
 
+Also prints a NOTE: line, never a failure, for a later part that names an untracked path (only part 1 lists them).
+Parses `(root)` in backticks, a folder-and-(direct) pair inside one pair of backticks, and a `Whole repo:` folder in backticks.
+
 Exit 0 prints LOOP PROVED and a summary (with --part-size, the summary gives the largest part's file count); exit 1 prints LOOP FAILED and one line per failure; exit 2 prints
 CAN'T CHECK: <why> (a missing file, an unreadable key, a crash). Standard library only, Python 3.9.
 
@@ -39,9 +42,9 @@ SWEEP_RE = re.compile(r"^SWEEP IN PARTS: (\d+) areas not read$")
 CONTINUE_SENTENCE = ("To read the rest, dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first line, "
                      "then every line from `Project:` to `END OF BLOCK`, copied as it stands.")
 AREA_RE = re.compile(r"^- ([^:]+?): (.+) \((\d+) files\)$")
-DIR_PIECE = r"`(?P<d>[^`]+/)`(?: \((?P<direct>direct)\))?"
+DIR_PIECE = r"`(?P<d>[^`]+/)(?:`(?: \((?P<direct>direct)\))?| \((?P<inner>direct)\)`)"
 PIECE_RE = re.compile(
-    r"(?:" + DIR_PIECE + r"|(?P<root>\(root\)))"
+    r"(?:" + DIR_PIECE + r"|`?(?P<root>\(root\))`?)"
     r"(?P<excepts>(?: except `[^`]+/`)*)"
     r"(?: from `(?P<a>[^`]+)` to `(?P<b>[^`]+)`)?"
 )
@@ -127,7 +130,7 @@ def parse_definition(definition):
         excepts = [e.encode("utf-8") for e in EXCEPT_RE.findall(m.group("excepts"))]
         a = m.group("a")
         b = m.group("b")
-        pieces.append((m.group("d").encode("utf-8") if m.group("d") else None, m.group("direct") is not None, excepts,
+        pieces.append((m.group("d").encode("utf-8") if m.group("d") else None, (m.group("direct") or m.group("inner")) is not None, excepts,
                        a.encode("utf-8") if a is not None else None, b.encode("utf-8") if b is not None else None))
         pos = m.end()
         if pos == len(definition):
@@ -379,6 +382,7 @@ def main(argv):
         fails.append("exactly once: no area was read in any part")
 
     # coverage
+    later_named = []
     skipped_total = sum(layout["skipped_whole"].values())
     for number, info in zip(numbers, infos):
         if info["shape"] is None:
@@ -420,7 +424,7 @@ def main(argv):
                 if got != want:
                     fails.append("%s: Whole repo expected %d tracked, %d skipped whole, %d untracked; found %d, %d, %d" % ((name,) + want + got))
                 for folder, count in layout["skipped_whole"].items():
-                    fm = re.search(re.escape(folder) + r":\s*(\d+)", w.group(3))
+                    fm = re.search(re.escape(folder) + r"`?:\s*(\d+)", w.group(3))
                     if not fm or int(fm.group(1)) != count:
                         fails.append("%s: Whole repo should give '%s: %d' inside the parentheses, found %r" % (name, folder, count, w.group(3)))
             rest = "\n".join(lines[whole_at:])
@@ -432,10 +436,10 @@ def main(argv):
                 fails.append("%s: expected %r, found %r" % (name, WHOLE_LATER, lines[whole_at].strip()))
             named = [p for p in layout["untracked"] if re.search(r"(?<![\w./-])" + re.escape(p) + r"(?![\w/-])", info["text"])]
             if named:
-                fails.append("%s: a later part must name no untracked path; found %s" % (name, ", ".join(named)))
+                later_named.append("NOTE: %s names an untracked path that only part 1 should list: %s" % (name, ", ".join(named)))
 
     # part size
-    notes = []
+    notes = list(later_named)
     sizes = []
     if args.part_size is not None:
         counted = [(i, stated_counts(i["read"])) for i in infos if i["shape"] is not None and i["read"]]

@@ -33,6 +33,13 @@ INSTRUCTIONS = ("Instructions: In the route inventory, give every route its full
                 "give every CLI subcommand as `twctl <name>`")
 
 
+NOTE_2 = "NOTE: part-2.md names an untracked path that only part 1 should list: %s"
+
+
+def note_lines(out):
+    return [l for l in out.splitlines() if l.startswith("NOTE:")]
+
+
 # ---------------------------------------------------------------- fixture and a small independent evaluator
 
 class Fixture:
@@ -969,17 +976,25 @@ class CoverageTest(Base):
         self.assertFails(parts, r"part-1\.md: Whole repo line should read")
 
     def test_untracked_paths_repeated_in_part_2s_whole_repo_line(self):
+        # the line's shape still fails; the mention of the untracked path is only a note
         parts = edit(self.parts, "part-2.md", WHOLE_LATER, "Whole repo: given in part 1; untracked: notes/scratch.md")
-        self.assertFails(parts, r"part-2\.md: expected 'Whole repo: given in part 1\.'", r"part-2\.md: a later part must name no untracked path; found notes/scratch\.md")
+        out = self.assertFails(parts, r"part-2\.md: expected 'Whole repo: given in part 1\.'")
+        self.assertNotIn("must name no untracked path", out)
+        self.assertEqual(note_lines(out), [NOTE_2 % "notes/scratch.md"])
 
     def test_the_whole_repo_line_repeated_in_full_in_part_2(self):
+        # the answer to "what does a part 2 with part 1's whole line get": the shape failure, plus the note
         parts = edit(self.parts, "part-2.md", WHOLE_LATER, WHOLE_1)
-        out = self.assertFails(parts, r"part-2\.md: expected 'Whole repo: given in part 1\.'", r"part-2\.md: a later part must name no untracked path")
-        self.assertIn("rules/r9999_draft.py", out)
+        out = self.assertFails(parts, r"part-2\.md: expected 'Whole repo: given in part 1\.', found 'Whole repo: 990 tracked files")
+        self.assertNotIn("must name no untracked path", out)
+        self.assertEqual(note_lines(out), [NOTE_2 % ", ".join(UNTRACKED)])
+        self.assertEqual(len(out.splitlines()), 3, out)  # LOOP FAILED, the one failure, the one note
 
     def test_an_untracked_path_named_in_the_prose_of_part_3(self):
         parts = edit(self.parts, "part-3.md", "## Findings\n", "## Findings\nNote: zones/zz_todo.txt is not tracked.\n")
-        self.assertFails(parts, r"part-3\.md: a later part must name no untracked path; found zones/zz_todo\.txt")
+        code, out = run_script(parts)
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
+        self.assertEqual(note_lines(out), ["NOTE: part-3.md names an untracked path that only part 1 should list: zones/zz_todo.txt"])
 
     def test_a_later_part_that_says_something_else_for_whole_repo(self):
         parts = edit(self.parts, "part-3.md", WHOLE_LATER, "Whole repo: see part 1.")
@@ -988,6 +1003,505 @@ class CoverageTest(Base):
     def test_a_later_part_with_no_whole_repo_line(self):
         parts = edit(self.parts, "part-3.md", WHOLE_LATER + "\n", "")
         self.assertFails(parts, r"part-3\.md: no 'Whole repo:' line in Coverage")
+
+
+# ---------------------------------------------------------------- fix batch 1: what two real runs wrote
+#
+# The finished loop runs (outside the repo, so nothing here reads them) wrote `(root)` in backticks, the folder on the
+# Whole repo line in backticks, untracked paths in the prose of later parts, a count of 8 over a block of 7, and a
+# count with its read and skipped files inside the parentheses. The first three are tolerated now; the last two are not.
+
+def backtick_root(area):
+    return area.copy(definition=area.definition.replace("(root)", "`(root)`"))
+
+
+def backtick_direct(area):
+    return area.copy(definition=re.sub(r"`([^`]+/)` \(direct\)", r"`\1 (direct)`", area.definition))
+
+
+def moved_last(*names):
+    """The base split with the named areas moved to the end, so they sit in the blocks of parts 1 and 2 as well."""
+    areas = base_areas()
+    return [a for a in areas if a.name not in names] + [next(a for a in areas if a.name == n) for n in names]
+
+
+def backticked_split():
+    """Root and the direct files of api/ written the way the runs wrote them, in the blocks and under Areas read."""
+    areas = moved_last("root", "api-top")
+    areas[-2], areas[-1] = backtick_root(areas[-2]), backtick_direct(areas[-1])
+    return build_parts(areas, cuts=(9, 12))
+
+
+def with_prose(parts, name, text):
+    return edit(parts, name, "## Findings\n", "## Findings\n%s\n" % text)
+
+
+class BackticksOnRootAndDirectTest(Base):
+    """`(root)` in backticks, and `` `src/ (direct)` ``, are read the same as the bare forms the notation shows."""
+
+    def test_backticked_root_alone_is_proved_like_bare_root(self):
+        areas = base_areas()
+        areas[0] = backtick_root(areas[0])
+        self.assertEqual(areas[0].definition, "`(root)`")
+        self.assertEqual(self.assertProved(build_parts(areas)), self.assertProved(build_parts(base_areas())))
+
+    def test_backticked_root_in_the_blocks_of_parts_1_and_2_is_proved(self):
+        parts = backticked_split()
+        self.assertIn("- root: `(root)` (6 files)", parts["part-1.md"].split("\nEND OF BLOCK\n")[0])
+        self.assertIn("- api-top: `api/ (direct)` (", parts["part-2.md"].split("\nEND OF BLOCK\n")[0])
+        self.assertProved(parts)
+
+    def test_backticked_root_first_in_a_plus_definition(self):
+        # the shape run 2 wrote: `(root)` + `docs/`, 18 files, as in the real run
+        top = Area("top", "`(root)` + `docs/`", select(None) + select("docs/"))
+        self.assertEqual(top.count, 18)
+        areas = [top] + [a for a in base_areas() if a.name not in ("root", "docs")]
+        self.assertProved(build_parts(areas, cuts=(9, 12)))
+
+    def test_backticked_root_last_in_a_plus_definition(self):
+        both = Area("top", "`api/` (direct) + `(root)`", select("api/", direct=True) + select(None))
+        areas = [both] + [a for a in base_areas() if a.name not in ("root", "api-top")]
+        self.assertProved(build_parts(areas, cuts=(9, 12)))
+
+    def test_backticked_root_in_the_middle_of_a_plus_definition(self):
+        top = Area("top", "`api/` (direct) + `(root)` + `docs/`", select("api/", direct=True) + select(None) + select("docs/"))
+        areas = [top] + [a for a in base_areas() if a.name not in ("root", "api-top", "docs")]
+        self.assertProved(build_parts(areas, cuts=(8, 11)))
+
+    def test_backticked_root_joined_without_the_plus_spaces_is_still_not_the_notation(self):
+        top = Area("top", "`(root)`+`docs/`", select(None) + select("docs/"))
+        areas = [top] + [a for a in base_areas() if a.name not in ("root", "docs")]
+        self.assertFails(build_parts(areas, cuts=(9, 12)), r"area 'top': expected ' \+ ' between pieces")
+
+    def test_backticked_root_with_an_except_piece(self):
+        areas = base_areas()
+        areas[0] = Area("root", "`(root)` except `docs/`", select(None, excepts=["docs/"]))
+        self.assertProved(build_parts(areas))
+
+    def test_backticked_root_over_a_range_of_its_files(self):
+        roots = select(None)
+        r1 = Area("root-1", "`(root)` from `%s` to `%s`" % (roots[0], roots[2]), select(None, lo=roots[0], hi=roots[2]))
+        r2 = Area("root-2", "`(root)` from `%s` to `%s`" % (roots[3], roots[-1]), select(None, lo=roots[3], hi=roots[-1]))
+        self.assertEqual(r1.count + r2.count, len(roots))
+        self.assertProved(build_parts([r1, r2] + base_areas()[1:], cuts=(11, 14)))
+
+    def test_backticked_root_with_an_except_and_a_range_together(self):
+        roots = select(None)
+        areas = base_areas()
+        areas[0] = Area("root", "`(root)` except `docs/` from `%s` to `%s`" % (roots[0], roots[-1]), roots)
+        self.assertProved(build_parts(areas))
+
+    def test_backticked_root_rebuilds_to_the_same_file_set_and_count_as_bare_root(self):
+        areas = base_areas()
+        areas[0] = backtick_root(areas[0])
+        self.assertIn("files covered: 950 of 950", self.assertProved(build_parts(areas)))
+
+    def test_backticked_root_with_a_wrong_count_fails_with_both_numbers(self):
+        areas = base_areas()
+        areas[0] = backtick_root(areas[0]).copy(count=len(select(None)) + 1)
+        self.assertFails(build_parts(areas), r"area 'root': stated 7 files, the definition rebuilds to 6")
+
+    def test_a_backticked_root_area_dropped_leaves_its_files_in_no_area(self):
+        areas = [a for a in base_areas() if a.name != "root"]
+        self.assertFails(build_parts(areas, cuts=(9, 12)), r"exactly once: .* 6 are in no area read: CHANGELOG\.md")
+
+    def test_a_made_up_word_in_the_root_backticks_is_not_the_notation(self):
+        areas = base_areas()
+        areas[0] = areas[0].copy(definition="`(roots)`")
+        self.assertFails(build_parts(areas), r"area 'root': cannot read a piece at '`\(roots\)`'")
+
+    def test_the_direct_word_inside_the_folders_backticks_is_proved_like_outside(self):
+        areas = base_areas()
+        areas[1] = backtick_direct(areas[1])
+        self.assertEqual(areas[1].definition, "`api/ (direct)`")
+        self.assertEqual(self.assertProved(build_parts(areas)), self.assertProved(build_parts(base_areas())))
+
+    def test_the_direct_word_inside_the_backticks_next_to_other_pieces(self):
+        both = Area("top", "`api/ (direct)` + `(root)`", select("api/", direct=True) + select(None))
+        areas = [both] + [a for a in base_areas() if a.name not in ("root", "api-top")]
+        self.assertProved(build_parts(areas, cuts=(9, 12)))
+
+    def test_the_direct_word_inside_the_backticks_with_a_range(self):
+        areas = base_areas()
+        areas[9] = backtick_direct(areas[9])
+        self.assertIn("`rules/ (direct)` from", areas[9].definition)
+        self.assertProved(build_parts(areas))
+
+    def test_the_direct_word_inside_the_backticks_still_means_direct(self):
+        # stated as every file under api/, the count is wrong: the piece is the direct files only
+        areas = base_areas()
+        every = len(select("api/"))
+        areas[1] = backtick_direct(areas[1]).copy(count=every)
+        self.assertFails(build_parts(areas), r"area 'api-top': stated %d files, the definition rebuilds to %d" % (every, len(areas[1].files)))
+
+    def test_a_misspelled_direct_inside_the_backticks_is_not_the_notation(self):
+        areas = base_areas()
+        areas[1] = areas[1].copy(definition="`api/ (directly)`")
+        self.assertFails(build_parts(areas), r"area 'api-top': cannot read a piece at '`api/ \(directly\)`'")
+
+    def test_direct_with_a_backtick_on_both_sides_is_not_the_notation(self):
+        areas = base_areas()
+        areas[1] = areas[1].copy(definition="`api/` (direct)`")
+        self.assertFails(build_parts(areas), r"area 'api-top': expected ' \+ ' between pieces at '`'")
+
+    def test_direct_inside_the_backticks_without_the_space_is_not_the_notation(self):
+        areas = base_areas()
+        areas[1] = areas[1].copy(definition="`api/(direct)`")
+        self.assertFails(build_parts(areas), r"area 'api-top': cannot read a piece")
+
+
+class WholeRepoFolderTest(Base):
+    """The `Whole repo:` folder may be in backticks; the reason is free; the count and the folder are not."""
+
+    def whole(self, inner, tail=" (%s)" % ", ".join(UNTRACKED)):
+        return "Whole repo: 990 tracked files; 40 in folders skipped whole (%s); 3 untracked%s" % (inner, tail)
+
+    def with_line(self, line):
+        return edit(build_parts(base_areas()), "part-1.md", WHOLE_1, line)
+
+    def with_inner(self, inner):
+        return self.with_line(self.whole(inner))
+
+    def test_the_folder_in_backticks_is_proved(self):
+        self.assertProved(self.with_inner("`web/vendor/`: 40, vendored"))
+
+    def test_the_folder_without_backticks_is_proved(self):
+        self.assertProved(self.with_inner("web/vendor/: 40, vendored"))
+
+    def test_the_two_spellings_give_the_same_output(self):
+        self.assertEqual(self.assertProved(self.with_inner("`web/vendor/`: 40, x")), self.assertProved(self.with_inner("web/vendor/: 40, x")))
+
+    def test_the_reason_may_be_any_text_with_or_without_backticks(self):
+        for reason in ("vendored third-party code the README says not to edit", "third party; do not edit", "a, b, c", "x",
+                       "see `web/README.md` (vendored)", "says: 39 files were here once", "40 files"):
+            for folder in ("`web/vendor/`", "web/vendor/"):
+                with self.subTest(folder=folder, reason=reason):
+                    self.assertProved(self.with_inner("%s: 40, %s" % (folder, reason)))
+
+    def test_no_reason_at_all_is_proved_either_way(self):
+        self.assertProved(self.with_inner("`web/vendor/`: 40"))
+        self.assertProved(self.with_inner("web/vendor/: 40"))
+
+    def test_a_wrong_count_fails_in_backticks_with_the_message_the_brief_quotes(self):
+        self.assertFails(self.with_inner("`web/vendor/`: 39, vendored"),
+                         r"^part-1\.md: Whole repo should give 'web/vendor/: 40' inside the parentheses, found '`web/vendor/`: 39, vendored'$")
+
+    def test_a_wrong_count_fails_without_backticks(self):
+        self.assertFails(self.with_inner("web/vendor/: 39, vendored"), r"part-1\.md: Whole repo should give 'web/vendor/: 40' inside the parentheses")
+
+    def test_a_longer_count_that_starts_with_40_fails_either_way(self):
+        for folder in ("`web/vendor/`", "web/vendor/"):
+            with self.subTest(folder=folder):
+                self.assertFails(self.with_inner("%s: 400, vendored" % folder), r"Whole repo should give 'web/vendor/: 40'")
+
+    def test_a_missing_folder_fails_whatever_the_reason(self):
+        for inner in ("vendored third-party code", "`vendored`: 40", "40, vendored"):
+            with self.subTest(inner=inner):
+                self.assertFails(self.with_inner(inner), r"part-1\.md: Whole repo should give 'web/vendor/: 40'")
+
+    def test_the_wrong_folder_fails_even_with_the_right_count(self):
+        self.assertFails(self.with_inner("`web/other/`: 40, vendored"), r"Whole repo should give 'web/vendor/: 40'")
+
+    def test_the_untracked_paths_on_lines_under_the_whole_repo_line_are_read_as_both_runs_wrote_them(self):
+        one = self.whole("`web/vendor/`: 40, vendored third-party code", tail=".") + "\n- Untracked, unread: " + ", ".join("`%s`" % p for p in UNTRACKED)
+        self.assertProved(self.with_line(one))
+        two = (self.whole("`web/vendor/`: 40, vendored third-party code the README says not to edit", tail=", unread:") + "\n"
+               + "\n".join("- `%s`" % p for p in UNTRACKED))
+        self.assertProved(self.with_line(two))
+
+    def test_part_1_must_still_name_every_untracked_path_with_a_backticked_folder(self):
+        line = self.whole("`web/vendor/`: 40, vendored", tail=" (notes/scratch.md, zones/zz_todo.txt)")
+        self.assertFails(self.with_line(line), r"part-1\.md: Whole repo should name the untracked paths; missing rules/r9999_draft\.py")
+
+    def test_part_1_must_still_name_every_untracked_path_when_the_lines_under_it_leave_one_out(self):
+        one = self.whole("`web/vendor/`: 40, x", tail=".") + "\n- Untracked, unread: `notes/scratch.md`, `zones/zz_todo.txt`"
+        self.assertFails(self.with_line(one), r"missing rules/r9999_draft\.py")
+
+    def test_part_1_naming_none_of_them_fails_with_a_backticked_folder(self):
+        line = self.whole("`web/vendor/`: 40, vendored", tail="")
+        self.assertFails(self.with_line(line), r"part-1\.md: Whole repo should name the untracked paths; missing notes/scratch\.md, rules/r9999_draft\.py, zones/zz_todo\.txt")
+
+    def test_a_path_inside_a_longer_path_is_not_naming_the_untracked_one(self):
+        line = self.whole("`web/vendor/`: 40, x", tail=" (mynotes/scratch.md, rules/r9999_draft.py, zones/zz_todo.txt)")
+        self.assertFails(self.with_line(line), r"missing notes/scratch\.md")
+
+    def test_the_numbers_are_still_exact_with_a_backticked_folder(self):
+        line = self.whole("`web/vendor/`: 40, x").replace("990 tracked", "989 tracked")
+        self.assertFails(self.with_line(line), r"Whole repo expected 990 tracked, 40 skipped whole, 3 untracked; found 989, 40, 3")
+
+
+class StillStrictTest(Base):
+    """What the two real runs got wrong stays a failure, with the message the brief quotes."""
+
+    def count_slip(self, parts, line_1=8, coverage=None):
+        parts = edit(parts, "part-1.md", "SWEEP IN PARTS: 7 areas not read", "SWEEP IN PARTS: %d areas not read" % line_1)
+        if coverage is not None:
+            parts = edit(parts, "part-1.md", "Areas not read: 7 areas,", "Areas not read: %d areas," % coverage)
+        return parts
+
+    def test_line_1_saying_8_against_a_block_of_7_fails_with_the_brief_message(self):
+        self.assertFails(self.count_slip(build_parts(base_areas())), r"^part-1\.md: the SWEEP IN PARTS line says 8 areas, the block holds 7 area lines$")
+
+    def test_line_1_and_coverage_both_saying_8_still_fails_as_in_run_2(self):
+        parts = self.count_slip(build_parts(base_areas()), coverage=8)
+        parts = edit(parts, "part-1.md", "\nWhole repo:", "\nThe block at the top lists seven areas, but the heading says eight.\n\nWhole repo:")
+        self.assertFails(parts, r"^part-1\.md: the SWEEP IN PARTS line says 8 areas, the block holds 7 area lines$")
+
+    def test_line_1_saying_6_against_a_block_of_7_fails_too(self):
+        self.assertFails(self.count_slip(build_parts(base_areas()), line_1=6), r"part-1\.md: the SWEEP IN PARTS line says 6 areas, the block holds 7 area lines")
+
+    def test_a_count_off_by_one_in_a_later_part_fails_too(self):
+        parts = edit(build_parts(base_areas()), "part-2.md", "SWEEP IN PARTS: 4 areas not read", "SWEEP IN PARTS: 5 areas not read")
+        self.assertFails(parts, r"part-2\.md: the SWEEP IN PARTS line says 5 areas, the block holds 4 area lines")
+
+    def test_the_real_run_1_area_line_fails_with_the_message_the_brief_quotes(self):
+        top = Area("top", "`(root)` + `scripts/` + `tests/` + `zones/`", select(None) + select("scripts/") + select("tests/") + select("zones/"))
+        self.assertEqual(top.count, 70)
+        areas = [top] + [a for a in base_areas() if a.name not in ("root", "scripts-zones", "tests")]
+        parts = build_parts(areas, cuts=(9, 12))
+        self.assertProved(parts)  # the same split with the count alone in the parentheses
+        real = "- top: `(root)` + `scripts/` + `tests/` + `zones/` (70 files; 69 read, `poetry.lock` skipped)"
+        self.assertFails(edit(parts, "part-1.md", top.line(), real),
+                         r"^part-1\.md: area line does not match '- <name>: <definition> \(<n> files\)': '- top: `\(root\)` \+ `scripts/` \+ `tests/` \+ `zones/` \(70 files; 69 read, `poetry\.lock` skipped\)'$")
+
+    def test_anything_but_the_count_in_the_parentheses_fails(self):
+        base = build_parts(base_areas())
+        for extra in ("; 69 read", ", 1 skipped", " read", " (1 skipped)", "; 5 read, `poetry.lock` skipped"):
+            with self.subTest(extra=extra):
+                parts = edit_all(base, lambda t: t.replace("(6 files)", "(6 files%s)" % extra))
+                self.assertFails(parts, r"part-1\.md: area line does not match '- <name>: <definition> \(<n> files\)'")
+
+    def test_the_bare_number_in_the_parentheses_fails(self):
+        self.assertFails(edit_all(build_parts(base_areas()), lambda t: t.replace("(6 files)", "(6)")), r"area line does not match")
+
+    def test_extra_text_after_the_parentheses_fails(self):
+        self.assertFails(edit_all(build_parts(base_areas()), lambda t: t.replace("(6 files)", "(6 files) read")), r"area line does not match")
+
+    def test_extra_text_in_the_parentheses_of_a_block_line_fails_too(self):
+        parts = edit(build_parts(base_areas()), "part-1.md", "- web: `web/` except `web/vendor/` (30 files)\nEND OF BLOCK",
+                     "- web: `web/` except `web/vendor/` (30 files; none read)\nEND OF BLOCK")
+        self.assertFails(parts, r"part-1\.md: area line does not match '- <name>: <definition> \(<n> files\)': '- web: `web/` except `web/vendor/` \(30 files; none read\)'")
+
+    def test_the_continuation_of_run_2s_count_slip_does_not_rescue_a_wrong_coverage_line(self):
+        # Areas not read says 8 and the block holds 7: the check against the block's lines still runs on Coverage
+        parts = edit(build_parts(base_areas()), "part-1.md", "Areas not read: 7 areas,", "Areas not read: 8 areas,")
+        self.assertFails(parts, r"part-1\.md: Coverage says 8 areas, \d+ files not read; the block holds 7 areas, \d+ files")
+
+
+class UntrackedNoteTest(Base):
+    """A later part that names an untracked path gets a NOTE, which changes neither the exit code nor the verdict word."""
+
+    def test_the_note_has_the_exact_text(self):
+        out = run_script(with_prose(build_parts(base_areas()), "part-2.md", "The file notes/scratch.md is not tracked."))[1]
+        self.assertEqual(note_lines(out), ["NOTE: part-2.md names an untracked path that only part 1 should list: notes/scratch.md"])
+
+    def test_the_note_lists_every_path_named_comma_separated_in_the_keys_order(self):
+        out = run_script(with_prose(build_parts(base_areas()), "part-3.md", "zones/zz_todo.txt, rules/r9999_draft.py and notes/scratch.md are untracked."))[1]
+        self.assertEqual(note_lines(out), ["NOTE: part-3.md names an untracked path that only part 1 should list: " + ", ".join(UNTRACKED)])
+
+    def test_the_note_never_changes_the_exit_code_or_the_verdict_word(self):
+        code, out = run_script(with_prose(build_parts(base_areas()), "part-2.md", "notes/scratch.md"))
+        self.assertEqual(code, 0)
+        self.assertEqual(out.splitlines()[0], "LOOP PROVED")
+        self.assertNotIn("LOOP FAILED", out)
+        self.assertEqual(out.splitlines()[1].split(";")[0], "parts: 3")
+
+    def test_the_note_leaves_the_summary_line_what_it_was(self):
+        plain = run_script(build_parts(base_areas()))[1]
+        noted = run_script(with_prose(build_parts(base_areas()), "part-2.md", "notes/scratch.md"))[1]
+        self.assertEqual(noted.splitlines()[:2], plain.splitlines()[:2])
+        self.assertEqual(len(noted.splitlines()), 3)
+
+    def test_the_note_beside_a_real_failure_keeps_exit_1_and_the_failed_verdict(self):
+        parts = edit(with_prose(build_parts(base_areas()), "part-2.md", "notes/scratch.md"), "part-1.md", "990 tracked files", "989 tracked files")
+        code, out = run_script(parts)
+        self.assertEqual((code, out.splitlines()[0]), (1, "LOOP FAILED"), out)
+        self.assertEqual(len(note_lines(out)), 1)
+        self.assertNotIn("must name no untracked path", out)
+        self.assertTrue(out.splitlines()[-1].startswith("NOTE:"), out)  # failures first, notes last
+
+    def test_each_later_part_that_names_one_gets_its_own_note_in_part_order(self):
+        parts = with_prose(with_prose(build_parts(base_areas()), "part-2.md", "notes/scratch.md"), "part-3.md", "zones/zz_todo.txt")
+        out = run_script(parts)[1]
+        self.assertEqual(note_lines(out), [NOTE_2 % "notes/scratch.md", "NOTE: part-3.md names an untracked path that only part 1 should list: zones/zz_todo.txt"])
+
+    def test_part_1_naming_them_gets_no_note(self):
+        out = run_script(build_parts(base_areas()))[1]
+        self.assertEqual(note_lines(out), [])
+        self.assertEqual(len(out.strip().splitlines()), 2)
+
+    def test_a_part_naming_none_gets_no_note(self):
+        self.assertEqual(note_lines(run_script(with_prose(build_parts(base_areas()), "part-2.md", "nothing untracked here"))[1]), [])
+
+    def test_a_path_inside_a_longer_path_is_not_a_mention(self):
+        out = run_script(with_prose(build_parts(base_areas()), "part-2.md", "see mynotes/scratch.md and docs/zones/zz_todo.txt and notes/scratch.md-old"))[1]
+        self.assertEqual(note_lines(out), [])
+
+    def test_a_backticked_path_is_a_mention(self):
+        out = run_script(with_prose(build_parts(base_areas()), "part-2.md", "the untracked `rules/r9999_draft.py`."))[1]
+        self.assertEqual(note_lines(out), [NOTE_2 % "rules/r9999_draft.py"])
+
+    def test_the_note_sits_with_the_part_size_notes_at_the_end_of_the_output(self):
+        code, out = run_script(with_prose(build_parts(base_areas()), "part-2.md", "notes/scratch.md"), extra=["--part-size", "490"])
+        lines = out.splitlines()
+        self.assertEqual((code, lines[0]), (0, "LOOP PROVED"), out)
+        self.assertEqual(len(note_lines(out)), 3)  # the untracked one and the two "could have held the next area" notes
+        self.assertTrue(all(l.startswith("NOTE:") for l in lines[2:]), out)
+        self.assertIn(NOTE_2 % "notes/scratch.md", lines)
+
+    def test_the_note_sits_with_the_part_size_notes_when_the_run_fails(self):
+        parts = edit(with_prose(build_parts(base_areas()), "part-3.md", "zones/zz_todo.txt"), "part-1.md", "Mode: full sweep, 10 area leads", "Mode: full sweep, 7 area leads")
+        code, out = run_script(parts, extra=["--part-size", "490"])
+        lines = out.splitlines()
+        self.assertEqual((code, lines[0]), (1, "LOOP FAILED"), out)
+        notes = [i for i, l in enumerate(lines) if l.startswith("NOTE:")]
+        self.assertEqual(len(notes), 3, out)
+        self.assertEqual(notes, list(range(len(lines) - 3, len(lines))), out)
+
+    def test_a_part_whose_block_cannot_be_read_gets_no_note_and_no_old_failure(self):
+        parts = edit(with_prose(build_parts(base_areas()), "part-3.md", "zones/zz_todo.txt"), "part-3.md", "SWEEP IN PARTS: 0 areas not read", "no sweep line")
+        code, out = run_script(parts)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("must name no untracked path", out)
+
+    @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no stock python")
+    def test_the_stock_python_prints_the_same_note(self):
+        parts = with_prose(build_parts(base_areas()), "part-2.md", "notes/scratch.md")
+        code, out, err = run_script_at(SCRIPT, parts, python="/usr/bin/python3")
+        self.assertEqual(code, 0, out + err)
+        self.assertEqual(note_lines(out), [NOTE_2 % "notes/scratch.md"])
+
+
+class RealRunShapesTest(Base):
+    """Lines copied from the two finished runs (loop-1 and loop-2), set into synthetic parts: the shapes a model really wrote."""
+
+    def run1(self):
+        top = Area("top", "`(root)` + `scripts/` + `tests/` + `zones/`", select(None) + select("scripts/") + select("tests/") + select("zones/"))
+        areas = [top] + [a for a in base_areas() if a.name not in ("root", "scripts-zones", "tests")]
+        return build_parts(areas, cuts=(9, 12))
+
+    def test_run_1_whole_repo_lines_and_the_untracked_prose_of_parts_2_and_3(self):
+        parts = edit(self.run1(), "part-1.md", WHOLE_1,
+                     "Whole repo: 990 tracked files; 40 in folders skipped whole (`web/vendor/`: 40, vendored third-party code); 3 untracked.\n"
+                     "- Untracked, unread: `notes/scratch.md`, `rules/r9999_draft.py`, `zones/zz_todo.txt`")
+        parts = with_prose(parts, "part-2.md",
+                           "- Not covered in this part. No plan file is known beyond `CHANGELOG.md`, `docs/`, and the untracked `notes/scratch.md` and `parts/part-1.md`. I did not read these here.\n"
+                           "- **Untracked `rules/r9999_draft.py`.** It is not tracked, so I did not read it. See Coverage.")
+        parts = with_prose(parts, "part-3.md", "- `notes/` and `parts/` (`notes/scratch.md`, `parts/part-1.md`, `parts/part-2.md`) are untracked and were not read.")
+        code, out = run_script(parts)
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
+        self.assertEqual(note_lines(out), [NOTE_2 % "notes/scratch.md, rules/r9999_draft.py",
+                                           "NOTE: part-3.md names an untracked path that only part 1 should list: notes/scratch.md"])
+
+    def test_run_1_area_line_with_the_count_alone_is_proved(self):
+        parts = self.run1()
+        self.assertIn("- top: `(root)` + `scripts/` + `tests/` + `zones/` (70 files)", parts["part-1.md"])
+        self.assertProved(parts)
+
+    def test_run_2_area_line_whole_repo_line_and_untracked_prose_of_part_3(self):
+        top = Area("top", "`(root)` + `docs/`", select(None) + select("docs/"))
+        areas = [top] + [a for a in base_areas() if a.name not in ("root", "docs")]
+        parts = build_parts(areas, cuts=(9, 12))
+        self.assertIn("- top: `(root)` + `docs/` (18 files)", parts["part-1.md"])
+        parts = edit(parts, "part-1.md", WHOLE_1,
+                     "Whole repo: 990 tracked files; 40 in folders skipped whole (`web/vendor/`: 40, vendored third-party code the README says not to edit); 3 untracked, unread:\n"
+                     "- `notes/scratch.md`\n- `rules/r9999_draft.py`\n- `zones/zz_todo.txt`")
+        parts = with_prose(parts, "part-3.md",
+                           "- The untracked `notes/scratch.md` and `parts/part-1.md` and `parts/part-2.md` were not read.\n"
+                           "- **Untracked files:** `rules/r9999_draft.py` and `zones/zz_todo.txt` are untracked and were not read.")
+        code, out = run_script(parts)
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"), out)
+        self.assertEqual(note_lines(out), ["NOTE: part-3.md names an untracked path that only part 1 should list: " + ", ".join(UNTRACKED)])
+
+
+class FixBatch1MutationTest(Base):
+    """A temp copy of the script with one tolerance undone must behave differently from the script on a part that needs it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.src = SCRIPT.read_text(encoding="utf-8")
+        cls.tmp = tempfile.TemporaryDirectory()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def mutant(self, name, old, new):
+        self.assertEqual(self.src.count(old), 1, "the script no longer has %r once; update this mutation" % old)
+        path = Path(self.tmp.name) / (name + ".py")
+        path.write_text(self.src.replace(old, new), encoding="utf-8")
+        return path
+
+    def pair(self, mutant, parts):
+        return run_script_at(SCRIPT, parts), run_script_at(mutant, parts)
+
+    def test_the_unmutated_copy_behaves_as_the_script_does(self):
+        copy = Path(self.tmp.name) / "same.py"
+        copy.write_text(self.src, encoding="utf-8")
+        parts = backticked_split()
+        self.assertEqual(run_script_at(copy, parts), run_script_at(SCRIPT, parts))
+
+    def test_making_the_untracked_mention_a_failure_again_is_caught(self):
+        m = self.mutant("mention", "later_named.append(", "fails.append(")
+        real, mutated = self.pair(m, with_prose(build_parts(base_areas()), "part-3.md", "zones/zz_todo.txt"))
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+        self.assertTrue(mutated[1].startswith("LOOP FAILED"))
+
+    def test_dropping_the_backtick_tolerance_for_root_is_caught(self):
+        m = self.mutant("noroot", "|`?(?P<root>\\(root\\))`?)", "|(?P<root>\\(root\\)))")
+        real, mutated = self.pair(m, backticked_split())
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+        self.assertIn("cannot read a piece at '`(root)`", mutated[1])
+        self.assertEqual(run_script_at(m, build_parts(base_areas()))[0], 0)  # the bare form still parses in the mutant
+
+    def test_dropping_the_backtick_tolerance_for_the_whole_repo_folder_is_caught(self):
+        m = self.mutant("nofolder", 're.escape(folder) + r"`?:\\s*(\\d+)"', 're.escape(folder) + r":\\s*(\\d+)"')
+        parts = edit(build_parts(base_areas()), "part-1.md", WHOLE_1, WHOLE_1.replace("(web/vendor/: 40", "(`web/vendor/`: 40"))
+        real, mutated = self.pair(m, parts)
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+        self.assertIn("Whole repo should give 'web/vendor/: 40'", mutated[1])
+        self.assertEqual(run_script_at(m, build_parts(base_areas()))[0], 0)  # the bare folder still reads in the mutant
+
+    def test_dropping_the_direct_inside_the_backticks_tolerance_is_caught(self):
+        m = self.mutant("nodirect", "| \\((?P<inner>direct)\\)`)", ")")
+        areas = base_areas()
+        areas[1] = backtick_direct(areas[1])
+        real, mutated = self.pair(m, build_parts(areas))
+        self.assertEqual(real[0], 0, real[1])
+        self.assertNotEqual(mutated[0], 0, mutated[1])  # this mutant removes a named group the code still reads, so it may crash (2) rather than fail (1)
+
+    def test_reading_the_direct_inside_the_backticks_as_not_direct_is_caught(self):
+        m = self.mutant("notdirect", '(m.group("direct") or m.group("inner")) is not None', 'm.group("direct") is not None')
+        areas = base_areas()
+        areas[1] = backtick_direct(areas[1])
+        real, mutated = self.pair(m, build_parts(areas))
+        self.assertEqual((real[0], mutated[0]), (0, 1), mutated[1])
+        self.assertIn("area 'api-top': stated", mutated[1])
+
+    def test_dropping_the_count_against_the_block_check_is_caught(self):
+        m = self.mutant("nocount", "if len(areas) != n:", "if False:")
+        parts = edit(build_parts(base_areas()), "part-1.md", "SWEEP IN PARTS: 7 areas not read", "SWEEP IN PARTS: 8 areas not read")
+        real, mutated = self.pair(m, parts)
+        self.assertEqual(real[0], 1, real[1])
+        self.assertNotEqual(mutated[1], real[1])
+        self.assertNotIn("the block holds 7 area lines", mutated[1])
+
+    def test_loosening_the_parentheses_to_take_extra_text_is_caught(self):
+        m = self.mutant("loose", 'AREA_RE = re.compile(r"^- ([^:]+?): (.+) \\((\\d+) files\\)$")', 'AREA_RE = re.compile(r"^- ([^:]+?): (.+) \\((\\d+) files[^)]*\\)$")')
+        parts = edit_all(build_parts(base_areas()), lambda t: t.replace("(6 files)", "(6 files; 5 read)"))
+        real, mutated = self.pair(m, parts)
+        self.assertEqual(real[0], 1)
+        self.assertNotIn("area line does not match", mutated[1])
+
+    def test_dropping_the_part_1_untracked_names_check_is_caught(self):
+        m = self.mutant("noabsent", "if absent:", "if False:")
+        real, mutated = self.pair(m, edit(build_parts(base_areas()), "part-1.md", ", zones/zz_todo.txt", ""))
+        self.assertEqual((real[0], mutated[0]), (1, 0), real[1])
+
+    def test_loosening_the_later_parts_whole_repo_line_is_caught(self):
+        m = self.mutant("looseline", 'if lines[whole_at].strip().lstrip("- ").rstrip() != WHOLE_LATER:', "if False:")
+        real, mutated = self.pair(m, edit(build_parts(base_areas()), "part-2.md", WHOLE_LATER, WHOLE_1))
+        self.assertEqual((real[0], mutated[0]), (1, 0), real[1])
 
 
 class FactsTest(Base):

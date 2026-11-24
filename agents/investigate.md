@@ -155,6 +155,7 @@ A definition is one or more pieces joined by ` + `:
 - `dir/` is every tracked file under that folder.
 - `dir/` (direct) is the tracked files directly in that folder, not in its
   subfolders. (root) is the files at the root.
+- Only folder and file paths go in backticks. `(root)` and `(direct)` are written bare.
 - `dir/` except `dir/sub/` leaves a folder out. It's how an area steps around a
   folder skipped whole.
 - A piece followed by from `first` to `last` is every file of that piece whose path
@@ -165,7 +166,10 @@ A definition is one or more pieces joined by ` + `:
 This is not a git pathspec: `git ls-files -- 'docs/*'` matches everything under
 `docs/`, not its direct files. The count is the number of tracked files the
 definition matches, with no file-by-file skips applied, so any run can rebuild it and
-get the same number. Order the areas by the byte order of each area's first path.
+get the same number. The parentheses hold that count and nothing else: `(70 files)`,
+never `(70 files; 69 read)`. What was read and what was skipped go on the `Files listed:`
+line and the skip reasons after it. Order the areas by the byte order of each area's
+first path.
 
 `<list>` below is `git -c core.quotepath=off ls-files`, with the brief's wrapper in
 place of `git`. Outside a git repo it's this command, or a bounded variant of it:
@@ -224,6 +228,9 @@ The rest of the areas go back in the block, in the order given.
 Every part carries this block, and it's the whole of the next brief. Its first line,
 `SWEEP IN PARTS: <n> areas not read`, goes at line 1 of your report, or line 2 under
 `NOT A PER-FILE READ`, and the report's sections follow it as usual.
+
+Work out the block's area lines before you write line 1, and count them. The `<n>` on
+line 1 is the number of area lines in the block, no more and no fewer.
 
 ```
 SWEEP IN PARTS: 3 areas not read
@@ -518,10 +525,10 @@ front of `Areas read:` or `Areas not read:`:
   starting `- ` and in the notation from "Areas". An area whose lead failed twice is
   on it too: its files are listed unread by path and counted as unread. In a continuing
   run each line is copied exactly as the brief gave it, apart from a count that
-  changed. The mode line's N is the number of these area lines: it counts areas, not
-  restarts.
+  changed. The parentheses hold the count alone, as in "Areas". The mode line's N is the
+  number of these area lines: it counts areas, not restarts.
 - `Areas not read: <n> areas, <m> files; see SWEEP IN PARTS at the top.`, on the line
-  straight after the last area line.
+  straight after the last area line. The `<n>` is the same as on line 1.
 - After it, a note on its own line, never starting with `-`, for each rebuilt area
   that changed: `Count changed: <name>: found <n>, the brief said <m>.` or
   `Area dropped: <name>: now <n> files, the brief said <m>; not read.`
