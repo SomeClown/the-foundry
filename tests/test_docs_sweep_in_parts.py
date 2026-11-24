@@ -192,7 +192,8 @@ class ReadmePartsTest(PinTable, unittest.TestCase):
     @property
     def PINS(self):
         return [
-            ("the part size is the agent's", "A repo above %s tracked files is read in parts" % part_size()),
+            ("the part size is the agent's",
+             "A repo with more than %s tracked files to read, not counting folders skipped whole such as vendored code, is read in parts" % part_size()),
             ("each report says which areas are left", "each report covers whole areas and says which areas are left"),
             ("the session carries on without asking", "your session sends the next brief without asking you"),
             ("the cost sentence has its own subject", "A per-file sweep costs more than one agent reading everything"),
@@ -209,11 +210,11 @@ class ReadmePartsTest(PinTable, unittest.TestCase):
     def test_the_part_size_is_read_from_the_agent_file_and_is_a_number(self):
         self.assertRegex(part_size(), r"^\d+$")
         # a different size in the README would fail the first pin
-        self.assertNotIn("above 300 tracked files", fold(self.text()))
-        self.assertIn("above %s tracked files" % part_size(), fold(self.text()))
+        self.assertNotIn("more than 300 tracked files", fold(self.text()))
+        self.assertIn("more than %s tracked files to read" % part_size(), fold(self.text()))
 
     def test_a_wrong_part_size_in_the_readme_is_caught(self):
-        folded = fold(self.text()).replace("above %s tracked files" % part_size(), "above 300 tracked files")
+        folded = fold(self.text()).replace("more than %s tracked files" % part_size(), "more than 300 tracked files")
         self.assertEqual(missing(folded, self.PINS), ["the part size is the agent's"])
 
 
@@ -307,7 +308,8 @@ class EvalsReadmeTest(unittest.TestCase):
         for size in sizes:
             with self.subTest(size=size):
                 self.assertIn(("`reply-size-%s`" if size == sizes[0] else "`-%s`") % size, text)
-        self.assertIn("--case 'reply-size-*'", text)
+        for case in ("reply-size-320", "reply-size-full"):
+            self.assertIn("--case %s " % case, text)
         for script in self.SCRIPTS:
             with self.subTest(script=script):
                 self.assertIn(script, text)
@@ -352,10 +354,11 @@ class EvalsReadmeTest(unittest.TestCase):
 
     def test_the_scoring_line_uses_min_parts_3_and_the_agents_part_size(self):
         text = self.section()
-        self.assertIn("--min-parts 3 --part-size %s" % part_size(), text)
+        self.assertIn("--min-parts 3 --part-size %s --transcript" % part_size(), text)
         for m in re.finditer(r"--part-size (\d+)", raw("evals/README.md")):
             self.assertEqual(m.group(1), part_size())
-        self.assertIn("reads a repo above %s tracked files in parts" % part_size(), fold(text))
+        self.assertIn("reads a repo with more than %s tracked files to read, not counting folders skipped whole such as vendored code, in parts"
+                      % part_size(), fold(text))
 
     def test_the_pass_words_are_spelled_as_the_scripts_print_them(self):
         loop = (EXPENSIVE / "check_parts.py").read_text(encoding="utf-8")
@@ -419,22 +422,35 @@ class EvalsReadmeAgreesWithTheBuildLogTest(unittest.TestCase):
             rows[(m.group(1), m.group(2).strip())] = (m.group(3), m.group(4))
         return rows
 
-    def test_the_three_report_sizes_are_rows_in_the_build_logs_table(self):
-        rows = self.table()
-        self.assertGreaterEqual(len(rows), 7)
-        m = re.search(r"a report of ([\d.]+)KB for (\d+) files, ([\d.]+)KB for (\d+) and ([\d.]+)KB for the whole (\d+)-file repo", self.section)
-        self.assertIsNotNone(m, "the part-size paragraph changed shape")
-        sizes = [(m.group(1), m.group(2)), (m.group(3), m.group(4)), (m.group(5), m.group(6))]
-        for kb, files in sizes:
-            with self.subTest(files=files, kb=kb):
-                self.assertTrue(any(f == files and v[0] == kb for (f, _), v in rows.items()), (files, kb))
+    SIZES = (r"With the plain brief, a report was ([\d.]+)KB for (\d+) files \(([\d,]+) seconds\)\. "
+             r"With the brief asking for full route paths, it was ([\d.]+)KB for (\d+) files \(([\d,]+) seconds\) "
+             r"and ([\d.]+)KB for the whole (\d+)-file repo as it was then \(([\d,]+) seconds\)")
 
-    def test_the_seconds_range_is_the_tables_150_row_to_its_645_full_paths_row(self):
+    def size_claims(self, section):
+        """[(brief, files, kb, seconds)] read out of the part-size paragraph, or None when its shape changed."""
+        m = re.search(self.SIZES, section)
+        if not m:
+            return None
+        g = m.groups()
+        return [("plain", g[1], g[0], g[2]), ("full paths", g[4], g[3], g[5]), ("full paths", g[7], g[6], g[8])]
+
+    def unmatched(self, claims):
+        """Claims that aren't a row of the build log's table with the same brief, report size and seconds."""
         rows = self.table()
-        m = re.search(r"in ([\d,]+) to ([\d,]+) seconds", self.section)
-        self.assertIsNotNone(m)
-        self.assertEqual(m.group(1), rows[("150", "plain")][1])
-        self.assertEqual(m.group(2), rows[("645", "full paths")][1])
+        return [c for c in claims if rows.get((c[1], c[0])) != (c[2], c[3])]
+
+    def test_the_three_report_sizes_are_rows_in_the_build_logs_table_with_their_brief_and_seconds(self):
+        self.assertGreaterEqual(len(self.table()), 7)
+        claims = self.size_claims(self.section)
+        self.assertIsNotNone(claims, "the part-size paragraph changed shape")
+        self.assertEqual([c[:2] for c in claims], [("plain", "150"), ("full paths", "320"), ("full paths", "645")])
+        self.assertEqual(self.unmatched(claims), [])
+
+    def test_the_150_file_report_is_the_plain_briefs_and_not_the_full_path_ones(self):
+        # the qa pass's finding: the 150-file figure was once given as a full-path run
+        self.assertEqual(self.table()[("150", "plain")], ("11.0", "425"))
+        self.assertNotIn(("150", "full paths"), self.table())
+        self.assertNotRegex(self.section, r"11\.0KB for 150 files[^.]*full route paths")
 
     def test_the_two_harness_runs_match_the_build_logs_line(self):
         found = re.findall(r"`reply-size-(\w+)` took ([\d,]+) seconds and cost \$([\d.]+)", self.section)
@@ -486,10 +502,18 @@ class EvalsReadmeAgreesWithTheBuildLogTest(unittest.TestCase):
                 self.assertIn(fig, sources)
 
     def test_a_changed_figure_would_be_seen(self):
-        wrong = self.section.replace("19.6KB for 320", "19.7KB for 320")
-        self.assertNotEqual(wrong, self.section)
-        m = re.search(r"a report of ([\d.]+)KB for (\d+) files, ([\d.]+)KB for (\d+)", wrong)
-        self.assertFalse(any(f == m.group(4) and v[0] == m.group(3) for (f, _), v in self.table().items()))
+        for old, new in (("19.6KB for 320", "19.7KB for 320"), ("(1,064 seconds)", "(1,065 seconds)"),
+                         ("11.0KB for 150 files (425 seconds)", "11.0KB for 150 files (669 seconds)"),
+                         ("With the plain brief, a report was 11.0KB", "With the plain brief, a report was 11.1KB")):
+            with self.subTest(change=new):
+                wrong = self.section.replace(old, new)
+                self.assertNotEqual(wrong, self.section)
+                self.assertNotEqual(self.unmatched(self.size_claims(wrong)), [])
+
+    def test_a_figure_given_under_the_wrong_brief_would_be_seen(self):
+        self.assertNotEqual(self.unmatched([("plain", "320", "19.6", "1,064")]), [])
+        self.assertNotEqual(self.unmatched([("full paths", "150", "11.0", "425")]), [])
+        self.assertEqual(self.unmatched([("plain", "320", "17.0", "992")]), [])
 
 
 class ContributingAndPrivacyTest(unittest.TestCase):

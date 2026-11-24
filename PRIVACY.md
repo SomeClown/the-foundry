@@ -45,8 +45,10 @@ that run through its own Bash. On the `main` branch, `evals-expensive/compare.py
 `evals-expensive/sync_case.py`, `evals-expensive/sync_big_sweep.py`,
 `evals-expensive/measure_reply.py` and `evals-expensive/check_parts.py` run
 only when you run them by hand, stay local, use no network, and read result
-JSON, transcripts or saved reports; the eval scaffold writes a `bin/git`
-wrapper into its scratch fixture.
+JSON, transcripts or saved reports. `sync_big_sweep.py` also runs a scaffold
+and writes generated files under `evals-expensive/`, and `check_parts.py`
+runs the fixture's own `bin/git`. The `evals-expensive/` scaffolds that build
+a repo each write a `bin/git` wrapper into their scratch fixture.
 
 The README's "What it runs, sends, and fetches" section has the full list. If
 something here is ever wrong, that's a bug: please

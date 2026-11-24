@@ -12,8 +12,8 @@ on without asking.
 
 ### Changed
 - The stop above 500 files, its rough cost and the `STOPPED BEFORE READING`
-  reply are gone, at any size. Nobody asks the user before a sweep or between
-  parts (design §4).
+  reply are gone. Nobody asks the user before a sweep, whatever its size, or
+  between parts (design §4).
 - Above 450 tracked files (after whole folders skipped by rule), `investigate`
   returns one part: the first areas, whole areas only and never fewer than
   one, with every inventory untrimmed. The report opens with
@@ -32,7 +32,16 @@ on without asking.
   level doesn't read them itself. That rule now holds in every sweep, small
   ones included.
 - On a full sweep the report holds nothing quoted from a folder skipped whole
-  or from an untracked file, even when a search of the tree turned it up.
+  or from an untracked file, and nothing drawn from their contents, even when
+  a search of the tree turned it up.
+- Every top-level report's Coverage gives its counts as one fixed line,
+  `Files listed: <n>; read: <n>; skipped: <n>; re-dispatched: <n>; failed: <n>; unread: <n>`.
+  The counts are added with a
+  command, never in the model's head. An area line's parentheses hold the
+  count and nothing else, `(root)` and `(direct)` are written bare, and the
+  block's area lines are counted before line 1 is written. A lead's return
+  that arrives as a preview is read from its saved file. Readers go 10 at a
+  time and area leads one at a time, never two leads in one message.
 - `docs/orchestrator.md` has the loop for the session, and `brainstorm`'s
   recon line says a sweep can come back in parts.
 
@@ -48,9 +57,13 @@ on without asking.
 - `evals-expensive/sync_big_sweep.py` (writes the answer key and the cases'
   generated files; `--check` exits 1 naming files that differ),
   `evals-expensive/measure_reply.py` (bytes of each agent result and whether
-  it kept its last line) and `evals-expensive/check_parts.py` (scores a sweep
-  read in parts: every file once, every planted fact, nobody asked). All three
-  run by hand, stay local and use no network.
+  it kept its last line; a result is whole only when the marker is its last
+  line) and `evals-expensive/check_parts.py` (scores a sweep
+  read in parts: every file read once, every planted fact found in the part
+  that read its file, the counts and the block right, and, with `--transcript`,
+  its reads checked against the run's own transcript). Whether anybody asked is
+  for the `no-asking` grader and the session's final message, not the scorer.
+  All three run by hand, stay local and use no network.
 
 ## [2.2.1] — 2026-11-23
 

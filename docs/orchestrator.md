@@ -50,7 +50,9 @@ Routing:
   doesn't, that has no `SWEEP IN PARTS` line when the brief was a
   `CONTINUE SWEEP` one, or that names the same areas unread that its brief
   gave it, gets the same brief once more. If that fails too, stop the sweep
-  and tell the user which areas are unread.
+  and tell the user which areas are unread. For a scoped read, a report that
+  leaves the same paths unread gets the same brief once more, then you stop
+  and tell the user which files are unread.
 - A report that arrives as a preview, with the full text saved to a file: read
   the saved file, which is the report. If it can't be read, stop the sweep
   and tell the user that reports this size can't be handed back here. Don't

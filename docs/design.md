@@ -1196,3 +1196,167 @@ the four gaps that read found are settled here):
 What it costs: a route that lives only in vendored code no longer shows up
 in a report. That fits §1's rule that a skipped file is counted, not
 described.
+
+### As built (2026-11-24)
+
+What was built against §4, for a reader who wasn't here. The approved text
+and its amendments stay as written; the figures are from the build log in
+`docs/plans/2026-11-23-big-sweep-in-parts.md`. This section replaces §1
+Part 6 (the stop) and the rulings about the stop in §1's "As built". The
+rest of §1 stands. `investigate` no longer stops, quotes a cost or has the
+session ask. A list at or under 450 files comes back as one report, as
+before, ending `INVESTIGATE REPORT ENDS`. A bigger one comes back as one
+part of whole areas with a block that is the whole next brief, and the
+session sends it back with `CONTINUE SWEEP` until a part says 0 areas are
+unread.
+
+**The part size and how it was set.** Measured on 2026-11-23 in headless
+sessions (`investigate` on Sonnet, readers on Haiku), today's definition at
+the time. Every report reached the session whole, in the result, with its
+last line:
+
+| Files read | Brief | Report | Seconds |
+|---|---|---|---|
+| 150 | plain | 11.0KB | 425 |
+| 230 | plain | 14.9KB | 669 |
+| 320 | plain | 17.0KB | 992 |
+| 450 | plain | 14.2KB | 1,118 |
+| 645 | plain | 17.7KB | 1,837 |
+| 320 | full paths | 19.6KB | 1,064 |
+| 645 | full paths | 27.3KB | 1,840 |
+
+The harness ran the full-path brief twice: `reply-size-320` took 866 s and
+$3.39, and `reply-size-full` 1,157 s and $6.07, both whole. One run from this
+session, on the 645-file repo, came back whole as about 19.5KB after 2,222 s.
+Previews start somewhere between 36KB and 54KB: a 56KB reply in this session
+arrived as a 2KB preview with a readable saved file, and on 2026-11-05 the
+harness handed a 35.6KB report back whole and a 53.7KB one as a preview whose
+saved file the sandbox blocked. The 53.7KB the design started from came from
+the one arm with `investigate` on Haiku; on Sonnet the same repo gave 17KB to
+27KB. By the plan's rule (the biggest report that arrived whole, divided by
+200 files) k was 3, not the 2 that 300 assumed, so the number went to the
+owner, who chose 450 over 300 and 600.
+
+The loop runs then showed real parts. Their reports ran 7.6KB to 29.1KB for
+96 to 450 files, and none came back as a preview. Parts hold whole areas, so
+none reached 450 files until loop run 10, whose second part was exactly 450
+files and 15.9KB; the largest report, 29.1KB, held 340 files. A full part of
+dense files can still land where previews start, which costs the session a
+file read. The part-size amendment's "about 22KB" for 450 files was my
+estimate, not a measurement, and the amendment was corrected on 2026-11-24.
+
+**What the proof is.** The test repo (`evals-expensive/big-sweep-in-parts`)
+has 990 tracked files, 950 after the vendored folder skipped whole, 945
+readable, 33 planted facts and 5 decoys. Its flat `rules/` folder holds 610
+files. `check_parts.py` scores the saved parts. From the parts it establishes
+that every readable file was read once, that unread and failed are 0, that
+each area line rebuilds to its count, that every fact is in the part that read
+its file, and that no decoy appears. With the run's transcript it also checks
+that every readable file had one reader started and completed, that each
+continuing brief is the previous block byte for byte, and that each part is
+the report the agent returned.
+
+The runs of record are on the final text. Headless runs 9 and 10 both scored
+`LOOP PROVED`: three parts each (412, 366 and 172 files; then 404, 450 and 96),
+33 of 33 facts, 945 of 945 files read once, nothing asked, in 2,992 s and
+2,974 s. The harness run on the same text took 2,541 s and $9.80, passed all
+six graders, and scored `LOOP PROVED` on parts rebuilt from its kept trace
+(368, 366 and 216 files).
+
+It took ten headless runs and three fix batches, besides the final review's,
+to get two proofs in a row on one text. Run 8 was stopped by a safety
+classifier while the session saved part 2, and isn't counted. Of the other
+nine, four failed the scorer and five proved. Every failure was a line's
+format or a number in a report; none was a file left unread or a sweep that
+stopped, and each got a sentence in the agent's text.
+
+Task 8 on the final text: `nesting-smoke` passed 8 of 8 graders (59 s,
+$0.42). The head-to-head found 48 of 48 in all three runs, missed 0 and made
+up 0, and scored `BAR MET` (2,004 s, $7.50). One of the three passes run
+during the build scored `BAR MISSED`: `compare.py` read `fxctl X`, a
+placeholder inside a quoted docstring, as a made-up command. The scorer wasn't
+changed, and the pass on the final text met the bar.
+
+**Calls made during the build** that §4 doesn't say:
+
+- The architect's own wording, which §4 left open: `Areas read:`, the counts
+  line, `Whole repo:`, areas ordered by first path, the `awk`
+  filters, the default `find`, the scoped-read sentence and the preview
+  sentence for a lead's return. They had no separate cold read; the Task 5
+  spec check read them against §4.
+- The `Instructions:` line and the quoting rule are amendments above.
+- A range is compared as a string, `($0 "") >= (a "")`. The first form
+  compared two number-looking paths as numbers, so a root range from `10` to
+  `9` matched nothing.
+- A continuing run drops an area only when it matches nothing, or its rebuilt
+  count differs from the brief's and is over about 150. Part 3 says only "over
+  about 150", which would have left a 152-file area part 1 built unread
+  forever.
+- A rebuilt area that changed count, or was dropped, gets a `Count changed:`
+  or `Area dropped:` line after `Areas not read:`.
+- Notes about the run (a failed lead, refused spawns, a request set aside) go
+  after the `Mode:` line, one to a line.
+- The test repo's files hold what a real repo's do (public functions, routes
+  and commands in the head-to-head's proportions), since the first version
+  made reports a fifth of real size. It grew when the part size became 450.
+- The scorer counts a later part's mention of an untracked path as a note, not
+  a failure. Three of four later parts did it in passing, it's harmless, and
+  the proof doesn't turn on it.
+- Task 8 started before Task 7 passed, since the Coverage rule changes every
+  report, and the stored 1.7.6 baseline (2026-11-05, the same Claude Code
+  version) was reused.
+
+**What real runs did that the text forbids.**
+
+- Later parts named untracked files. Three older sentences invited it and
+  were fixed; the scorer notes it. It still happened once in the final runs
+  (run 9, one note).
+- Two area leads ran in one message (runs 2 and 8). The sentence had no
+  subject and was reworded in the qa batch, then again in batch 3; the scorer
+  reports it as a note. None in runs 9 and 10 or the harness run.
+- A lock file went to a reader in runs 2 and 3, because the leads were named
+  before the skips. Fixed by a reordered sentence; none in later runs.
+- A sum was wrong: part 2 of run 3, and part 3 of run 7 (204 where the areas
+  made 208). The text now says to add with a command, and to count line 1 the
+  same way. Run 8 also put the working (`488 + 66 = 554 files`) where one
+  number goes, which batch 3 now forbids.
+- Mode words ("a new codebase") appeared on `Instructions:` once in six runs.
+  Nothing was changed, and the build log doesn't record it again.
+
+**The harness.** It refuses a `timeout_seconds` over 3600, so the loop case
+has an hour at most. `--keep-temp` keeps each workspace with the session's own
+folder sealed, so the parts were rebuilt from the Write calls in the kept
+trace. The one time the harness had a preview to read (2026-11-05) it
+couldn't read the saved file, and it wasn't tried again. In this app an
+agent's report arrives as a message, so `measure_reply.py` sees only the
+launch notice (1,125 bytes, `not-whole`) and the byte counts here came from
+the message itself.
+
+**Known limits and what's parked.**
+
+- Git's path quoting is turned off in every command. No test covers
+  non-ASCII paths.
+- Density: a report's size depends on what the files hold, and a repo denser
+  than the test repo could overflow a part. The open item stands.
+- The block grows with the repo, as the open item says. Nothing has been tried
+  near 20,000 files.
+- The `reply-size-*` cases measure the old definition only: their prompts ask
+  for `TAIL-MARK-6620`, and `reply-size-400` never ran.
+- The harness graders are weaker than the scorer (`finished` matches its phrase
+  anywhere in the trace, `parts-saved` checks part 1 only), so the headless
+  runs scored by the scorer are the proof.
+- The scaffold has no guard against running inside an existing repo.
+- In the loop case the session saves its parts inside the fixture, in
+  `parts/`, which the fixture now leaves out of git's untracked list.
+- Nobody checks claims across parts, as the non-goals say.
+- The smoke's brief says to read its six files "exactly as you would above the
+  size limit", and on the final text `investigate` opened that one report with
+  `SWEEP IN PARTS: 0 areas not read`. All 8 graders pass either way. The
+  brief's wording predates parts and is left for a follow-up.
+
+**Open items from §4.** The part size is closed: 450. The other three (dense
+repos, the block's growth on very large repos, and claims across parts) stand
+as they were.
+
+The `STOPPED BEFORE READING` line in the owner's own `~/.claude/CLAUDE.md`
+is updated when this ships (owner decision 2A), not by this branch.
