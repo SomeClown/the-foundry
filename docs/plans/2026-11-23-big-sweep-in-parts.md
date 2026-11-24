@@ -712,6 +712,7 @@ Baseline on 1f4c8dc, after the rebase (2026-11-23): Ran 950, OK on `python3` 3.1
   | 645 | full paths | 27.3KB | whole, in the result | 1,840 |
 
   Beside it: in this live session a 9KB agent reply arrived whole and a 56KB one as a 2KB preview with a readable saved file; in the eval harness on 2026-11-05 a 35.6KB report arrived whole and a 53.7KB one as a preview whose saved file the sandbox blocked. So previews start somewhere between 36KB and 54KB, about twice the biggest report measured here. Lead returns ran 5.8KB to 16.6KB and all arrived. Not run yet: the harness series and the in-session confirmation.
+- Task 3, harness series (`claude plugin eval .`, the full-path brief, one run each, `--keep-temp`): `reply-size-320` exit 0, 866 s, $3.39, the session wrote `RECEIVED: whole` and `SAVED OUTPUT: none`; `reply-size-full` exit 0, 1,157 s, $6.07, `RECEIVED: whole`, `SAVED OUTPUT: none`, the relayed report 15.1KB with its last line. All three graders passed in both. `--keep-temp` kept each workspace under `/private/tmp/e-*`, with the session's own `home/` and `tmp/` sealed (mode 000) inside it. So at these sizes the harness hands a report back whole, as the live sessions do.
 - Task 3, the rule: the biggest report whose full text reached the session with its last line is the 645-file one, so k = 3 (645 is at least 3 x 200). k isn't 2, so this is the plan's stop: the part size goes to the owner with the table. Stopped 2026-11-23; Tasks 5 on wait for the answer.
 
 ### Decisions made during the build
