@@ -221,24 +221,41 @@ class ReadmePartsTest(PinTable, unittest.TestCase):
 class ChangelogTest(unittest.TestCase):
     NUMBERED = re.compile(r"^## \[(\d+\.\d+\.\d+)\]", re.M)
 
-    def test_exactly_one_unreleased_heading(self):
-        self.assertEqual(len(re.findall(r"^## \[Unreleased\]", raw("CHANGELOG.md"), re.M)), 1)
+    SAMPLE = "# Changelog\n\n## [Unreleased]\n\nnew\n\n## [1.2.0] \u2014 2026-01-02\n\nb\n\n## [1.1.0] \u2014 2026-01-01\n\na\n"
 
-    def test_the_unreleased_heading_sits_above_the_newest_numbered_heading(self):
-        text = raw("CHANGELOG.md")
-        unreleased = re.search(r"^## \[Unreleased\]", text, re.M).start()
-        newest = self.NUMBERED.search(text).start()
-        self.assertLess(unreleased, newest)
+    @classmethod
+    def unreleased_problems(cls, text):
+        """What is wrong with the Unreleased heading: more than one, or one that isn't above every numbered heading.
+        None at all is fine (the heading is renamed to a version at a release)."""
+        starts = [m.start() for m in re.finditer(r"^## \[Unreleased\]", text, re.M)]
+        numbered = [m.start() for m in cls.NUMBERED.finditer(text)]
+        problems = []
+        if len(starts) > 1:
+            problems.append("more than one Unreleased heading")
+        if starts and numbered and starts[0] > min(numbered):
+            problems.append("Unreleased is below a numbered heading")
+        return problems
+
+    def test_at_most_one_unreleased_heading_and_it_sits_above_every_numbered_one(self):
+        self.assertEqual(self.unreleased_problems(raw("CHANGELOG.md")), [])
 
     def test_the_unreleased_heading_is_not_taken_for_a_version(self):
         text = raw("CHANGELOG.md")
         self.assertNotIn("Unreleased", [m.group(1) for m in self.NUMBERED.finditer(text)])
-        # moving it under the newest version, or adding a second one, would be seen
-        moved = text.replace("## [Unreleased]", "## [2.2.0] — 2026-11-23", 1)
-        self.assertEqual(len(self.NUMBERED.findall(moved)), len(self.NUMBERED.findall(text)) + 1)
-        below = re.sub(r"^## \[Unreleased\]", "## [Xx]", text, flags=re.M)
-        below = below.replace("## [2.2.0]", "## [Unreleased]\n\n## [2.2.0]", 1)
-        self.assertLess(re.search(r"^## \[Unreleased\]", below, re.M).start(), self.NUMBERED.search(below).start())
+
+    def test_the_position_check_on_a_sample_sees_each_fault_and_allows_a_release(self):
+        s = self.SAMPLE
+        self.assertEqual(self.unreleased_problems(s), [])
+        # after a release: no Unreleased heading at all
+        released = s.replace("## [Unreleased]", "## [1.3.0] \u2014 2026-02-01", 1)
+        self.assertEqual(self.unreleased_problems(released), [])
+        self.assertEqual(len(self.NUMBERED.findall(released)), len(self.NUMBERED.findall(s)) + 1)
+        # a second heading, and a heading moved below the newest version, are seen
+        self.assertEqual(self.unreleased_problems(s + "\n## [Unreleased]\n"), ["more than one Unreleased heading"])
+        below = s.replace("## [Unreleased]", "## [Xx]", 1).replace("## [1.2.0]", "## [Unreleased]\n\n## [1.2.0]", 1)
+        self.assertEqual(self.unreleased_problems(below), [])  # still above every numbered heading
+        moved = s.replace("## [Unreleased]\n\nnew\n\n", "", 1).replace("## [1.1.0]", "## [Unreleased]\n\n## [1.1.0]", 1)
+        self.assertEqual(self.unreleased_problems(moved), ["Unreleased is below a numbered heading"])
 
     def test_the_newest_numbered_heading_is_the_plugin_version(self):
         version = json.loads(raw(".claude-plugin/plugin.json"))["version"]

@@ -518,11 +518,19 @@ class OrchestratorScopedRetryTest(PinTable, unittest.TestCase):
 class ChangelogTest(unittest.TestCase):
     NUMBERED = re.compile(r"^## \[(\d+\.\d+\.\d+)\][^\n]*\n", re.M)
 
-    @staticmethod
-    def unreleased(text):
-        m = re.search(r"^## \[Unreleased\]", text, re.M)
-        nxt = re.compile(r"^## \[\d+\.\d+\.\d+\]", re.M).search(text, m.end())
-        return text[m.start(): nxt.start()]
+    @classmethod
+    def entries(cls, text):
+        """[(heading line, entry text)] for every `## [` entry."""
+        starts = [m.start() for m in re.finditer(r"^## \[", text, re.M)] + [len(text)]
+        return [(text[a:text.index("\n", a)], text[a:b]) for a, b in zip(starts, starts[1:])]
+
+    @classmethod
+    def unreleased(cls, text):
+        """The entry for this work, found by what it holds, whatever its heading says: the oldest entry that mentions
+        SWEEP IN PARTS (a later release may quote the token, the one that introduced it is this work's)."""
+        hits = [e for _h, e in cls.entries(text) if "SWEEP IN PARTS" in e]
+        assert hits, "no changelog entry mentions SWEEP IN PARTS"
+        return hits[-1]
 
     @classmethod
     def entry(cls, text, version):
@@ -545,13 +553,46 @@ class ChangelogTest(unittest.TestCase):
         j = text.index("\n", text.index("\n", i) + 2)
         self.assertNotEqual(self.entry(text[:j] + "." + text[j:], "2.2.0"), self.entry(text, "2.2.0"))
 
-    def test_exactly_one_unreleased_heading_above_the_first_numbered_one(self):
+    def test_the_entry_is_found_by_its_content_under_an_unreleased_or_a_numbered_heading(self):
         text = raw("CHANGELOG.md")
-        self.assertEqual(len(re.findall(r"^## \[Unreleased\]", text, re.M)), 1)
-        self.assertLess(re.search(r"^## \[Unreleased\]", text, re.M).start(), self.NUMBERED.search(text).start())
-        # the heading before the first numbered one is the Unreleased one
-        before = text[: self.NUMBERED.search(text).start()]
-        self.assertEqual(re.findall(r"^## .*$", before, re.M), ["## [Unreleased]"])
+        heading = [h for h, e in self.entries(text) if e == self.unreleased(text)][0]
+        self.assertTrue(heading.startswith("## [Unreleased]") or self.NUMBERED.match(heading + "\n"), heading)
+
+    def test_every_numbered_entry_that_main_also_has_is_byte_identical_to_mains(self):
+        main = git_show("main:CHANGELOG.md")
+        if main is None:
+            self.skipTest("no main branch to compare with")
+        mine = raw("CHANGELOG.md")
+        shared = [v for v in re.findall(r"^## \[(\d+\.\d+\.\d+)\]", mine, re.M) if self.entry(main, v) is not None]
+        self.assertIn("2.2.0", shared)
+        for v in shared:
+            with self.subTest(version=v):
+                self.assertEqual(self.entry(mine, v), self.entry(main, v))
+
+    def test_that_comparison_sees_an_edited_entry_whichever_version_it_is(self):
+        text = raw("CHANGELOG.md")
+        for v in re.findall(r"^## \[(\d+\.\d+\.\d+)\]", text, re.M)[:3]:
+            with self.subTest(version=v):
+                i = text.index("## [%s]" % v)
+                j = text.index("\n", text.index("\n", i) + 2)
+                self.assertNotEqual(self.entry(text[:j] + "." + text[j:], v), self.entry(text, v))
+
+    def test_after_a_release_renames_the_heading_every_content_pin_still_holds(self):
+        text = raw("CHANGELOG.md")
+        heading = self.entries(text)[0][0]
+        released = text.replace(heading, "## [2.3.0] \u2014 2026-12-01", 1)
+        if heading == "## [2.3.0] \u2014 2026-12-01":
+            self.skipTest("already renamed")
+        self.assertNotEqual(released, text)
+        self.assertEqual(len(re.findall(r"^## \[Unreleased\]", released, re.M)), 0)
+        self.assertEqual(self.NUMBERED.search(released).group(1), "2.3.0")
+        entry = fold(self.unreleased(released))
+        self.assertEqual(missing(entry, self.PINS), [])
+        for name, phrase in self.PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(entry, phrase), self.PINS), [name])
+        block = entry[entry.index("`evals-expensive/check_parts.py` ("): entry.index("All three run by hand")]
+        self.assertEqual(len(re.findall(r"(?i)\basked\b", block)), 1)
 
     PINS = [
         ("the counts line, as the exact fixed token",
