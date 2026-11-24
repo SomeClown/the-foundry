@@ -1593,6 +1593,268 @@ class ReplySizeCopiesTest(unittest.TestCase):
                     self.assertEqual(len(tracked), n)
 
 
+SMOKE_PROMPT = EXPENSIVE / "nesting-smoke" / "prompt.md"
+SMOKE_SENTENCE = ("Although this repo is small, run it as one area with one area lead, as you would for a repo of more than about 150 files; "
+                  "it still comes back as one report, not a sweep in parts.")
+
+
+class NestingSmokePromptTest(unittest.TestCase):
+    """The smoke brief no longer points at "the size limit", which the part size replaced."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.text = SMOKE_PROMPT.read_text(encoding="utf-8")
+        cls.flat = " ".join(cls.text.split())
+
+    def test_the_brief_says_to_run_it_as_one_area_as_for_a_repo_of_more_than_about_150_files(self):
+        self.assertEqual(self.flat.count(SMOKE_SENTENCE), 1)
+
+    def test_the_words_size_limit_are_gone_from_the_prompt(self):
+        self.assertNotRegex(self.flat, r"(?i)size[\s-]+limit")
+        self.assertNotIn("above the size limit", self.flat)
+
+    def test_the_sentence_sits_inside_the_brief_between_the_wrapper_sentence_and_the_quote_request(self):
+        brief = self.flat[self.flat.index("Brief for the agent:"):]
+        order = [brief.index("use `./bin/git` wherever"), brief.index(SMOKE_SENTENCE), brief.index("Tell the lead to quote the file-reader's report")]
+        self.assertEqual(order, sorted(order))
+        self.assertTrue(brief.rstrip().endswith('quote it in your report too."'))
+
+    def test_the_sentence_check_fails_when_a_word_goes_or_the_old_words_come_back(self):
+        for label, mutated in (
+            ("old words back", self.flat.replace(SMOKE_SENTENCE, "Although this repo is small, run it as one area with one area lead, exactly as you would above the size limit.")),
+            ("150 gone", self.flat.replace("more than about 150 files", "more than about files")),
+            ("one report gone", self.flat.replace("it still comes back as one report, not a sweep in parts", "")),
+        ):
+            with self.subTest(mutation=label):
+                self.assertTrue(mutated.count(SMOKE_SENTENCE) == 0 or re.search(r"(?i)size[\s-]+limit", mutated))
+
+    def test_the_rest_of_the_prompt_still_holds_what_the_case_leans_on(self):
+        for must in ("Dispatch the the-foundry:investigate agent", "END-OF-REPORT", "deep/only_here.py", "./bin/git", "allowed_tools: [Agent, Read, Glob, Grep, Bash]"):
+            with self.subTest(must=must):
+                self.assertIn(must, self.text)
+
+
+GUARD_MESSAGE = "is inside a git repo already; run it in an empty folder outside any repo"
+GUARD_LINES = [
+    'if "$real_git" rev-parse --git-dir >/dev/null 2>&1; then',
+    '  echo "scaffold.sh: $(pwd) is inside a git repo already; run it in an empty folder outside any repo" >&2',
+    "  exit 1",
+    "fi",
+]
+COPY_SUFFIXES = ("150", "230", "320", "400", "450", "full")
+
+
+def clean_env(home):
+    """A minimal environment for a scaffold run: the tools, a home of its own, no git config of the machine's."""
+    keep = ("PATH", "LANG", "LC_ALL", "TMPDIR", "TZ", "USER", "SHELL")
+    env = {k: v for k, v in os.environ.items() if k in keep}
+    env.update({"HOME": str(home), "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null"})
+    return env
+
+
+def snapshot(folder):
+    """Every path under the folder, .git included (its object store left out: git's own background maintenance repacks it), with a
+    hash of each file: what a run left behind."""
+    found = {}
+    for base, dirs, names in os.walk(str(folder)):
+        if base.endswith(os.sep + ".git"):
+            dirs[:] = [d for d in dirs if d != "objects"]
+        for name in dirs:
+            found[str((Path(base) / name).relative_to(folder)) + "/"] = ""
+        for name in names:
+            path = Path(base) / name
+            found[str(path.relative_to(folder))] = sha(path)
+    return found
+
+
+class ScaffoldGuardTest(unittest.TestCase):
+    """The scaffold stops with exit 1 inside a git repo: without it, `git init` and `git add -A` would act on that repo."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.base = Path(cls.tmp.name).resolve()
+        cls.home = cls.base / "home"
+        cls.home.mkdir()
+        cls.env = clean_env(cls.home)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def make_repo(self, name):
+        repo = self.base / name
+        (repo / "sub" / "deeper").mkdir(parents=True)
+        (repo / "keep.txt").write_text("keep\n", encoding="utf-8")
+        (repo / "sub" / "s.txt").write_text("s\n", encoding="utf-8")
+        for args in (("init", "-q", "-b", "main"), ("add", "-A"),
+                     ("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "one")):
+            subprocess.run(["git", *args], cwd=str(repo), env=self.env, check=True, capture_output=True, text=True)
+        (repo / "dirty.txt").write_text("not added\n", encoding="utf-8")  # an untracked file, so the working tree isn't trivially clean
+        return repo
+
+    def repo_state(self, repo):
+        def run(*args):
+            return subprocess.run(["git", *args], cwd=str(repo), env=self.env, check=True, capture_output=True, text=True).stdout
+        return {"head": run("rev-parse", "HEAD"), "index": run("ls-files", "-s"), "status": run("status", "--porcelain"),
+                "branches": run("branch", "--list"), "files": snapshot(repo)}
+
+    def scaffold(self, cwd, *args, script=SCAFFOLD, env=None):
+        return subprocess.run(["bash", str(script), *args], cwd=str(cwd), env=env or self.env, capture_output=True, text=True)
+
+    def assertGuarded(self, result, cwd=None):
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(GUARD_MESSAGE, result.stderr)
+        self.assertIn("scaffold.sh: ", result.stderr)
+        self.assertEqual(result.stdout, "")
+        if cwd is not None:
+            self.assertIn(Path(cwd).name, result.stderr)
+
+    # ---- the five cases of the plan's table
+
+    def test_an_empty_folder_outside_any_repo_builds_the_fixture(self):
+        dest = self.base / "empty"
+        dest.mkdir()
+        result = self.scaffold(dest)
+        self.assertEqual((result.returncode, result.stderr), (0, ""), result.stdout)
+        self.assertEqual(subprocess.run([str(dest / "bin" / "git"), "rev-parse", "--short", "HEAD"], cwd=str(dest), env=self.env,
+                                        capture_output=True, text=True).stdout.strip(), "d12b0aa")
+        names = {p.name for p in dest.iterdir()}
+        self.assertTrue({".git", "bin", "README.md", "main.py", "rules", "web"} <= names, names)
+
+    def test_the_root_of_a_repo_stops_with_the_message_and_writes_nothing(self):
+        repo = self.make_repo("rootrun")
+        before = self.repo_state(repo)
+        result = self.scaffold(repo)
+        self.assertGuarded(result, repo)
+        self.assertEqual(self.repo_state(repo), before)
+        self.assertFalse((repo / "bin").exists())
+
+    def test_a_subfolder_of_a_repo_stops_with_the_message_and_leaves_the_folder_empty(self):
+        repo = self.make_repo("subrun")
+        folder = repo / "sub" / "deeper"
+        before = self.repo_state(repo)
+        result = self.scaffold(folder)
+        self.assertGuarded(result, folder)
+        self.assertEqual(list(folder.iterdir()), [])
+        self.assertEqual(self.repo_state(repo), before)
+
+    def test_emit_key_inside_a_repo_still_works_and_writes_the_committed_key(self):
+        repo = self.make_repo("emitrun")
+        before = self.repo_state(repo)
+        out = self.base / "emitted-key.json"
+        result = self.scaffold(repo, "--emit-key", str(out))
+        self.assertEqual((result.returncode, result.stderr, result.stdout), (0, "", ""))
+        self.assertEqual(out.read_bytes(), KEY_PATH.read_bytes())
+        self.assertEqual(self.repo_state(repo), before)
+
+    def test_a_rerun_in_a_built_fixture_stops_with_the_message(self):
+        dest = self.base / "built"
+        dest.mkdir()
+        self.assertEqual(self.scaffold(dest).returncode, 0)
+        before = snapshot(dest)
+        result = self.scaffold(dest)
+        self.assertGuarded(result, dest)
+        self.assertEqual(snapshot(dest), before)
+        again = self.scaffold(dest, "--subset", "150")
+        self.assertGuarded(again, dest)
+        self.assertEqual(snapshot(dest), before)
+
+    # ---- the guard leaves what was there alone
+
+    def test_the_guard_leaves_the_repos_head_index_branches_and_working_tree_untouched(self):
+        repo = self.make_repo("untouched")
+        before = self.repo_state(repo)
+        for args in ((), ("--subset", "150")):
+            with self.subTest(args=args):
+                self.assertGuarded(self.scaffold(repo, *args), repo)
+                after = self.repo_state(repo)
+                for key in ("head", "index", "status", "branches", "files"):
+                    self.assertEqual(after[key], before[key], key)
+        self.assertEqual(len(before["head"].strip()), 40)
+        self.assertIn("dirty.txt", before["status"])
+
+    def test_an_environment_pointing_git_at_a_repo_trips_the_guard_in_an_empty_folder(self):
+        repo = self.make_repo("gitdir")
+        before = self.repo_state(repo)
+        dest = self.base / "elsewhere"
+        dest.mkdir()
+        env = dict(self.env)
+        env["GIT_DIR"] = str(repo / ".git")
+        result = self.scaffold(dest, env=env)
+        self.assertGuarded(result, dest)
+        self.assertEqual(list(dest.iterdir()), [])
+        self.assertEqual(self.repo_state(repo), before)
+
+    def test_without_the_guard_the_scaffold_writes_into_the_repo_it_is_run_in(self):
+        # the mutation: the same script with the guard's four lines cut out. It builds the fixture on top of the repo, which is the harm.
+        text = SCAFFOLD.read_text(encoding="utf-8")
+        cut = "\n".join(GUARD_LINES) + "\n"
+        self.assertEqual(text.count(cut), 1)
+        mutant = self.base / "scaffold-without-guard.sh"
+        mutant.write_text(text.replace(cut, ""), encoding="utf-8")
+        repo = self.make_repo("mutant")
+        before = self.repo_state(repo)
+        result = self.scaffold(repo, script=mutant)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((repo / "bin" / "git").exists())
+        self.assertNotEqual(self.repo_state(repo)["files"], before["files"])
+
+    # ---- where the guard sits in the file
+
+    def test_the_guard_is_the_four_lines_after_the_no_git_check_and_before_anything_is_written(self):
+        lines = SCAFFOLD.read_text(encoding="utf-8").split("\n")
+        at = lines.index('[ -n "$real_git" ] || { echo "no git found" >&2; exit 1; }')
+        self.assertEqual(lines[at + 1:at + 5], GUARD_LINES)
+        self.assertEqual(lines[at + 5], "mkdir -p bin")
+
+    def test_the_guard_comes_after_the_emit_key_branch_and_the_subset_branch(self):
+        text = SCAFFOLD.read_text(encoding="utf-8")
+        guard = text.index(GUARD_LINES[0])
+        self.assertLess(text.index('if [ "${1:-}" = "--emit-key" ]'), guard)
+        self.assertLess(text.index('if [ "${1:-}" = "--subset" ]'), guard)
+        self.assertEqual(text.count("rev-parse --git-dir"), 1)
+
+    def test_the_guard_asks_the_real_git_not_the_wrapper(self):
+        text = SCAFFOLD.read_text(encoding="utf-8")
+        self.assertIn('"$real_git" rev-parse --git-dir', text)
+        self.assertLess(text.index('"$real_git" rev-parse --git-dir'), text.index("> bin/git"))
+
+    # ---- the six reply-size copies
+
+    def test_the_six_reply_size_copies_carry_the_guard_in_the_same_place(self):
+        for suffix in COPY_SUFFIXES:
+            with self.subTest(copy=suffix):
+                lines = (EXPENSIVE / ("reply-size-" + suffix) / "scaffold.sh").read_text(encoding="utf-8").split("\n")
+                at = lines.index('[ -n "$real_git" ] || { echo "no git found" >&2; exit 1; }')
+                self.assertEqual(lines[at + 1:at + 5], GUARD_LINES)
+                self.assertEqual(lines[at + 5], "mkdir -p bin")
+
+    def test_each_reply_size_copy_stops_inside_a_repo_and_leaves_it_alone(self):
+        repo = self.make_repo("copies")
+        before = self.repo_state(repo)
+        for suffix in COPY_SUFFIXES:
+            with self.subTest(copy=suffix):
+                self.assertGuarded(self.scaffold(repo, script=EXPENSIVE / ("reply-size-" + suffix) / "scaffold.sh"), repo)
+                self.assertEqual(self.repo_state(repo), before)
+
+    def test_a_reply_size_copy_still_builds_in_an_empty_folder(self):
+        dest = self.base / "copy-empty"
+        dest.mkdir()
+        result = self.scaffold(dest, script=EXPENSIVE / "reply-size-150" / "scaffold.sh")
+        self.assertEqual((result.returncode, result.stderr), (0, ""), result.stdout)
+        self.assertEqual(len(git(dest, "ls-files").splitlines()), 150)
+
+    # ---- the fixture itself did not move
+
+    def test_the_fixtures_commit_is_still_d12b0aa_and_two_builds_are_byte_identical(self):
+        self.assertEqual(git(Fixtures.a, "rev-parse", "--short", "HEAD").strip(), "d12b0aa")
+        self.assertEqual(git(Fixtures.b, "rev-parse", "--short", "HEAD").strip(), "d12b0aa")
+        a, b = tree(Fixtures.a), tree(Fixtures.b)
+        self.assertEqual(sorted(a), sorted(b))
+        self.assertEqual([p for p in a if p != "bin/git" and a[p] != b[p]], [])
+
+
 class FoundRuleTest(unittest.TestCase):
     """check_parts.py's found rule must not be fooled by an ordinary token."""
 

@@ -103,12 +103,12 @@ PINS = [
     ("what was read and skipped goes on Files listed and the skip reasons", "Areas", r"What was read and what was skipped go on the `Files listed:` line and the skip reasons after it"),
     ("only paths go in backticks, root and direct are bare", "Areas", r"Only folder and file paths go in backticks\. `\(root\)` and `\(direct\)` are written bare"),
     ("areas ordered by byte order of the first path", "Areas", r"Order the areas by the byte order of each area's first path"),
-    ("list command and wrapper", "Areas", r"`<list>` below is `git -c core\.quotepath=off ls-files`, with the brief's wrapper in place of `git`"),
+    ("list command and wrapper", "Areas", r"`<list>` below is `git ls-files -z \| tr '\\0' '\\n'`, with the brief's wrapper in place of `git`"),
     ("outside git the default find command", "Areas", r"`find \. \\\( -name \.git -o -name node_modules -o -name venv -o -name \.venv \\\) -prune -o -type f -print \| sed 's\|\^\\\./\|\|' \| LC_ALL=C sort`"),
     ("outside git, a bounded variant is allowed", "Areas", r"Outside a git repo it's this command, or a bounded variant of it"),
     ("the find command, default included, goes on Environment", "Areas", r"The find command you use, the default one included, goes on the `Environment:` line so every run lists the same way"),
     ("each piece runs the command under its own comment", "Areas", r"Each piece runs the command under its own comment"),
-    ("several pieces run in one group, skips chain one except each", "Areas", r"An area with several pieces runs them in one `\{ \.\.\.; \}` group, and several skipped folders chain one `except` filter each"),
+    ("several pieces run in one group, skips chain one except each", "Areas", r"An area with several pieces runs them in one `\{ \.\.\.; \}` group, and several skipped folders chain one `except` filter each, before the `sort` on the listing side"),
     ("find where a range ends with sed -n", "Areas", r"To find where a range should end, print the nth path of a piece with `<piece> \| sed -n '<n>p'`"),
     ("run the exactly-once check before reading", "Areas", r"On a first run, before you read anything, run the last command\. If it fails, fix the areas and check again\. Don't read while it fails"),
 
@@ -139,7 +139,7 @@ PINS = [
     ("a sweep that fits in one report never carries the block", "The Block", r"A sweep that fits in one report never carries the block"),
     ("work out the block's area lines before line 1 and count them", "The Block", r"Work out the block's area lines before you write line 1, and count them"),
     ("the n on line 1 is the number of area lines, no more and no fewer", "The Block", r"The `<n>` on line 1 is the number of area lines in the block, no more and no fewer"),
-    ("the block's area lines are counted with a command, as Coverage says of every count, the printf example", "The Block", r"count them with a command, as \"8\. Coverage\" says of every count, for example `printf '%s\\n' '<area line>' '<area line>' \| wc -l`"),
+    ("the block's area lines are counted with a command, as Coverage says of every count, pasted into a here-document", "The Block", r"count them with a command, as \"8\. Coverage\" says of every count: paste the area lines, as they'll stand in the block, between `wc -l <<'/END'` and `/END`, since an area line holds paths and is never typed between quotes"),
     ("line 1 is written only after the number is in hand", "The Block", r"Write line 1 only after you have the number"),
     ("Environment carries the wrapper or the find command", "The Block", r"`Environment:` carries the git wrapper, or the find command outside git"),
 
@@ -223,6 +223,56 @@ PINS = [
     ("part 1 lists the untracked files by path", "8. Coverage", r"with the untracked files listed by path"),
     ("Whole repo counts every tracked file before any skip", "8. Coverage", r"The tracked files are every tracked file, before any skip"),
     ("later parts say Whole repo is given in part 1", "8. Coverage", r"Later parts: `Whole repo: given in part 1\.`"),
+    # the batch of 2026-11-24: paths go into commands without being typed into them, and a brief that arrives broken
+    # Pick a Mode
+    ("a Read only these files line is exactly the scope and replaces any other file list or scope", "Pick a Mode", r"A brief with a `Read only these files:` line reads exactly the paths under it; that list replaces any other file list or scope in the brief"),
+
+    # Build the File List
+    ("the file list prints every path as it is: git ls-files -z through tr", "Build the File List", r"Use `git ls-files -z \| tr '\\0' '\\n'`, which prints every path exactly as it is, or a bounded `find` outside a git repo"),
+    ("the untracked listing is -z too", "Build the File List", r"\(`git ls-files --others --exclude-standard -z \| tr '\\0' '\\n'`\) in Coverage as unread"),
+    ("never type a path into a command, between quotes or not", "Build the File List", r"Never type a path into a command, between quotes or not"),
+    ("the reason: a quote, a dollar-paren, a backtick or a backslash is read as code", "Build the File List", r"Paths come from the repo, and a quote, `\$\(`, a backtick or a backslash in one would be read by the shell or by `awk` as code"),
+    ("paths come from a listing or a here-document whose quoted /END ends only on a line no path can be", "Build the File List", r"A command gets its paths from a listing, or from a here-document like the ones below, whose quoted `'/END'` makes the shell take every line as it is; no listed path starts with `/`, so none can end it early"),
+    ("line counts: a listing piped through tr and xargs -0, or paths pasted one per line with no indent", "Build the File List", r"Line counts go the same way: pipe a listing in, `<listing> \| tr '\\n' '\\0' \| xargs -0 wc -l --`, or, for paths you were given, paste them one per line, with no indent"),
+
+    # Areas
+    ("each path goes into a variable of its own, three lines per path, the trailing slash kept, no indent", "Areas", r"Put each path a command needs into a variable of its own, `p1`, `p2` and so on, as \"Build the File List\" says of every path: one block of three lines per path, with the path on the middle line exactly as the listing printed it or the area line gives it, a folder's trailing `/` included, and no indent"),
+    ("the variables are set in the same Bash call as the commands", "Areas", r"Set the variables in the same Bash call as the commands that use them"),
+    ("a command names its variable where the fence has a var placeholder", "Areas", r"with a variable's name where the command says `<dir var>`, `<folder var>`, `<first var>`, `<last var>` or `<skipped var>`"),
+    ("awk reads the path from ENVIRON and the colon-question-mark stops the command on an empty variable", "Areas", r"`awk` reads the path from `ENVIRON`, which leaves backslashes alone, and `:\?` stops the command when a variable is empty"),
+    ("a path with a backtick or a control character is never a piece, a skipped folder or a range end", "Areas", r"A path with a backtick or a control character in it \(a tab, a line break\) can't be written in an area line, so it is never a piece, a skipped folder or a range end"),
+    ("use a piece that holds it without naming it, or end the range beside it", "Areas", r"Use a piece that holds it without naming it, such as the folder above it, or end the range on the path beside it"),
+    ("a top-level folder named so is skipped whole in part 1 with that reason", "Areas", r"A top-level folder with such a name is skipped whole in part 1, with the reason \"name can't be written in an area line\""),
+    ("a line-break path is two lines of the listing, each in whatever area its text falls in", "Areas", r"A path with a line break shows in the listing as two lines that aren't real paths: each goes in whatever area its text falls in, and the reader sent for it reports no such file"),
+
+    # Reading a Part
+    ("an area line that can't be read as one is dropped, with the Area dropped form for such a line", "Reading a Part", r"An area line that can't be read as one \(no `\(<n> files\)` at its end, or a definition that doesn't follow \"Areas\"\) is dropped the same way, with the `Area dropped:` form for such a line \(see \"8\. Coverage\"\)"),
+    ("a listing that fails or prints nothing drops no area: every area goes back, nothing is read, a note gives the error", "Reading a Part", r"If the listing itself fails or prints nothing, no area is dropped: put every area back in the block, read nothing else, and give the error in a note that goes with the mode line \(see \"8\. Coverage\"\)"),
+
+    # The Block
+    ("a brief without Instructions is carried on as none", "The Block", r"A brief without the line is carried on as `Instructions: none`"),
+    ("a brief without Project, Focus or Environment is carried on as none with a note naming it", "The Block", r"One without `Project:`, `Focus:` or `Environment:` carries that line on as `none` the same way, with a note that goes with the mode line \(see \"8\. Coverage\"\) naming it"),
+
+    # When a Part Goes Wrong
+    ("an area put back after refused spawns has left the part", "When a Part Goes Wrong", r"Those areas have left the part: they aren't under `Areas read:`, in `Files listed:` or in the mode line's N"),
+
+    # If Your Brief Continues a Sweep
+    ("the brief is checked whole before anything runs", "If Your Brief Continues a Sweep", r"Check that the brief is whole before you run anything"),
+    ("no END OF BLOCK line or no area line means cut off: nothing is read and the reply is two lines", "If Your Brief Continues a Sweep", r"If it has no line that says `END OF BLOCK`, or no area line before it, it was cut off on the way: read nothing, and reply with these two lines and nothing else"),
+    ("the cut-off reply isn't a part: no block, no sections, no Coverage", "If Your Brief Continues a Sweep", r"That reply isn't a part: it carries no block, no sections and no Coverage"),
+    ("a whole brief lacking a line is carried on, and an unreadable area line is dropped", "If Your Brief Continues a Sweep", r"A whole brief that lacks a line before the areas is carried on as \"The Block\" says, and an area line that can't be read is dropped as \"Reading a Part\" says"),
+
+    # Check Before You Compile
+    ("coupling claims are checked with the Grep tool, never a grep with the name typed in", "Check Before You Compile", r"check coupling claims with the Grep tool for the referenced name, never a `grep` with the name typed into it"),
+
+    # When You're an Area Lead
+    ("a lead's line counts take its brief's paths in a here-document", "When You're an Area Lead", r"Get line counts with `wc -l` for the big-file rule, with your brief's paths in a here-document as \"Build the File List\" shows"),
+
+    # 8. Coverage
+    ("the one reply without Coverage is the one for a cut-off continuing brief", "8. Coverage", r"The one reply without it is the one for a cut-off `CONTINUE SWEEP` brief \(see \"If Your Brief Continues a Sweep\"\)"),
+    ("an area put back after refused spawns isn't under Areas read", "8. Coverage", r"An area put back in the block after refused spawns isn't one of them \(see \"When a Part Goes Wrong\"\)"),
+    ("the Area dropped form for a line that can't be read as an area line", "8. Coverage", r"`Area dropped: <the line as given>; can't be read as an area line; not read\.`"),
+    ("the per-folder counts are for a top-level single-agent report on a first run only", "8. Coverage", r"The per-folder counts apply only to a top-level single-agent report on a first run, never to a continuing run without `Agent` \(see \"When You Can't Spawn\"\) or to a lead's checklist"),
 ]
 
 TOKENS = [
@@ -243,25 +293,38 @@ TOKENS = [
     "Read only these files:",
 ]
 
-# The fence in "Areas", byte for byte (the range line changed in fix round 1: the string joins force a string comparison).
+# The fence in "Areas", byte for byte. Each command takes its paths from a variable (set by the variable block above it),
+# which awk reads from ENVIRON; `:?` stops the command when the variable is empty or unset.
 FENCE = [
     "# count by top-level folder",
     "<list> | LC_ALL=C awk -F/ '{print (NF > 1 ? $1 \"/\" : \"(root)\")}' | LC_ALL=C sort | uniq -c",
     "# count one level down inside <dir>/",
-    "<list> | LC_ALL=C awk -v d='<dir>/' 'index($0, d) == 1 {r = substr($0, length(d) + 1); i = index(r, \"/\"); print (i ? d substr(r, 1, i) : d \" (direct)\")}' | LC_ALL=C sort | uniq -c",
+    ": \"${<dir var>:?}\" && <list> | d=\"$<dir var>\" LC_ALL=C awk 'BEGIN {d = ENVIRON[\"d\"]} index($0, d) == 1 {r = substr($0, length(d) + 1); i = index(r, \"/\"); print (i ? d substr(r, 1, i) : d \" (direct)\")}' | LC_ALL=C sort | uniq -c",
     "# <dir>/",
-    "<list> | LC_ALL=C awk -v d='<dir>/' 'index($0, d) == 1'",
+    "<list> | d=\"${<dir var>:?}\" LC_ALL=C awk 'index($0, ENVIRON[\"d\"]) == 1'",
     "# <dir>/ (direct)",
-    "<list> | LC_ALL=C awk -v d='<dir>/' 'index($0, d) == 1 && index(substr($0, length(d) + 1), \"/\") == 0'",
+    "<list> | d=\"${<dir var>:?}\" LC_ALL=C awk 'BEGIN {d = ENVIRON[\"d\"]} index($0, d) == 1 && index(substr($0, length(d) + 1), \"/\") == 0'",
     "# (root)",
     "<list> | LC_ALL=C awk 'index($0, \"/\") == 0'",
     "# except <folder>/, after any piece above",
-    "<piece> | LC_ALL=C awk -v x='<folder>/' 'index($0, x) != 1'",
+    "<piece> | x=\"${<folder var>:?}\" LC_ALL=C awk 'index($0, ENVIRON[\"x\"]) != 1'",
     "# from <first> to <last>, after any piece above",
-    "<piece> | LC_ALL=C awk -v a='<first>' -v b='<last>' '($0 \"\") >= (a \"\") && ($0 \"\") <= (b \"\")'",
+    "<piece> | a=\"${<first var>:?}\" b=\"${<last var>:?}\" LC_ALL=C awk '($0 \"\") >= (ENVIRON[\"a\"] \"\") && ($0 \"\") <= (ENVIRON[\"b\"] \"\")'",
     "# every file left after the whole-folder skips is in exactly one area",
-    "diff <(<list> | LC_ALL=C awk -v x='<skipped>/' 'index($0, x) != 1') <({ <area 1>; <area 2>; <and so on>; } | LC_ALL=C sort) && echo \"each file in exactly one area\"",
+    "diff <(<list> | x=\"${<skipped var>:?}\" LC_ALL=C awk 'index($0, ENVIRON[\"x\"]) != 1' | LC_ALL=C sort) <({ <area 1>; <area 2>; <and so on>; } | LC_ALL=C sort) && echo \"each file in exactly one area\"",
 ]
+
+# The variable block above the fence: three lines per path, the path on the middle one.
+VAR_BLOCK = ["IFS= read -r p1 <<'/END'", "<path>", "/END"]
+
+# The one reply for a continuing brief that arrives cut off: two lines, in one fence.
+CUT_OFF_REPLY = [
+    "This CONTINUE SWEEP brief has no END OF BLOCK line, or no area line, so nothing was read. Send it again with the whole block, copied from the previous part's full text.",
+    "INVESTIGATE REPORT ENDS",
+]
+
+# The pasted-paths form of a line count, in "Build the File List".
+WC_FENCE = ["tr '\\n' '\\0' <<'/END' | xargs -0 wc -l --", "<path>", "<path>", "/END"]
 
 CONTINUE_TEMPLATE = [
     "CONTINUE SWEEP",
@@ -360,7 +423,7 @@ class PartsPinsTest(unittest.TestCase):
     def test_the_part_size_test_comes_before_anything_that_walks_the_list(self):
         section = self.text[self.text.index("\n## Build the File List\n"): self.text.index("\n## A Sweep in Parts\n")]
         above = section.index("**Above the part size.**")
-        for later in ("Use `git ls-files`", "`wc -l`", "Skip lock files"):
+        for later in ("Use `git ls-files -z | tr", "`wc -l`", "Skip lock files"):
             with self.subTest(later=later):
                 self.assertLess(above, section.index(later))
 
@@ -384,25 +447,22 @@ class PartsPinsTest(unittest.TestCase):
                 proc = subprocess.run(shell + [command], capture_output=True, text=True, timeout=30)
                 self.assertEqual((proc.returncode, proc.stdout.strip()), (0, str(sum(numbers))), proc.stderr)
 
-    def test_the_block_count_example_is_real_shell_that_counts_the_area_lines_under_bash_and_zsh(self):
-        found = re.findall(r"`(printf '%s\\n'[^`]*\| wc -l)`", self.body_raw("### The Block"))
+    def test_the_block_count_is_a_real_here_document_that_counts_the_area_lines_under_bash_and_zsh(self):
+        found = re.findall(r"between `(wc -l <<'/END')` and `/END`", " ".join(self.body_raw("### The Block").split()))
         self.assertEqual(len(found), 1, found)
-        self.assertEqual(len(re.findall(r"printf '%s", self.text)), 1)  # one example in the whole file
-        template = found[0]
-        self.assertEqual(template.count("'<area line>'"), 2)
-        lines = ["- docs: `docs/` (22 files)", "- web: `web/` except `web/vendor/` (86 files)", "- top: `(root)` + `scripts/` (70 files)"]
+        self.assertEqual(len(re.findall(r"printf '%s", self.text)), 0)  # no example that types the lines between quotes
+        header = found[0]
+        lines = ["- docs: `docs/` (22 files)", "- web: `web/` except `web/vendor/` (86 files)", "- top: `(root)` + `scripts/` (70 files)",
+                 "- odd: `bob's notes/` + `$(echo MARKER)/` + `a\\tb/` + `x'; echo MARKER; '/` (4 files)"]
         shells = [["bash", "-c"]]
         if shutil.which("zsh"):
             shells.append(["zsh", "-f", "-c"])
-        for n in (2, 3):
-            # two placeholders filled with two lines; for three, one more argument before the pipe
-            command = template.replace("'<area line>'", "{}").format(*["'%s'" % l for l in lines[:2]])
-            if n == 3:
-                command = command.replace(" | wc -l", " '%s' | wc -l" % lines[2])
+        for n in (1, 2, 3, 4):
+            command = "\n".join([header] + lines[:n] + ["/END"])
             for shell in shells:
                 with self.subTest(lines=n, shell=shell[0]):
                     proc = subprocess.run(shell + [command], capture_output=True, text=True, timeout=30)
-                    self.assertEqual((proc.returncode, proc.stdout.strip()), (0, str(n)), proc.stderr)
+                    self.assertEqual((proc.returncode, proc.stdout.strip(), proc.stderr), (0, str(n), ""))
 
     # ------------------------------------------------------------ the fence
 
@@ -420,9 +480,11 @@ class PartsPinsTest(unittest.TestCase):
 
     def test_the_range_line_is_the_string_comparison_one(self):
         fence = fence_with(self.body_raw("### Areas"), "# count by top-level folder")
-        want = "<piece> | LC_ALL=C awk -v a='<first>' -v b='<last>' '($0 \"\") >= (a \"\") && ($0 \"\") <= (b \"\")'"
+        want = ("<piece> | a=\"${<first var>:?}\" b=\"${<last var>:?}\" LC_ALL=C awk "
+                "'($0 \"\") >= (ENVIRON[\"a\"] \"\") && ($0 \"\") <= (ENVIRON[\"b\"] \"\")'")
         self.assertIn(want, fence)
         self.assertNotIn("'$0 >= a && $0 <= b'", self.text)
+        self.assertNotIn("$0 >= ENVIRON", self.text)  # each side joined with "" so the comparison is of strings
 
     def test_the_fence_check_fails_when_any_line_is_dropped_or_changed(self):
         area = self.body_raw("### Areas")
@@ -432,7 +494,8 @@ class PartsPinsTest(unittest.TestCase):
                 self.assertNotEqual(fence_with(dropped, "# count by top-level folder"), FENCE)
                 changed = area.replace(line + "\n", line + " #\n", 1)
                 self.assertNotEqual(fence_with(changed, "# count by top-level folder"), FENCE)
-        old = area.replace("'($0 \"\") >= (a \"\") && ($0 \"\") <= (b \"\")'", "'$0 >= a && $0 <= b'")
+        old = area.replace("'($0 \"\") >= (ENVIRON[\"a\"] \"\") && ($0 \"\") <= (ENVIRON[\"b\"] \"\")'", "'$0 >= ENVIRON[\"a\"] && $0 <= ENVIRON[\"b\"]'")
+        self.assertNotEqual(old, area)
         self.assertNotEqual(fence_with(old, "# count by top-level folder"), FENCE)
 
     def test_the_sed_sentence_follows_the_fence(self):
@@ -576,6 +639,150 @@ class PartsPinsTest(unittest.TestCase):
                          < body.index("If that fails too, list every file"), True)
 
 
+# ---------------------------------------------------------------- paths without typing, and a brief that arrives broken
+
+
+def raw_section(text, heading):
+    """The raw body of a section, up to the next `##`/`###` heading (comment lines in fences start with one `#`)."""
+    at = text.index("\n" + heading + "\n")
+    nxt = re.search(r"^#{2,3} ", text[at + 5:], flags=re.M)
+    return text[at: at + 5 + nxt.start()] if nxt else text[at:]
+
+
+class PathsAndBrokenBriefTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.text = raw()
+        cls.sections = sections(cls.text)
+
+    # ---- the variable block and the pasted-paths fence
+
+    def test_the_variable_block_is_exactly_three_lines_in_one_fence_with_no_indent(self):
+        self.assertEqual(fence_with(raw_section(self.text, "### Areas"), VAR_BLOCK[0]), VAR_BLOCK)
+
+    def test_the_variable_block_check_fails_when_a_line_is_dropped_indented_or_changed(self):
+        area = raw_section(self.text, "### Areas")
+        block = "\n".join(VAR_BLOCK) + "\n"
+        self.assertIn(block, area)
+        for label, mutated in (
+            ("the path line gone", block.replace("<path>\n", "")),
+            ("the delimiter line gone", block.replace("/END\n", "")),
+            ("the path line indented", block.replace("<path>", "  <path>")),
+            ("a word delimiter", block.replace("/END", "END")),
+            ("an unquoted delimiter", block.replace("<<'/END'", "<<END")),
+            ("read without -r", block.replace("read -r", "read")),
+            ("no IFS=", block.replace("IFS= ", "")),
+        ):
+            with self.subTest(mutation=label):
+                changed = area.replace(block, mutated, 1)
+                self.assertNotEqual(fence_with(changed, VAR_BLOCK[0]), VAR_BLOCK)
+
+    def test_the_variable_block_comes_before_the_command_fence_and_both_are_under_areas(self):
+        area = raw_section(self.text, "### Areas")
+        self.assertLess(area.index(VAR_BLOCK[0]), area.index("# count by top-level folder"))
+        self.assertLess(area.index("Put each path a command needs into a variable"), area.index(VAR_BLOCK[0]))
+        self.assertLess(area.index(VAR_BLOCK[0]), area.index("Set the variables in the same Bash call"))
+
+    def test_the_pasted_paths_fence_is_in_the_file_list_section_and_holds_two_path_lines(self):
+        section = raw_section(self.text, "## Build the File List")
+        self.assertEqual(fence_with(section, WC_FENCE[0]), WC_FENCE)
+        self.assertLess(section.index("Never type a path into a command"), section.index(WC_FENCE[0]))
+        self.assertLess(section.index("Get line counts with `wc -l`."), section.index("Never type a path into a command"))
+
+    def test_the_pasted_paths_fence_check_fails_when_a_line_changes(self):
+        section = raw_section(self.text, "## Build the File List")
+        block = "\n".join(WC_FENCE) + "\n"
+        self.assertIn(block, section)
+        for label, mutated in (
+            ("a word delimiter", block.replace("/END", "END")),
+            ("an unquoted delimiter", block.replace("<<'/END'", "<<END")),
+            ("no -0 on xargs", block.replace("xargs -0", "xargs")),
+            ("no -- before the paths", block.replace(" --\n", "\n")),
+            ("a path line gone", block.replace("<path>\n", "", 1)),
+        ):
+            with self.subTest(mutation=label):
+                self.assertNotEqual(fence_with(section.replace(block, mutated, 1), WC_FENCE[0]), WC_FENCE)
+
+    def test_the_never_type_a_path_rule_comes_before_the_first_command_that_takes_a_path(self):
+        text = self.text
+        rule = text.index("Never type a path into a command")
+        self.assertLess(rule, text.index("## A Sweep in Parts"))
+        self.assertLess(rule, text.index(VAR_BLOCK[0]))
+
+    # ---- the reply to a brief that was cut off
+
+    def test_the_cut_off_reply_is_exactly_two_lines_in_one_fence(self):
+        section = raw_section(self.text, "## If Your Brief Continues a Sweep")
+        self.assertEqual(fence_with(section, CUT_OFF_REPLY[0]), CUT_OFF_REPLY)
+
+    def test_the_cut_off_reply_check_fails_when_a_word_goes_a_line_is_added_or_the_fence_splits(self):
+        section = raw_section(self.text, "## If Your Brief Continues a Sweep")
+        block = "\n".join(CUT_OFF_REPLY) + "\n"
+        self.assertIn(block, section)
+        for label, mutated in (
+            ("the last line gone", block.replace("INVESTIGATE REPORT ENDS\n", "")),
+            ("a third line", block + "Mode: single agent\n"),
+            ("the order swapped", "\n".join(reversed(CUT_OFF_REPLY)) + "\n"),
+            ("END OF BLOCK dropped from the sentence", block.replace("no END OF BLOCK line, or no area line", "no area line")),
+            ("the previous part's full text dropped", block.replace(", copied from the previous part's full text", "")),
+            ("nothing was read dropped", block.replace(", so nothing was read", "")),
+            ("the sentence wrapped onto two lines", block.replace("brief has no END", "brief has\nno END")),
+            ("the two lines in two fences", block.replace("\nINVESTIGATE", "\n```\n\n```\nINVESTIGATE")),
+        ):
+            with self.subTest(mutation=label):
+                self.assertNotEqual(fence_with(section.replace(block, mutated, 1), CUT_OFF_REPLY[0]), CUT_OFF_REPLY)
+
+    def test_the_cut_off_reply_is_not_a_part_it_has_no_sweep_in_parts_line_and_ends_with_the_closing_line(self):
+        reply = fence_with(raw_section(self.text, "## If Your Brief Continues a Sweep"), CUT_OFF_REPLY[0])
+        self.assertEqual(len(reply), 2)
+        self.assertNotIn("SWEEP IN PARTS", "\n".join(reply))
+        self.assertEqual(reply[-1], "INVESTIGATE REPORT ENDS")
+        self.assertFalse(reply[0].startswith("NOT A PER-FILE READ"))  # the only first-line flag stays the only one
+        for word in ("Mode:", "Coverage", "Files listed", "Areas read", "Areas not read", "Whole repo"):
+            self.assertNotIn(word, "\n".join(reply))
+        self.assertTrue(reply[0].startswith("This CONTINUE SWEEP brief"))
+
+    def test_the_wholeness_check_follows_the_template_and_the_not_a_part_sentence_follows_the_reply(self):
+        section = raw_section(self.text, "## If Your Brief Continues a Sweep")
+        order = [section.index("CONTINUE SWEEP\nProject:"), section.index("Check that the brief is whole"),
+                 section.index(CUT_OFF_REPLY[0]), section.index("That reply isn't a part")]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(len(set(order)), 4)
+
+    def test_the_marker_check_still_comes_before_the_wholeness_check(self):
+        # the section's first sentence checks for the marker; the wholeness check runs after it
+        section = raw_section(self.text, "## If Your Brief Continues a Sweep")
+        self.assertLess(section.index("CONTINUE SWEEP"), section.index("Check that the brief is whole"))
+        self.assertIn("check that before you pick a mode", self.sections["If Your Brief Continues a Sweep"])
+
+    def test_the_cut_off_reply_is_said_in_one_place_and_pointed_to_from_coverage(self):
+        flat = " ".join(self.text.split())
+        self.assertEqual(flat.count("This CONTINUE SWEEP brief has no END OF BLOCK line"), 1)
+        self.assertEqual(flat.count("Check that the brief is whole before you run anything"), 1)
+        self.assertEqual(len(re.findall(r"cut-off `CONTINUE SWEEP` brief", self.sections["8. Coverage"])), 1)
+
+    # ---- the unreadable-line form of Area dropped
+
+    def test_the_unreadable_line_form_follows_the_named_form_in_coverage_and_is_one_line_in_one_note(self):
+        body = self.sections["8. Coverage"]
+        named = body.index("`Area dropped: <name>: now <n> files, the brief said <m>; not read.`")
+        broken = body.index("`Area dropped: <the line as given>; can't be read as an area line; not read.`")
+        self.assertLess(named, broken)
+        self.assertEqual(len(re.findall(r"Area dropped: <the line as given>", self.text)), 1)
+
+    def test_the_per_folder_counts_exception_is_said_once_and_the_old_unqualified_sentence_is_gone(self):
+        flat = " ".join(self.text.split())
+        self.assertEqual(flat.count("The per-folder counts apply only to"), 1)
+        self.assertNotIn("single-agent report, never to a lead's checklist", flat)
+
+    def test_no_sentence_types_a_path_between_quotes_in_a_command_the_model_runs(self):
+        flat = " ".join(self.text.split())
+        for old in ("-v d='", "-v x='", "-v a='", "-v b='", "'<dir>/'", "'<folder>/'", "'<skipped>/'", "'<first>'", "'<last>'",
+                    "core.quotepath", "printf '%s\\n' '"):
+            with self.subTest(old=old):
+                self.assertNotIn(old, flat)
+
+
 # ---------------------------------------------------------------- fix batch A of the final qa pass: the old inviting sentences are gone
 
 # (item, pattern that must not match the file, the old sentence it is aimed at). Each pattern is shown to catch its old sentence.
@@ -670,7 +877,11 @@ class QaFixAOldSentencesTest(unittest.TestCase):
 
     def test_the_mode_line_note_placement_is_said_once_and_the_two_notes_point_to_it(self):
         self.assertEqual(len(re.findall(r"come after the `Mode:` line and before the `Files listed:` line", self.flat)), 1)
-        self.assertEqual(len(re.findall(r"a note that goes with the mode line \(see \"8\. Coverage\"\)", self.flat)), 2)
+        self.assertEqual(len(re.findall(r"a note that goes with the mode line \(see \"8\. Coverage\"\)", self.flat)), 4)
+        # one each: a failed lead, refused spawns (When You Can't Spawn), the missing Project/Focus/Environment line, the failed listing
+        where = dict((h, len(re.findall(r"a note that goes with the mode line \(see \"8\. Coverage\"\)", b))) for h, b in self.sections.items())
+        self.assertEqual(dict((h, n) for h, n in where.items() if n),
+                         {"The Block": 1, "Reading a Part": 1, "Check Before You Compile": 1, "When You Can't Spawn": 1})
         self.assertEqual(len(re.findall(r"line right after the `Mode:`", self.flat)), 0)
 
     def test_the_scoped_read_has_no_part_lines_and_the_part_lines_are_for_a_part_of_a_full_sweep(self):
@@ -783,7 +994,7 @@ class ReportFromTemplatesIsAcceptedByTheScorerTest(unittest.TestCase):
             base = Path(tmp)
             (base / "repo" / "bin").mkdir(parents=True)
             git = base / "repo" / "bin" / "git"
-            git.write_text("#!/bin/sh\nprintf '%s\\n' " + " ".join("'%s'" % p for p in TRACKED) + "\n", encoding="utf-8")
+            git.write_text("#!/bin/sh\nprintf '%s\\0' " + " ".join("'%s'" % p for p in TRACKED) + "\n", encoding="utf-8")
             git.chmod(git.stat().st_mode | stat.S_IXUSR)
             key = {
                 "facts": [{"id": "f1", "kind": "route", "path": "a/x.py", "line": 1, "token": "TOKENONE"}],

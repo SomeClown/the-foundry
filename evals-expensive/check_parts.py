@@ -29,7 +29,8 @@ Reads DIR/part-<n>.md in number order and checks, against the key and the fixtur
 Also prints a NOTE: line, never a failure, for a later part that names an untracked path (only part 1 lists them).
 Parses `(root)` in backticks, a folder-and-(direct) pair inside one pair of backticks, and a `Whole repo:` folder in backticks.
 
-Exit 0 prints LOOP PROVED and a summary (with --part-size, the summary gives the largest part's file count); exit 1 prints LOOP FAILED and one line per failure; exit 2 prints
+Exit 0 prints LOOP PROVED and a summary (with --part-size, the summary gives the largest part's file count; without --transcript it
+ends "readers: not checked", since the read, unread and failed numbers are then the parts' own); exit 1 prints LOOP FAILED and one line per failure; exit 2 prints
 CAN'T CHECK: <why> (a missing file, an unreadable key, an unreadable transcript, a crash). Standard library only, Python 3.9.
 The script runs <repo>/bin/git, so it is for fixtures it was built to score.
 
@@ -107,13 +108,13 @@ def tracked_files(repo):
     if not os.path.isfile(git):
         raise CantCheck("the fixture's git wrapper %s is missing; build the fixture with its scaffold" % git)
     try:
-        done = subprocess.run([git, "-c", "core.quotepath=off", "ls-files"], cwd=repo,
+        done = subprocess.run([git, "ls-files", "-z"], cwd=repo,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
     except (OSError, subprocess.SubprocessError) as err:
         raise CantCheck("could not run %s (%s)" % (git, err))
     if done.returncode != 0:
         raise CantCheck("git ls-files failed in %s: %s" % (repo, done.stderr.decode("utf-8", "replace").strip()))
-    return [p for p in done.stdout.split(b"\n") if p]
+    return [p for p in done.stdout.split(b"\0") if p]
 
 
 def read_parts(parts_dir):
@@ -736,7 +737,8 @@ def main(argv):
     print("parts: %d; areas: %d; files covered: %d of %d; read: %d of %d; facts found: %d of %d; decoys found: 0 of %d"
           % (len(parts), read_area_count, len(covered), len(expected), read_got, read_expected, len(facts) - len(missing_facts), len(facts), len(decoys))
           + ("; largest part: %d files" % max(sizes) if sizes else "")
-          + ("; readers: %d of %d, once each" % readers if readers else ""))
+          + ("; readers: %d of %d, once each" % readers if readers else
+             "; readers: not checked; read, unread and failed are the parts' own numbers (--transcript checks them)"))
     for line in notes:
         print(line)
     return 0

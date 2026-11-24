@@ -857,38 +857,45 @@ class DesignAsBuiltPlacementTest(unittest.TestCase):
         self.assertEqual(re.findall(r"^#{1,6} .*$", sub, re.M), [AS_BUILT])
         self.assertTrue(self.text.rstrip().endswith(sub.rstrip()))
 
-    def test_it_comes_after_the_last_amended_subsection_of_section_4(self):
-        _before, sec4, _sub = design_parts(self.text)
+    def test_it_comes_after_every_amended_subsection_of_section_4_and_is_the_last_subsection_of_the_file(self):
+        # not tied to which amendment is the last one: a later amendment goes above the As built heading and this still holds
+        _before, sec4, sub = design_parts(self.text)
         amended = [m.start() for m in re.finditer(r"^### Amended", sec4, re.M)]
         self.assertGreaterEqual(len(amended), 4)
-        self.assertLess(max(amended), len(sec4))
-        self.assertIn("### Amended (2026-11-23): what a report may quote from files it didn't read", sec4[max(amended):])
-        self.assertEqual(len(re.findall(r"^#{1,3} ", sec4[max(amended) + 4:], re.M)), 0, "no heading between the last Amended and As built")
+        self.assertEqual(len(re.findall(r"^### Amended", self.text, re.M)), len(re.findall(r"^### Amended", self.text[:self.text.index(AS_BUILT)], re.M)),
+                         "an Amended subsection comes after the As built heading")
+        # the heading just before As built (inside section 4) is an Amended one, and nothing sits between them but its text
+        headings = re.findall(r"^#{1,6} .*$", sec4, re.M)
+        self.assertTrue(headings[-1].startswith("### Amended"), headings[-1])
+        self.assertEqual(re.findall(r"^#{1,6} .*$", sub, re.M), [AS_BUILT])
+        self.assertTrue(self.text.rstrip().endswith(sub.rstrip()))
+
+    def test_the_subsections_of_section_4_run_parts_one_to_eight_then_the_amendments_in_date_order(self):
+        # holds over time: it says nothing about how many amendments there are, only how they are laid out
+        _before, sec4, _sub = design_parts(self.text)
+        subs = re.findall(r"^### (.*)$", sec4, re.M)
+        parts = [h for h in subs if h.startswith("Part ")]
+        self.assertEqual([h.split(":")[0] for h in parts], ["Part %d" % n for n in range(1, 9)])
+        amended = [h for h in subs if h.startswith("Amended ")]
+        self.assertEqual(subs, parts + amended, "every Part comes before every Amended subsection")
+        dates = [re.match(r"Amended \((\d{4}-\d{2}-\d{2})\): ", h) for h in amended]
+        self.assertTrue(all(dates), amended)
+        stamps = [m.group(1) for m in dates]
+        self.assertEqual(stamps, sorted(stamps), "the amendments are out of date order")
+
+    def test_the_layout_check_sees_an_amendment_moved_out_of_order(self):
+        _before, sec4, _sub = design_parts(self.text)
+        subs = re.findall(r"^### (.*)$", sec4, re.M)
+        amended = [h for h in subs if h.startswith("Amended ")]
+        stamps = [re.match(r"Amended \((\d{4}-\d{2}-\d{2})\)", h).group(1) for h in amended]
+        self.assertGreater(len(set(stamps)), 1)
+        self.assertNotEqual(list(reversed(stamps)), sorted(stamps))
 
     def test_section_4_holds_no_other_as_built(self):
         _before, sec4, sub = design_parts(self.text)
         self.assertEqual(re.findall(r"^### As built", sec4, re.M), [])
         self.assertEqual(len(re.findall(r"^### As built", self.text, re.M)), 4)
         self.assertEqual(len(re.findall(r"^### As built", sub, re.M)), 1)
-
-    def test_nothing_else_in_the_design_changed_against_the_state_before_this_batch(self):
-        head = git_show("HEAD:docs/design.md")
-        if head is None:
-            self.skipTest("no git history to compare with")
-        before, sec4, _sub = design_parts(self.text)
-        h_before, h_sec4, _h_sub = design_parts(head)
-        # HEAD may already hold the new subsection once this batch is committed; both are cut at its heading
-        self.assertEqual(before, h_before, "the text above section 4 changed")
-        self.assertEqual(sec4.rstrip(), h_sec4.rstrip(), "section 4 changed above the new heading")
-
-    def test_the_comparison_sees_a_changed_word_in_section_4(self):
-        head = git_show("HEAD:docs/design.md")
-        if head is None:
-            self.skipTest("no git history to compare with")
-        _b, sec4, _s = design_parts(self.text)
-        _hb, h_sec4, _hs = design_parts(head)
-        i = sec4.index("Amended (2026-11-23): the part size is 450 files")
-        self.assertNotEqual((sec4[:i] + "x" + sec4[i:]).rstrip(), h_sec4.rstrip())
 
 
 class DesignAsBuiltFiguresTest(unittest.TestCase):

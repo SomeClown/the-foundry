@@ -1197,6 +1197,126 @@ What it costs: a route that lives only in vendored code no longer shows up
 in a report. That fits §1's rule that a skipped file is counted, not
 described.
 
+### Amended (2026-11-24): paths go into commands without being typed into them, and a brief that arrives broken
+
+Found by an independent review of the finished branch, before release.
+
+**Paths.** The area commands in Part 3 had the model type a folder or file
+path between single quotes: `awk -v d='<dir>/'`. Paths come from the repo
+being read, which nobody vouches for, and an area's definition travels on
+into the next brief and is typed again there. The reviewer ran three cases
+in a scratch repo, and I ran them again: a folder named `bob's notes/` makes
+the command a syntax error; a folder named to close the quote and carry a
+command of its own runs that command; and a path with a backslash or a
+double quote in it comes out of `git ls-files` wrapped in quotes with
+escapes, `core.quotepath=off` or not, while `awk -v` turns `\t` into a tab,
+so the piece matches nothing and a full area reads as empty.
+
+**Calls I made** (not the owner's; cold-read by `the-foundry:architect`
+before any builder was briefed, and the ten gaps that read found are settled
+here):
+
+- **No path from the repo is typed into a command, between quotes or not.**
+  That holds for every command the agent runs, not only the area commands:
+  line counts, the count of the block's area lines (an area line holds
+  paths), and a search for a name a reader reported. The cold read found the
+  last three by running them: the block's count example printed a planted
+  marker under one shell.
+- **How a path gets in.** One path to a variable, through a three-line
+  here-document: `IFS= read -r p1 <<'/END'`, the path on a line of its own
+  exactly as the listing printed it, then `/END`. The quoted delimiter makes
+  the shell take the line as it is. The delimiter starts with `/` because no
+  listed path does, so no file's name can end it early (a plain word could:
+  a root file called `END` would). The command gets the variable in its
+  environment, written `d="${p1:?}"`, so an empty or unset one stops the
+  command with an error where it would otherwise match every file, and
+  `awk` reads it from `ENVIRON`, which leaves backslashes alone. There's no
+  escaping step for the model to get right: the only step is pasting. The
+  form with `$(cat <<…)` was tried and dropped, since the stock bash on
+  macOS can't parse it around a path that holds `)` and `'`.
+- **Line counts and the block's count** take their paths the same way: a
+  listing piped through `tr '\n' '\0' | xargs -0 wc -l --`, or the paths
+  pasted into a here-document that feeds it; the block's area lines pasted
+  between `wc -l <<'/END'` and `/END`. A name from a reader's report is
+  looked up with the Grep tool, never a `grep` with the name typed in.
+- **The listing prints every path as it is.** In git it becomes
+  `git ls-files -z | tr '\0' '\n'` (with the brief's wrapper in place of
+  `git`), which never quotes. This replaces Part 3's "with git's path
+  quoting off". For ordinary paths it's the same listing byte for byte (it
+  was compared on the 990-file test repo), so areas already written in a
+  brief still rebuild. The `find` listing outside git already prints paths
+  as they are.
+- **What still can't be carried.** An area line writes its paths between
+  backticks, one line each, so a path with a backtick or a control
+  character in it (a tab, a line break) is never a piece, a skipped folder
+  or a range end. The model uses a piece that holds it without naming it,
+  such as the folder above it, or ends the range on the path beside it. A
+  top-level folder with such a name is skipped whole in part 1, with that
+  as its reason. A path with a line break in it shows as two lines of the
+  listing that aren't real paths: each lands in whatever area its text
+  falls in, the reader sent for it reports no such file, and Coverage names
+  both halves unread. The exactly-once check sorts its listing side, so
+  such a path doesn't make it fail forever. None of this has turned up in a
+  real run.
+- The notation in Part 3 doesn't change, and neither does what an area
+  means. Only the commands that rebuild one do. The scorer rebuilds areas
+  from the same listing.
+
+**A continuing brief that arrives broken.** Part 5 says what a continuing
+run does with the brief it should get. It didn't say what to do with one
+that was cut off or mangled on the way, which a session that copied a block
+out of a preview could send.
+
+**Calls I made** (same standing):
+
+- **No `END OF BLOCK` line, or no area line before it:** the brief was cut
+  off. The run reads nothing and replies with two fixed lines and nothing
+  else: a sentence saying the brief has no `END OF BLOCK` line or no area
+  line, that nothing was read, and to send it again with the whole block
+  copied from the previous part's full text; then `INVESTIGATE REPORT ENDS`.
+  It's the one reply that isn't a part and carries no sections and no
+  Coverage. Its first line is a sentence, not a flag, so `NOT A PER-FILE
+  READ` is still the only first-line flag (Part 1).
+- **The session's side of that.** Its rule for a continuing brief answered
+  without a `SWEEP IN PARTS` line already gives one more try. The
+  orchestrator's notes now say to copy the block afresh from the previous
+  part's full text before that try (its saved output, if the part arrived
+  as a preview), since sending the same cut brief gets the same reply. They
+  also say, for every continuing brief, to copy from the full text and
+  never a preview, to add, fix or drop nothing, and to check that the block
+  holds as many area lines as the number on its first line. That last check
+  closes the one silent path the cold read found: a session that "repaired"
+  a cut block by adding `END OF BLOCK` would have sent a brief that passes,
+  and the lost areas would never have been named again.
+- **An area line that can't be read as one** (no count at its end, a
+  definition that doesn't follow the notation) is treated like an area that
+  matches nothing: dropped, not read, left out of the block, and named in
+  Coverage as `Area dropped: <the line as given>; can't be read as an area
+  line; not read.` So the sweep still ends, and when it does the session
+  tells the user of every `Area dropped:` and `Count changed:` line a part
+  carried.
+- **A listing that fails isn't a repo with nothing in it.** If the listing
+  command itself fails or prints nothing (a missing git wrapper will do
+  it), no area is dropped: every area goes back in the block, nothing is
+  read, and the error goes in a note. The session's rule for a part that
+  names the same areas again then gives it one more try and stops with the
+  user told.
+- **A missing `Project:`, `Focus:` or `Environment:` line** is carried on as
+  `none`, with a note in Coverage naming it. A missing `Instructions:` line
+  is carried on as `none` without a note, as before.
+
+**Smaller things the same review found,** settled in the agent's text and
+the orchestrator's notes without changing what §4 means: a
+`Read only these files:` list is the whole scope of a scoped follow-up and
+replaces any list or scope in the brief above it; the session's rule for a
+report without its last line covers one-report sweeps and scoped reads, not
+only parts; an area put back in the block after a refused spawn has left
+the part (it isn't under `Areas read:`, in `Files listed:` or in the mode
+line's count); a continuing run without `Agent` lists unread files by path,
+and that wins over the per-folder counts of a first run's single-agent
+report. The scorer says in its summary when it was given no transcript, so
+its read numbers are then the parts' own.
+
 ### As built (2026-11-24)
 
 What was built against §4, for a reader who wasn't here. The approved text

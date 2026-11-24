@@ -10,7 +10,9 @@ No model session starts here. Standard library only; runs on Python 3.9.
 """
 
 import json
+import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -32,6 +34,9 @@ WHOLE_LATER = "Whole repo: given in part 1."
 INSTRUCTIONS = ("Instructions: In the route inventory, give every route its full path on its own line, never grouped under a prefix; "
                 "give every CLI subcommand as `twctl <name>`")
 
+
+# the summary of a run scored without --transcript ends with this note: the readers weren't checked, the read numbers are the parts' own
+NO_TRANSCRIPT_NOTE = "; readers: not checked; read, unread and failed are the parts' own numbers (--transcript checks them)"
 
 NOTE_2 = "NOTE: part-2.md names an untracked path that only part 1 should list: %s"
 
@@ -2122,7 +2127,7 @@ class PartSizeOutputTest(PartSizeBase):
     def test_without_the_argument_the_output_is_the_old_two_lines_exactly(self):
         code, out = run_script(build_parts(base_areas()))
         self.assertEqual(code, 0)
-        self.assertEqual(out, "LOOP PROVED\n" + self.old_summary() + "\n")
+        self.assertEqual(out, "LOOP PROVED\n" + self.old_summary() + NO_TRANSCRIPT_NOTE + "\n")
 
     def test_without_the_argument_no_largest_part_and_no_note_ever(self):
         for parts in (build_parts(base_areas()), build_parts(base_areas(), cuts=(9,)), build_parts(base_areas(), cuts=SMALL_PARTS)):
@@ -2143,7 +2148,7 @@ class PartSizeOutputTest(PartSizeBase):
 
     def test_with_the_argument_the_summary_gains_the_largest_part_and_nothing_else_changes(self):
         out = self.sized(450)[1]
-        self.assertEqual(out, "LOOP PROVED\n" + self.old_summary() + "; largest part: 368 files\n")
+        self.assertEqual(out, "LOOP PROVED\n" + self.old_summary() + "; largest part: 368 files" + NO_TRANSCRIPT_NOTE + "\n")
 
     def test_the_largest_part_is_the_biggest_not_the_first_or_last(self):
         out = self.sized(1000, build_parts(base_areas(), cuts=(2, 12)))[1]
@@ -2452,8 +2457,8 @@ class TotalsTest(Base):
     def test_a_proved_run_says_read_945_of_945_in_its_summary(self):
         code, out = run_script(self.parts)
         self.assertEqual(code, 0, out)
-        self.assertEqual(out, "LOOP PROVED\nparts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d\n"
-                         % len(Fixture.key["decoys"]))
+        self.assertEqual(out, "LOOP PROVED\nparts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d%s\n"
+                         % (len(Fixture.key["decoys"]), NO_TRANSCRIPT_NOTE))
 
     def test_unread_above_zero_in_a_part_fails_naming_the_part_and_the_number(self):
         parts = set_listed(self.parts, "part-3.md", read=self.l3[1] - 62, unread=62)
@@ -3116,12 +3121,26 @@ class TranscriptProvedTest(TranscriptBase):
         out = self.assertTranscriptProved(self.run_t(extra=["--part-size", "450"]))
         self.assertTrue(out.splitlines()[1].endswith("; largest part: 368 files" + SUMMARY_READERS), out)
 
-    def test_without_the_transcript_option_no_word_of_the_check_appears(self):
+    def test_without_the_transcript_option_no_line_of_the_check_appears_and_the_summary_says_so(self):
+        # what the old test protected: no transcript failure line, no readers count. What it now says instead: the readers weren't checked.
         for parts in (self.parts, edit(self.parts, "part-3.md", "failed: 0;", "failed: 2;")):
             code, out = run_script(parts)
-            self.assertNotIn("transcript", out)
-            self.assertNotIn("readers", out)
+            self.assertFalse([l for l in out.splitlines() if l.startswith("transcript:") or l.startswith("NOTE: transcript")], out)
+            self.assertNotRegex(out, r"readers: \d+ of \d+")
             self.assertNotIn("once each", out)
+            if code == 0:
+                summary = out.splitlines()[1]
+                self.assertTrue(summary.endswith(NO_TRANSCRIPT_NOTE), summary)
+                self.assertIn("readers: not checked", summary)
+                self.assertIn("the parts' own numbers", summary)
+        self.assertEqual(run_script(self.parts)[0], 0)
+
+    def test_with_the_transcript_option_the_no_transcript_note_is_absent(self):
+        out = self.assertTranscriptProved(self.run_t())
+        self.assertNotIn("not checked", out)
+        self.assertNotIn("--transcript", out)
+        self.assertNotIn("parts' own numbers", out)
+        self.assertTrue(out.splitlines()[1].endswith(SUMMARY_READERS), out)
 
     def test_a_readers_path_line_with_trailing_commentary_is_read_by_its_first_token(self):
         events = self.events()
@@ -3638,10 +3657,20 @@ class TranscriptMutationTest(MutantBase):
         self.assertEqual(self.run_at(SCRIPT, events)[0], 0)
         self.assertEqual(self.run_at(m, events)[0], 1)
 
+    READERS_EXPR = ('+ ("; readers: %d of %d, once each" % readers if readers else\n'
+                    '             "; readers: not checked; read, unread and failed are the parts\' own numbers (--transcript checks them)")')
+
     def test_a_summary_without_the_readers_is_caught(self):
-        m = self.mutant('+ ("; readers: %d of %d, once each" % readers if readers else "")', '+ ""')
+        m = self.mutant(self.READERS_EXPR, '+ ""')
         self.assertIn(SUMMARY_READERS, self.run_at(SCRIPT, self.events())[1])
         self.assertNotIn("readers", self.run_at(m, self.events())[1])
+
+    def test_a_summary_without_the_no_transcript_note_is_caught(self):
+        m = self.mutant(self.READERS_EXPR, '+ ("; readers: %d of %d, once each" % readers if readers else "")')
+        self.assertIn(NO_TRANSCRIPT_NOTE, run_script(self.parts)[1])
+        code, out, err = run_script_at(m, self.parts)
+        self.assertEqual(code, 0)
+        self.assertNotIn("not checked", out)
 
     def test_a_crash_on_an_odd_transcript_is_exit_2_and_without_the_handler_it_would_be_exit_1(self):
         events = self.events()
@@ -3653,6 +3682,179 @@ class TranscriptMutationTest(MutantBase):
         self.assertEqual(self.run_at(m, events)[0], 1)
 
 
+
+
+# ---------------------------------------------------------------- names the old listing quoted: the scorer reads `git ls-files -z`
+
+def load_scorer_module():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("check_parts_hostile_under_test", str(SCRIPT))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# a backslash followed by t, a double quote, a single quote, a non-ASCII letter, a trailing backslash
+HOSTILE_NAMES = ["a\\tb/y.py", 'q"uote/z.py', "bob's notes/x.md", "café/m.txt", "tail\\/t.py", "plain/p.py", "vendor/v.js"]
+
+
+class HostileNamesTest(unittest.TestCase):
+    """A tiny repo, not the fixture: folders with odd names, behind a `bin/git` that passes everything to the real git
+    and logs what it was asked."""
+
+    @classmethod
+    def setUpClass(cls):
+        real = shutil.which("git")
+        if not real:
+            raise unittest.SkipTest("no git")
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.base = Path(cls.tmp.name)
+        cls.repo = cls.base / "repo"
+        (cls.repo / "bin").mkdir(parents=True)
+        wrapper = cls.repo / "bin" / "git"
+        wrapper.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$(dirname \"$0\")/calls.log\"\nexec \"" + real + "\" \"$@\"\n", encoding="utf-8")
+        wrapper.chmod(0o755)
+        cls.env = {"PATH": os.environ["PATH"], "HOME": str(cls.base), "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+                   "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        cls.git("init", "-q", "-b", "main")
+        cls.created = []
+        for name in HOSTILE_NAMES:
+            path = cls.repo / name
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x = 1\n", encoding="utf-8")
+            except OSError:
+                continue
+            cls.created.append(name)
+        (cls.repo / "scratch.md").write_text("untracked\n", encoding="utf-8")
+        cls.git("add", *cls.created)
+        cls.git("commit", "-q", "-m", "all")
+        cls.scorer = load_scorer_module()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    @classmethod
+    def git(cls, *args):
+        done = subprocess.run(["git", *args], cwd=str(cls.repo), env=cls.env, capture_output=True)
+        assert done.returncode == 0, done.stderr
+        return done.stdout
+
+    def test_the_names_the_old_listing_quoted_were_created(self):
+        for must in ("a\\tb/y.py", 'q"uote/z.py', "bob's notes/x.md", "café/m.txt"):
+            self.assertIn(must, self.created)
+
+    def test_tracked_files_returns_the_raw_bytes_of_every_path_exactly_as_it_is(self):
+        got = self.scorer.tracked_files(str(self.repo))
+        self.assertEqual(sorted(got), sorted(n.encode("utf-8") for n in self.created))
+        self.assertIn(b"a\\tb/y.py", got)       # a backslash and a t, not a tab and not a quoted form
+        self.assertIn(b'q"uote/z.py', got)
+        self.assertIn("café/m.txt".encode("utf-8"), got)
+        for path in got:
+            self.assertNotEqual(path[:1], b'"')  # git's own quoting wraps a path in double quotes
+
+    def test_the_listing_is_asked_for_with_z_and_without_quotepath(self):
+        log = self.repo / "bin" / "calls.log"
+        if log.exists():
+            log.unlink()
+        self.scorer.tracked_files(str(self.repo))
+        self.assertEqual(log.read_text(encoding="utf-8").splitlines(), ["ls-files -z"])
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('[git, "ls-files", "-z"]', source)
+        self.assertNotIn("quotepath", source)
+        self.assertIn('split(b"\\0")', source)
+
+    def test_an_area_for_each_hostile_folder_rebuilds_to_its_one_file(self):
+        tracked = self.scorer.tracked_files(str(self.repo))
+        cases = (
+            ("`a\\tb/`", {b"a\\tb/y.py"}),
+            ('`q"uote/`', {b'q"uote/z.py'}),
+            ("`bob's notes/`", {b"bob's notes/x.md"}),
+            ("`café/`", {"café/m.txt".encode("utf-8")}),
+            ("`tail\\/`", {b"tail\\/t.py"}),
+            ('`a\\tb/` + `q"uote/`', {b"a\\tb/y.py", b'q"uote/z.py'}),
+            ("`plain/` except `plain/sub/`", {b"plain/p.py"}),
+        )
+        for definition, want in cases:
+            with self.subTest(definition=definition):
+                pieces = self.scorer.parse_definition(definition)
+                self.assertIsInstance(pieces, list, pieces)
+                self.assertEqual(self.scorer.rebuild(pieces, tracked), want)
+
+    def test_the_fixture_listing_is_still_990_files_and_equals_the_newline_listing(self):
+        got = [p.decode("utf-8") for p in self.scorer.tracked_files(str(Fixture.repo))]
+        self.assertEqual(len(got), 990)
+        self.assertEqual(got, Fixture.tracked)
+
+    def parts_for(self):
+        """A three-part report for areas a, b and c, written by hand in the shapes the agent file's templates give."""
+        def part(block, read_line, count, rest_n, rest_m, whole):
+            lines = list(block) + ["", "### 1. Project Identity", "A toy repo.", "", "### 8. Coverage", "Mode: full sweep, 1 area leads",
+                                   "Files listed: %d; read: %d; skipped: 0; re-dispatched: 0; failed: 0; unread: 0" % (count, count),
+                                   "Skip reasons: none in this part.", "Areas read:", read_line,
+                                   "Areas not read: %d areas, %d files; see SWEEP IN PARTS at the top." % (rest_n, rest_m)] + whole + ["", "INVESTIGATE REPORT ENDS"]
+            return "\n".join(lines) + "\n"
+        head = ["To read the rest, dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first line, then every line from `Project:` to "
+                "`END OF BLOCK`, copied as it stands.",
+                "Project: a toy repo", "Focus: none", "Environment: none", "Instructions: none", "Areas not read:"]
+        a = "- a: `a\\tb/` + `q\"uote/` (2 files)"
+        b = "- b: `bob's notes/` + `plain/` (2 files)"
+        c = "- c: `café/` + `tail\\/` (2 files)"
+        whole1 = ["Whole repo: 7 tracked files; 1 in folders skipped whole (vendor/: 1, vendored); 1 untracked", "- scratch.md"]
+        later = ["Whole repo: given in part 1."]
+        return {
+            "part-1.md": part(["SWEEP IN PARTS: 2 areas not read"] + head + [b, c, "END OF BLOCK"], a, 2, 2, 4, whole1),
+            "part-2.md": part(["SWEEP IN PARTS: 1 areas not read"] + head + [c, "END OF BLOCK"], b, 2, 1, 2, later),
+            "part-3.md": part(["SWEEP IN PARTS: 0 areas not read"], c, 2, 0, 0, later),
+        }
+
+    def key_file(self):
+        key = {"facts": [{"id": "f1", "kind": "route", "path": "a\\tb/y.py", "line": 1, "token": "TOKENONE"}],
+               "decoys": [{"id": "d1", "why": "vendored", "path": "vendor/v.js", "token": "DECOYONE"}],
+               "layout": {"tracked": 7, "skipped_whole": {"vendor/": 1}, "untracked": ["scratch.md"]}}
+        path = self.base / "key.json"
+        path.write_text(json.dumps(key), encoding="utf-8")
+        return path
+
+    def score(self, script=SCRIPT, parts=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            pdir = Path(tmp)
+            for name, text in (parts or self.parts_for()).items():
+                if name == "part-1.md":
+                    text = text.replace("A toy repo.", "A toy repo. Route TOKENONE is here.", 1)
+                (pdir / name).write_text(text, encoding="utf-8")
+            done = subprocess.run([sys.executable, "-I", str(script), "--key", str(self.key_file()), "--repo", str(self.repo), "--parts", str(pdir)],
+                                  capture_output=True, text=True)
+            return done.returncode, done.stdout + done.stderr
+
+    def test_a_report_whose_areas_are_the_hostile_folders_is_proved(self):
+        code, out = self.score()
+        self.assertEqual((code, out.splitlines()[0] if out else ""), (0, "LOOP PROVED"), out)
+
+    def test_a_report_that_names_the_wrong_folder_for_a_hostile_area_fails(self):
+        parts = self.parts_for()
+        parts["part-2.md"] = parts["part-2.md"].replace("- b: `bob's notes/` + `plain/` (2 files)", "- b: `plain/` + `plain/` (2 files)")
+        code, out = self.score(parts=parts)
+        self.assertEqual(code, 1, out)
+
+    def test_a_scorer_that_reads_the_quoting_listing_fails_the_same_report(self):
+        # the mutation: ask git for the newline listing, as the scorer did before. git quotes a path with a backslash, a double quote
+        # or a non-ASCII letter, so the areas no longer rebuild to the files that exist.
+        source = SCRIPT.read_text(encoding="utf-8")
+        old, new = '[git, "ls-files", "-z"]', '[git, "ls-files"]'
+        self.assertEqual(source.count(old), 1)
+        self.assertEqual(source.count('split(b"\\0")'), 1)
+        mutant = self.base / "check_parts_newline.py"
+        mutant.write_text(source.replace(old, new).replace('split(b"\\0")', 'split(b"\\n")'), encoding="utf-8")
+        self.assertEqual(self.score(script=SCRIPT)[0], 0)
+        code, out = self.score(script=mutant)
+        self.assertEqual(code, 1, out)
+
+    def test_git_without_z_would_have_quoted_these_names(self):
+        quoted = self.git("ls-files").decode("utf-8").splitlines()
+        self.assertTrue(any(line.startswith('"') for line in quoted), quoted)
+        self.assertIn('"a\\\\tb/y.py"', quoted)
 
 
 @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no stock python")
