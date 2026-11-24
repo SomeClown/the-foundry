@@ -111,7 +111,9 @@ asking, look. A few reads of the project's code and docs need no permission;
 just say what you found, especially when it changes the question. For bigger
 recon (web research, an upstream API's docs, an `investigate` dispatch on an
 unfamiliar codebase, whose report also feeds the architect later), say what
-you'd look for and offer to go.
+you'd look for and offer to go. On a big codebase its report can come back in
+parts, each opening with a `SWEEP IN PARTS` line; send each part back as the
+line says until it reads 0, and treat no single part as the whole codebase.
 
 **Think wide privately.** Before proposing an approach, come up with several
 and drop the weak ones, including any that fight what the user said they want.

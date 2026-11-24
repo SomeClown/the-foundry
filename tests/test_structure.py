@@ -933,6 +933,84 @@ class NoStopBeforeReadingTest(unittest.TestCase):
                 self.assertIsNone(re.search(self.PATTERN, kept))
 
 
+class BrainstormSweepInPartsLineTest(unittest.TestCase):
+    """Task 9: brainstorm's "Look before you ask" says an `investigate` report can come back in parts and what
+    to do with each. Whitespace is folded, so a re-wrap passes. debug and run-plan need nothing."""
+
+    SENTENCE = (
+        "On a big codebase its report can come back in parts, each opening with a `SWEEP IN PARTS` line; "
+        "send each part back as the line says until it reads 0, and treat no single part as the whole codebase."
+    )
+    RECON = "an `investigate` dispatch on an unfamiliar codebase"
+    START = "**Look before you ask.**"
+    END = "**Think wide privately.**"
+
+    def raw(self, *parts):
+        return ROOT.joinpath(*parts).read_text(encoding="utf-8")
+
+    def folded(self, text):
+        return " ".join(text.split())
+
+    def paragraph(self, text):
+        text = self.folded(text)
+        if self.START not in text:
+            return None
+        at = text.index(self.START)
+        end = text.find(self.END, at)
+        return text[at:end] if end != -1 else text[at:]
+
+    def pinned(self, text):
+        """True when the sentence sits in the paragraph, after the investigate recon clause."""
+        para = self.paragraph(text)
+        if para is None or self.RECON not in para or self.SENTENCE not in para:
+            return False
+        return para.index(self.RECON) < para.index(self.SENTENCE)
+
+    def brainstorm(self):
+        return self.raw("skills", "brainstorm", "SKILL.md")
+
+    def test_the_sentence_sits_in_look_before_you_ask_after_the_investigate_recon_clause(self):
+        self.assertTrue(self.pinned(self.brainstorm()))
+
+    def test_a_rewrap_of_the_sentence_still_passes(self):
+        rewrapped = self.brainstorm().replace(", each opening", ",\neach opening").replace("; send each", ";\nsend each")
+        self.assertNotEqual(rewrapped, self.brainstorm())
+        self.assertTrue(self.pinned(rewrapped))
+
+    def test_mutation_removing_the_sentence_fails_the_pin(self):
+        text = self.folded(self.brainstorm())
+        self.assertIn(self.SENTENCE, text)
+        self.assertFalse(self.pinned(text.replace(" " + self.SENTENCE, "")))
+
+    def test_mutation_moving_the_sentence_to_another_section_fails_the_pin(self):
+        text = self.folded(self.brainstorm())
+        moved = text.replace(" " + self.SENTENCE, "")
+        moved = moved.replace("## 5. Play the design back in numbered parts", "## 5. Play the design back in numbered parts " + self.SENTENCE, 1)
+        self.assertIn(self.SENTENCE, moved)
+        self.assertFalse(self.pinned(moved))
+
+    def test_mutation_putting_the_sentence_before_the_recon_clause_fails_the_pin(self):
+        text = self.folded(self.brainstorm())
+        moved = text.replace(" " + self.SENTENCE, "").replace(self.START, self.START + " " + self.SENTENCE, 1)
+        self.assertFalse(self.pinned(moved))
+
+    def test_sweep_in_parts_appears_once_in_the_file_and_on_one_line(self):
+        raw = self.raw("skills", "brainstorm", "SKILL.md")
+        self.assertEqual(raw.count("SWEEP IN PARTS"), 1)
+        self.assertEqual(self.folded(raw).count("SWEEP IN PARTS"), 1)
+        self.assertEqual(len([l for l in raw.splitlines() if "`SWEEP IN PARTS`" in l]), 1)
+
+    def test_debug_and_run_plan_hold_no_sweep_line_or_continue_line(self):
+        for name in ("debug", "run-plan"):
+            text = self.raw("skills", name, "SKILL.md")
+            for needle in ("SWEEP IN PARTS", "CONTINUE SWEEP"):
+                with self.subTest(skill=name, needle=needle):
+                    self.assertNotIn(needle, text)
+
+    def test_the_sentence_adds_no_cost_gate_and_asks_nothing_before_a_sweep(self):
+        self.assertIsNone(re.search(r"(?i)\bcosts?\b|approv|permission|confirm|\bask|\boffer|wait for|before (?:you )?(?:send|read|sweep)", self.SENTENCE))
+
+
 class InvestigateInstructionsLineTest(unittest.TestCase):
     """The block's `Instructions:` line (design section 4, last amendment): each rule is pinned in "The Block"
     and shown able to fail by deleting the matched phrase."""
