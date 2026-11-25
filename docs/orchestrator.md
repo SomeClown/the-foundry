@@ -30,9 +30,44 @@ pushes.
 
 Routing:
 - Unfamiliar codebase or post-context-gap → `investigate` first; pass its
-  report to later agents instead of re-deriving it. If it replies
-  `STOPPED BEFORE READING`, ask the user; a yes goes back in a new brief that
-  says so.
+  report to later agents instead of re-deriving it. It never stops to ask, at
+  any size. A repo too big for one report comes back one part at a time, and
+  each part's first line (second, under `NOT A PER-FILE READ`) says what's
+  left. While that line isn't the `0` one:
+  1. Dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first
+     line, then every line from `Project:` to `END OF BLOCK` in the report,
+     copied as it stands. Copy it from the report's full text, never from a
+     preview, add, fix or drop nothing, and check it holds as many area lines
+     as the `<n>` on the report's `SWEEP IN PARTS` line. Don't ask the user.
+  2. Wait for it before anything else that starts agents.
+  3. Stop when a report says `SWEEP IN PARTS: 0 areas not read`. Then tell
+     the user the repo was read in parts, how many, and anything a part named
+     as unread. That includes every `Area dropped:` and `Count changed:` line.
+
+  A scoped read can come back with `SWEEP IN PARTS: <n> files not read`
+  instead. Send the original brief again, with "Read only these files:" and
+  the unread paths from its Coverage. That list replaces any file list or
+  scope the original brief gave. The loop ends when a report has no such line.
+- Every `investigate` report ends with `INVESTIGATE REPORT ENDS`. One that
+  doesn't was cut off, whatever kind of report it is, and is never passed on as
+  complete. A report that was cut off, a part that has no `SWEEP IN PARTS` line
+  when the brief was a `CONTINUE SWEEP` one, or that names the same areas
+  unread that its brief gave it, gets the same brief once more. If that fails
+  too, stop the sweep and tell the user which areas are unread; for one report,
+  tell the user it came back cut off twice. Send a `CONTINUE SWEEP` brief again
+  copied afresh from the previous part's full text (its saved file, if that
+  part arrived as a preview), since a brief cut off on the way comes back with
+  no `SWEEP IN PARTS` line and nothing read. For a scoped read, a report that
+  leaves the same paths unread gets the same brief once more, then you stop and
+  tell the user which files are unread.
+- A report that arrives as a preview, with the full text saved to a file: read
+  the saved file, which is the report. If it can't be read, stop the sweep
+  and tell the user that reports this size can't be handed back here. Don't
+  send the same brief again, and don't treat the preview as the report.
+- Keep one line per part saying which areas it covers, and hand later agents
+  the parts that cover what they need. You may save the parts to files
+  outside the tracked tree and hand over paths; ten parts in one conversation
+  crowd out everything else.
 - New feature or project with open choices → the `brainstorm` skill first; it
   writes the approved design to `docs/design.md`. Nothing gets built before
   the user approves it.
@@ -92,6 +127,13 @@ whether the session already knows the codebase. A new one gets a full sweep,
 one reader per file, unless the brief asks one narrow question or names the
 files; a known one gets a scoped read of only the files that matter, unless
 the brief asks for the whole thing.
+
+**Read the saved output, not the preview.** A long agent result can reach
+your session as a short preview with the full text saved to a file. The
+`SWEEP IN PARTS` block is at the top of a part, so the preview shows that it's
+a part, but the block and the rest of the report are in the file. In a live
+session that file read fine; in the eval harness it was blocked the one time
+it was tried (2026-11-05).
 
 **Don't re-run investigate out of habit.** Its report is reusable within a
 session. Re-run it after a context gap, a big landed change, or when you catch

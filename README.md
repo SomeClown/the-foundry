@@ -291,8 +291,11 @@ version, so you don't have to take my word for it:
   leads, and the one-level bound on leads holds at Claude Code's default nesting
   depth; a raised `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`, `claude --agent`, or
   running `investigate` as an agent-team teammate leaves only the instructions.
-  It stops above 500 files so your session can ask you first. That costs more than
-  one agent reading everything: on one test repo of 191 files, one full sweep
+  A repo with more than 450 tracked files to read, not counting folders skipped
+  whole such as vendored code, is read in parts: each report covers whole areas
+  and says which areas are left, and your session sends the next brief
+  without asking you. A per-file sweep costs more than one agent reading
+  everything: on one test repo of 191 files, one full sweep
   with the readers on Haiku cost about $2.31 and about 710 seconds a run (the
   mean of three eval runs, judge cost included), against about $0.47 and 109
   seconds for 1.7.6's single-agent read (the mean of three eval runs, labeled
@@ -349,9 +352,15 @@ version, so you don't have to take my word for it:
   harness's temporary workspace, run only if you also pass `--scaffold`, and
   `evals-expensive/` runs only with `--eval-dir evals-expensive`.
   `evals-expensive/compare.py` and `evals-expensive/sync_case.py` (Python) are
-  run by hand, read result JSON and the case files, and stay local; the
-  `evals-expensive/` scaffold writes a `bin/git` wrapper into its scratch
-  fixture. None of them touches the network. Installing from this GitHub
+  run by hand, read result JSON and the case files, and stay local.
+  Three more scripts there are run by hand too: `sync_big_sweep.py` runs the
+  big-sweep scaffold with `--emit-key` and writes generated files under
+  `evals-expensive/`; `check_parts.py` runs the fixture's `bin/git ls-files`
+  and reads the saved part files and, when given one, a transcript; and
+  `measure_reply.py` reads transcripts and result JSON. Each of the
+  `evals-expensive/` scaffolds that builds a repo writes a `bin/git` wrapper
+  into its scratch fixture. None of them touches the network, and none
+  starts a model session. Installing from this GitHub
   repository's own marketplace brings them along; they still run only when you
   run them.
 
