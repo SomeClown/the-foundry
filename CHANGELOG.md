@@ -24,8 +24,8 @@ on without asking.
   `SWEEP IN PARTS: <n> files not read` instead, and the session sends the
   original brief again with the unread paths.
 - Every report now ends with `INVESTIGATE REPORT ENDS` (an area lead's return
-  with `AREA REPORT ENDS`), so a cut-off report shows. A part with no last
-  line, or naming the same areas unread again, gets one retry, then the
+  with `AREA REPORT ENDS`), so a cut-off report shows. A report (or part) with
+  no last line, or naming the same areas unread again, gets one retry, then the
   session stops and says which areas are unread. A report that arrives as a
   preview is read from its saved output.
 - A lead that fails twice has its files listed unread by path, and the top
@@ -44,6 +44,15 @@ on without asking.
   time and area leads one at a time, never two leads in one message.
 - `docs/orchestrator.md` has the loop for the session, and `brainstorm`'s
   recon line says a sweep can come back in parts.
+- `investigate` never types a path from the repo into a command: each path
+  goes into a shell variable through a here-document, `awk` reads it from its
+  environment, and the listing is `git ls-files -z`, so a name with a quote, a
+  backslash, `$(…)` or a leading dash can't break the area commands or run as
+  one. Line counts and the block's count take their paths the same way.
+- A `CONTINUE SWEEP` brief that arrives cut off is answered without reading,
+  and the session copies the block again; an area line that can't be read is
+  dropped and quoted in Coverage; a `Read only these files:` list replaces any
+  other scope.
 
 ### Added
 - `evals-expensive/big-sweep-in-parts`: a generated test repo of 990 tracked
@@ -61,9 +70,11 @@ on without asking.
   line) and `evals-expensive/check_parts.py` (scores a sweep
   read in parts: every file read once, every planted fact found in the part
   that read its file, the counts and the block right, and, with `--transcript`,
-  its reads checked against the run's own transcript). Whether anybody asked is
-  for the `no-asking` grader and the session's final message, not the scorer.
-  All three run by hand, stay local and use no network.
+  its reads checked against the run's own transcript; without one it says
+  `readers: not checked`). Whether anybody asked is for the `no-asking`
+  grader and the session's final message, not the scorer. All three run by
+  hand, stay local and use no network. The big-sweep scaffold and its six
+  copies stop with exit 1 inside a git repo.
 
 ## [2.2.1] — 2026-11-23
 

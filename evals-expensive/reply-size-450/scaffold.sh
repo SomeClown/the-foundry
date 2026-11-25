@@ -599,8 +599,12 @@ for candidate in "$(xcrun --find git 2>/dev/null || true)" /Library/Developer/Co
   if [ -n "$candidate" ] && [ -x "$candidate" ]; then real_git="$candidate"; break; fi
 done
 [ -n "$real_git" ] || { echo "no git found" >&2; exit 1; }
-if "$real_git" rev-parse --git-dir >/dev/null 2>&1; then
-  echo "scaffold.sh: $(pwd) is inside a git repo already; run it in an empty folder outside any repo" >&2
+if [ -n "$(ls -A)" ]; then
+  echo "scaffold.sh: $(pwd) isn't empty; run it in an empty folder" >&2
+  exit 1
+fi
+if "$real_git" rev-parse --verify -q HEAD >/dev/null 2>&1; then
+  echo "scaffold.sh: $(pwd) is inside a git repo that has commits; run it in an empty folder outside any repo" >&2
   exit 1
 fi
 mkdir -p bin

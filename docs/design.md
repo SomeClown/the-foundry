@@ -1369,12 +1369,13 @@ estimate, not a measurement, and the amendment was corrected on 2026-11-24.
 has 990 tracked files, 950 after the vendored folder skipped whole, 945
 readable, 33 planted facts and 5 decoys. Its flat `rules/` folder holds 610
 files. `check_parts.py` scores the saved parts. From the parts it establishes
-that every readable file was read once, that unread and failed are 0, that
-each area line rebuilds to its count, that every fact is in the part that read
-its file, and that no decoy appears. With the run's transcript it also checks
-that every readable file had one reader started and completed, that each
-continuing brief is the previous block byte for byte, and that each part is
-the report the agent returned.
+that every tracked file outside the folder skipped whole is in exactly one
+area, that the parts say unread and failed are 0, that each area line rebuilds
+to its count, that every fact is in the part that read its file, and that no
+decoy appears. With the run's transcript it also checks that every readable
+file had one reader started and completed, that each continuing brief is the previous block byte for byte, and that each part is
+the report the agent returned. Without a transcript the summary says
+`readers: not checked`, and the read numbers are the parts' own.
 
 The runs of record are on the final text. Headless runs 9 and 10 both scored
 `LOOP PROVED`: three parts each (412, 366 and 172 files; then 404, 450 and 96),
@@ -1425,6 +1426,28 @@ changed, and the pass on the final text met the bar.
 - Task 8 started before Task 7 passed, since the Coverage rule changes every
   report, and the stored 1.7.6 baseline (2026-11-05, the same Claude Code
   version) was reused.
+- The three-line here-document, `IFS= read -r p1 <<'/END'`, has a delimiter
+  that starts with `/`. A word such as `END` is closed early by a root file of
+  that name, and the variable then comes out empty.
+- Each use is `d="${p1:?}"`, so an empty or unset variable stops the command
+  where `awk` would match every file. The one pipeline that ends in `uniq -c`
+  swallowed the stop (the shell's error, exit 0, nothing listed), so a guard,
+  `: "${<dir var>:?}" &&`, goes in front of it.
+- The listing is `git ls-files -z | tr '\0' '\n'`: git quotes a path with a
+  backslash or a double quote even with `core.quotepath` off, and `-z` never
+  quotes. On the 990-file repo it's byte for byte the old listing.
+- The exactly-once check sorts the listing side as well. A path with a line
+  break shows as two lines out of byte order, and without the sort the `diff`
+  failed forever.
+- Line counts take their paths from a listing piped through
+  `tr '\n' '\0' | xargs -0 wc -l --`, or from a here-document, and the block's
+  count from the area lines pasted between `wc -l <<'/END'` and `/END`. The old
+  `printf '%s\n' '<area line>' | wc -l` ran a planted command under zsh.
+- A reported name is looked up with the Grep tool, since a `grep` with the name
+  typed in has the same hole.
+- The scorer says `readers: not checked` without a transcript and keeps its
+  verdict words and exit codes, since several hundred tests score synthetic
+  parts without one.
 
 **What real runs did that the text forbids.**
 
@@ -1443,6 +1466,12 @@ changed, and the pass on the final text met the bar.
 - Mode words ("a new codebase") appeared on `Instructions:` once in six runs.
   Nothing was changed, and the build log doesn't record it again.
 
+An independent review before release found that the area commands had the
+model type repo paths between quotes. It was shown by running: a folder named
+to close the quote ran a planted command, `bob's notes/` was a syntax error,
+and a path with a backslash matched nothing. No run of the loop had hit it,
+because the test repo has no such names.
+
 **The harness.** It refuses a `timeout_seconds` over 3600, so the loop case
 has an hour at most. `--keep-temp` keeps each workspace with the session's own
 folder sealed, so the parts were rebuilt from the Write calls in the kept
@@ -1454,8 +1483,12 @@ the message itself.
 
 **Known limits and what's parked.**
 
-- Git's path quoting is turned off in every command. No test covers
-  non-ASCII paths.
+- A path with a backtick or a control character can't be written in an area
+  line, so it is covered by a parent piece, or skipped whole when it's a
+  top-level folder in part 1. A path with a line break shows as two lines and
+  is reported unread. The tests cover quotes, backslashes, `$(…)`, spaces,
+  dashes, non-ASCII, a carriage return and a line break, on the stock macOS
+  awk, bash 3.2 and zsh only; gawk and mawk are untried.
 - Density: a report's size depends on what the files hold, and a repo denser
   than the test repo could overflow a part. The open item stands.
 - The block grows with the repo, as the open item says. Nothing has been tried
@@ -1465,7 +1498,8 @@ the message itself.
 - The harness graders are weaker than the scorer (`finished` matches its phrase
   anywhere in the trace, `parts-saved` checks part 1 only), so the headless
   runs scored by the scorer are the proof.
-- The scaffold has no guard against running inside an existing repo.
+- The big-sweep scaffold stops inside a repo; the head-to-head's and the
+  smoke's don't.
 - In the loop case the session saves its parts inside the fixture, in
   `parts/`, which the fixture now leaves out of git's untracked list.
 - Nobody checks claims across parts, as the non-goals say.

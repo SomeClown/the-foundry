@@ -185,7 +185,8 @@ head-to-head's three requests (full route paths one to a line, commands as
 report to `parts/part-<n>.md`, sends back `CONTINUE SWEEP` while a report says
 areas are unread, and asks the user nothing. It has a 3600-second timeout,
 which is as high as the harness allows (it refuses a `timeout_seconds` over
-3600).
+3600). Its scaffold stops with exit 1 inside a git repo, so run it in an empty
+folder outside any repo.
 
 **`reply-size-150`, `-230`, `-320`, `-400`, `-450` and `-full`** are for
 measuring how big a report can be and still reach the session whole, on the
@@ -215,7 +216,7 @@ none starts a model session.
 - `check_parts.py --key KEY --repo FIXTURE_DIR --parts DIR [--min-parts N]
   [--part-size N] [--transcript FILE]` scores the saved parts. From the parts
   it establishes that every tracked file outside the folder skipped whole is
-  in exactly one area and was read once; that unread and failed are 0 and the
+  in exactly one area; that the parts say unread and failed are 0 and their
   skipped and read numbers add up to the key's; that every area line rebuilds
   to its count and no area holds more than 165 files; that each block is the
   one before it minus the areas just read, with the Coverage lines, the block
@@ -225,10 +226,12 @@ none starts a model session.
   `--transcript` (the run's own `claude -p` transcript) it also checks that
   each readable file had one reader started and completed, that each later
   `investigate` brief is `CONTINUE SWEEP` plus the previous part's block, and
-  that each part file is the report the agent returned. Two leads running at
-  once, and a later part that names an untracked path, are notes, not
-  failures. Exit 0 prints `LOOP PROVED`, exit 1 prints `LOOP FAILED` with a
-  line for each failure, and exit 2 prints `CAN'T CHECK:` with the reason.
+  that each part file is the report the agent returned. Without `--transcript`
+  the summary says `readers: not checked`, and the read numbers are the parts'
+  own. Two leads running at once, and a later part that names an untracked
+  path, are notes, not failures. Exit 0 prints `LOOP PROVED`, exit 1 prints
+  `LOOP FAILED` with a line for each failure, and exit 2 prints `CAN'T CHECK:`
+  with the reason.
 
 **How the part size was set.** Measured on 2026-11-23 in live headless
 sessions (`investigate` on Sonnet, readers on Haiku). With the plain brief, a

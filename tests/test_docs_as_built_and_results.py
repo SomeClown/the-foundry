@@ -500,7 +500,17 @@ class OrchestratorScopedRetryTest(PinTable, unittest.TestCase):
         self.assertIn("For a scoped read", b)
         self.assertEqual(len(re.findall(r"once more", b)), 2)  # the area retry above it, and this one
         self.assertEqual(len(re.findall(r"once more", b[b.index("For a scoped read"):])), 1)
-        self.assertNotRegex(b, r"(?i)\btwice\b|keeps? (?:trying|going)|until (?:it|they) (?:work|succeed)|as many times")
+        # one retry then a stop: no second or third retry, no loop. Saying a single report "came back cut off twice" is a report of what
+        # happened, not a retry count, so only "twice" used for retrying is out.
+        self.assertNotRegex(b, r"(?i)(?:retr(?:y|ies)|tr(?:y|ies)|send(?:s|ing)?|again|resend)\s+(?:it\s+)?twice|twice\s+(?:more|again)|keeps? (?:trying|going)|until (?:it|they) (?:work|succeed)|as many times")
+        self.assertEqual(len(re.findall(r"\btwice\b", b)), len(re.findall(r"cut off twice", b)))
+
+    def test_the_no_loop_check_still_catches_a_retry_twice_wording(self):
+        pattern = r"(?i)(?:retr(?:y|ies)|tr(?:y|ies)|send(?:s|ing)?|again|resend)\s+(?:it\s+)?twice|twice\s+(?:more|again)"
+        for bad in ("then retry twice", "try it twice", "send the brief again twice", "gets one more go, twice more"):
+            with self.subTest(bad=bad):
+                self.assertRegex(bad, pattern)
+        self.assertNotRegex("tell the user it came back cut off twice", pattern)
 
     def test_the_scoped_retry_doesnt_tell_the_session_to_ask(self):
         b = self.bullet()
@@ -896,6 +906,116 @@ class DesignAsBuiltPlacementTest(unittest.TestCase):
         self.assertEqual(re.findall(r"^### As built", sec4, re.M), [])
         self.assertEqual(len(re.findall(r"^### As built", self.text, re.M)), 4)
         self.assertEqual(len(re.findall(r"^### As built", sub, re.M)), 1)
+
+
+class ChangelogReviewBatchTest(unittest.TestCase):
+    """The Unreleased entry's bullets for the paths-and-broken-briefs batch, found by content (as the release-proof tests do)."""
+
+    PINS = [
+        ("no path typed into a command: a shell variable through a here-document",
+         "`investigate` never types a path from the repo into a command: each path goes into a shell variable through a here-document,"),
+        ("awk reads it from its environment and the listing is git ls-files -z",
+         "`awk` reads it from its environment, and the listing is `git ls-files -z`,"),
+        ("a name with a quote, a backslash, a command substitution or a leading dash can't break or run", "so a name with a quote, a backslash, `$(…)` or a leading dash can't break the area commands or run as one."),
+        ("line counts and the block's count take their paths the same way", "Line counts and the block's count take their paths the same way."),
+        ("a cut-off CONTINUE SWEEP brief is answered without reading and the block is copied again",
+         "A `CONTINUE SWEEP` brief that arrives cut off is answered without reading, and the session copies the block again;"),
+        ("an unreadable area line is dropped and quoted; the Read only list replaces any other scope",
+         "an area line that can't be read is dropped and quoted in Coverage; a `Read only these files:` list replaces any other scope."),
+        ("a report or part with no last line gets the retry", "A report (or part) with no last line"),
+        ("the scorer says readers not checked without a transcript", "without one it says `readers: not checked`"),
+        ("the big-sweep scaffold and its six copies carry a guard", "The big-sweep scaffold and its six copies"),
+    ]
+
+    def entry(self):
+        return fold(ChangelogTest.unreleased(raw("CHANGELOG.md")))
+
+    def test_every_pin_holds_in_the_unreleased_entry(self):
+        self.assertEqual(missing(self.entry(), self.PINS), [])
+
+    def test_deleting_each_phrase_fails_that_pin_and_only_that_pin(self):
+        folded = self.entry()
+        for name, phrase in self.PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(folded, phrase), self.PINS), [name])
+
+    def test_the_two_new_bullets_are_under_changed_and_the_guard_is_mentioned_under_added(self):
+        text = ChangelogTest.unreleased(raw("CHANGELOG.md"))
+        changed, added = text.index("### Changed"), text.index("### Added")
+        for phrase in ("never types a path from the repo", "arrives cut off is answered without reading"):
+            with self.subTest(phrase=phrase):
+                self.assertGreater(text.index(phrase), changed)
+        self.assertGreater(text.index("The big-sweep scaffold"), min(changed, added))
+        self.assertRegex(fold(text), r"(?i)scaffold.{0,80}(?:stop|refus).{0,60}(?:exit 1|empty)")  # loosely: a docs follow-up rewords how
+
+
+class EvalsReadmeReviewBatchTest(unittest.TestCase):
+    PINS = [
+        ("the parts say unread and failed are 0 and their numbers add up", "that the parts say unread and failed are 0 and their"),
+        ("without a transcript the summary says readers not checked",
+         "Without `--transcript` the summary says `readers: not checked`, and the read numbers are the parts' own."),
+    ]
+
+    def text(self):
+        return fold(raw("evals/README.md"))
+
+    def test_pins_hold_and_each_fails_on_deletion(self):
+        self.assertEqual(missing(self.text(), self.PINS), [])
+        for name, phrase in self.PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(self.text(), phrase), self.PINS), [name])
+
+    def test_the_readme_says_the_big_sweep_scaffold_guards_where_it_runs_without_pinning_how(self):
+        # seen: "Its scaffold stops with exit 1 inside a git repo, so run it in an empty folder outside any repo." (before fix round 2)
+        self.assertRegex(self.text(), r"(?i)scaffold.{0,60}(?:stops|refuses).{0,200}empty folder")
+
+
+class DesignAsBuiltReviewBatchTest(unittest.TestCase):
+    PINS = [
+        ("the proof says readers not checked without a transcript",
+         "Without a transcript the summary says `readers: not checked`, and the read numbers are the parts' own."),
+        ("every tracked file outside the skipped folder is in exactly one area", "that every tracked file outside the folder skipped whole is in exactly one area"),
+        ("call: the here-document delimiter starts with a slash", "has a delimiter that starts with `/`."),
+        ("call: a word delimiter is closed early by a root file of that name", "A word such as `END` is closed early by a root file of that name"),
+        ("call: each use is guarded with colon-question-mark", "so an empty or unset variable stops the command where `awk` would match every file."),
+        ("call: the uniq pipeline needed a guard in front", "swallowed the stop (the shell's error, exit 0, nothing listed), so a guard,"),
+        ("call: the listing is git ls-files -z through tr", "The listing is `git ls-files -z | tr '\\0' '\\n'`: git quotes a path with a backslash or a double quote even with `core.quotepath` off, and `-z` never quotes."),
+        ("call: the exactly-once check sorts the listing side", "The exactly-once check sorts the listing side as well."),
+        ("call: line counts through tr and xargs or a here-document, and the block's count between wc -l and the delimiter",
+         "Line counts take their paths from a listing piped through `tr '\\n' '\\0' | xargs -0 wc -l --`, or from a here-document, and the block's count from the area lines pasted between `wc -l <<'/END'` and `/END`."),
+        ("call: a reported name is looked up with the Grep tool", "A reported name is looked up with the Grep tool, since a `grep` with the name typed in has the same hole."),
+        ("call: the scorer says readers not checked and keeps its verdict words", "The scorer says `readers: not checked` without a transcript and keeps its verdict words and exit codes"),
+        ("review paragraph: found by an independent review before release", "An independent review before release found that the area commands had the model type repo paths between quotes."),
+        ("review paragraph: shown by running three cases", "It was shown by running: a folder named to close the quote ran a planted command, `bob's notes/` was a syntax error, and a path with a backslash matched nothing."),
+        ("review paragraph: no run had hit it", "No run of the loop had hit it, because the test repo has no such names."),
+        ("known limits: a path with a backtick or a control character is covered by a parent piece", "A path with a backtick or a control character can't be written in an area line, so it is covered by a parent piece"),
+    ]
+
+    def sub(self):
+        return fold(design_parts(raw("docs/design.md"))[2])
+
+    def test_every_pin_holds_in_the_subsection(self):
+        self.assertEqual(missing(self.sub(), self.PINS), [])
+
+    def test_deleting_each_phrase_fails_that_pin_and_only_that_pin(self):
+        folded = self.sub()
+        for name, phrase in self.PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(folded, phrase), self.PINS), [name])
+
+    def test_the_seven_new_calls_are_lines_of_the_calls_made_list(self):
+        sub = design_parts(raw("docs/design.md"))[2]
+        calls = sub[sub.index("**Calls made during the build**"):]
+        bullets = ["- " + b for b in ("\n" + calls).split("\n- ")[1:]]
+        mine = [b for b in bullets if fold(b)[2:].startswith(("The three-line here-document", "Each use is", "The listing is", "The exactly-once check sorts",
+                                                          "Line counts take", "A reported name", "The scorer says"))]
+        self.assertEqual(len(mine), 7)
+
+    def test_the_subsection_mentions_the_scaffold_guard_without_pinning_how(self):
+        # seen: "The big-sweep scaffold stops inside a repo; the head-to-head's and the smoke's don't." (before fix round 2)
+        t = self.sub()
+        self.assertRegex(t, r"(?i)big-sweep scaffold (?:stops|refuses)")
+        self.assertIn("head-to-head", t[t.index("big-sweep scaffold"):])
 
 
 class DesignAsBuiltFiguresTest(unittest.TestCase):

@@ -36,23 +36,30 @@ Routing:
   left. While that line isn't the `0` one:
   1. Dispatch `investigate` again. The brief is `CONTINUE SWEEP` on its first
      line, then every line from `Project:` to `END OF BLOCK` in the report,
-     copied as it stands. Don't ask the user.
+     copied as it stands. Copy it from the report's full text, never from a
+     preview, add, fix or drop nothing, and check it holds as many area lines
+     as the `<n>` on the report's `SWEEP IN PARTS` line. Don't ask the user.
   2. Wait for it before anything else that starts agents.
   3. Stop when a report says `SWEEP IN PARTS: 0 areas not read`. Then tell
      the user the repo was read in parts, how many, and anything a part named
-     as unread.
+     as unread. That includes every `Area dropped:` and `Count changed:` line.
 
   A scoped read can come back with `SWEEP IN PARTS: <n> files not read`
   instead. Send the original brief again, with "Read only these files:" and
-  the unread paths from its Coverage. The loop ends when a report has no
-  such line.
-- Every `investigate` report ends with `INVESTIGATE REPORT ENDS`. A part that
-  doesn't, that has no `SWEEP IN PARTS` line when the brief was a
-  `CONTINUE SWEEP` one, or that names the same areas unread that its brief
-  gave it, gets the same brief once more. If that fails too, stop the sweep
-  and tell the user which areas are unread. For a scoped read, a report that
-  leaves the same paths unread gets the same brief once more, then you stop
-  and tell the user which files are unread.
+  the unread paths from its Coverage. That list replaces any file list or
+  scope the original brief gave. The loop ends when a report has no such line.
+- Every `investigate` report ends with `INVESTIGATE REPORT ENDS`. One that
+  doesn't was cut off, whatever kind of report it is, and is never passed on as
+  complete. A report that was cut off, a part that has no `SWEEP IN PARTS` line
+  when the brief was a `CONTINUE SWEEP` one, or that names the same areas
+  unread that its brief gave it, gets the same brief once more. If that fails
+  too, stop the sweep and tell the user which areas are unread; for one report,
+  tell the user it came back cut off twice. Send a `CONTINUE SWEEP` brief again
+  copied afresh from the previous part's full text (its saved file, if that
+  part arrived as a preview), since a brief cut off on the way comes back with
+  no `SWEEP IN PARTS` line and nothing read. For a scoped read, a report that
+  leaves the same paths unread gets the same brief once more, then you stop and
+  tell the user which files are unread.
 - A report that arrives as a preview, with the full text saved to a file: read
   the saved file, which is the report. If it can't be read, stop the sweep
   and tell the user that reports this size can't be handed back here. Don't
