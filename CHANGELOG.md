@@ -74,7 +74,8 @@ on without asking.
   `readers: not checked`). Whether anybody asked is for the `no-asking`
   grader and the session's final message, not the scorer. All three run by
   hand, stay local and use no network. The big-sweep scaffold and its six
-  copies stop with exit 1 inside a git repo.
+  copies stop with exit 1 in a folder that isn't empty, and in an empty folder
+  inside a repo that has commits.
 
 ## [2.2.1] — 2026-11-23
 

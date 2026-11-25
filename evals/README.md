@@ -185,8 +185,10 @@ head-to-head's three requests (full route paths one to a line, commands as
 report to `parts/part-<n>.md`, sends back `CONTINUE SWEEP` while a report says
 areas are unread, and asks the user nothing. It has a 3600-second timeout,
 which is as high as the harness allows (it refuses a `timeout_seconds` over
-3600). Its scaffold stops with exit 1 inside a git repo, so run it in an empty
-folder outside any repo.
+3600). Its scaffold stops with exit 1 in a folder that isn't empty, and in an
+empty folder inside a repo that has commits, so run it in an empty folder
+outside any repo. An empty folder under an empty repo, which is what the
+harness's workspace is, builds.
 
 **`reply-size-150`, `-230`, `-320`, `-400`, `-450` and `-full`** are for
 measuring how big a report can be and still reach the session whole, on the
@@ -295,7 +297,7 @@ final message should ask the user nothing. In the harness, a session that
 stops and says reports this size can't be handed back is the right outcome if
 the parts arrive as previews it can't read.
 
-**The results, on the final text (2026-11-24).** Both headless runs scored
+**The results, on the text before the review's batch (2026-11-24).** Both headless runs scored
 `LOOP PROVED` with `--min-parts 3 --part-size 450 --transcript`, each with all
 33 facts, no decoy, and `read: 945 of 945` with `readers: 945 of 945, once
 each`. Each ran as three parts (one first brief, two `CONTINUE SWEEP`
@@ -312,27 +314,61 @@ Its kept workspace seals the session's folder, so the three parts were
 rebuilt from the Write calls in the kept trace and scored against a freshly
 built fixture, with the trace as the transcript: `LOOP PROVED`, no notes.
 
-It took fix rounds to get there. Ten headless runs were started and nine
-finished (run 8 was stopped by a safety classifier while the session saved
-part 2, and isn't counted). Four of the nine failed the scorer before the
-wording settled, and every failure was a line's format or a number in a
+It took fix rounds to get there. By run 10, ten headless runs were started
+and nine finished (run 8 was stopped by a safety classifier while the session
+saved part 2, and isn't counted). Four of the nine failed the scorer before
+the wording settled, and every failure was a line's format or a number in a
 report (an area line with notes inside its count, a wrong sum, a count of 8
 areas over a block of 7). None was a file left unread or a sweep that
-stopped. Each got a sentence in the agent's text, in three batches, besides the final review's.
+stopped. Each got a sentence in the agent's text, in three batches, besides
+the final review's.
 
-**The smoke and the head-to-head, on the final text.** `nesting-smoke` passed
-8 of 8 graders in 59 seconds ($0.42), and its report ended with
-`INVESTIGATE REPORT ENDS`. That one report opened with
-`SWEEP IN PARTS: 0 areas not read`, because the smoke's brief says to read its six files
-"exactly as you would above the size limit". All 8 graders pass either way,
-and the brief's wording is left for a follow-up. The head-to-head ran 3 times in 2,004 seconds
-($7.50 by the harness), every grader passed in all three, and no stored
-report holds a `SWEEP IN PARTS` line. `compare.py` against the stored 1.7.6
-baseline: the new version found 48, 48 and 48 of 48, missed 0 and made up 0,
-and scored `BAR MET`. One of the three passes run during the build scored
-`BAR MISSED`: `compare.py` read `fxctl X`, a placeholder inside a quoted
-docstring, as a made-up command. The scorer wasn't changed, and the pass on
-the final text met the bar.
+**The results, on the review's batch (2026-11-24).** The batch changed every
+command the model runs, so the proofs ran again on it. Three headless runs
+(13, 14 and 15) and one harness run: in all four the sweep ran to the end in
+three parts without asking, every one of the 945 readable files had one reader
+started and completed (the transcript check), and the model used the new
+command forms and none of the old. As the case defines a proof, the saved
+parts scored with the transcript:
+
+- Run 14 (2,793 s): `LOOP PROVED`, 33 of 33 facts, `readers: 945 of 945, once
+  each`.
+- Runs 13 and 15 (2,892 s and 3,065 s) aren't proofs. A safety classifier
+  stopped the session's write of the last part, and the session stopped and
+  said so. Both score `LOOP PROVED` on the reports as the agent returned them.
+- The harness run (2,361 s, $9.58, all six graders passed): `LOOP FAILED`.
+  Part 1 reported three files unread after an area lead summarised its
+  checklist in groups. The transcript shows every one of them was read.
+
+So two headless proofs in a row, the bar the plan set, was met on the text
+before the batch, and once on the text after it. Counting every headless run,
+fifteen were started: six proved, four failed the scorer, three were stopped
+by the classifier (8, 13 and 15), and two (11 and 12) were stopped by me and
+not used, when a bug came in.
+
+**The smoke and the head-to-head, on the text before the review's batch.**
+`nesting-smoke` passed 8 of 8 graders in 59 seconds ($0.42), and its report
+ended with `INVESTIGATE REPORT ENDS`. That one report opened with
+`SWEEP IN PARTS: 0 areas not read`, because the smoke's brief said to read its
+six files "exactly as you would above the size limit". The head-to-head ran 3
+times in 2,004 seconds ($7.50 by the harness), every grader passed in all
+three, and no stored report holds a `SWEEP IN PARTS` line. `compare.py`
+against the stored 1.7.6 baseline: the new version found 48, 48 and 48 of 48,
+missed 0 and made up 0, and scored `BAR MET`. One of the three passes run
+during the build scored `BAR MISSED`: `compare.py` read `fxctl X`, a
+placeholder inside a quoted docstring, as a made-up command. The scorer wasn't
+changed, and the pass on the final text met the bar.
+
+**The smoke and the head-to-head, on the review's batch.** The smoke's brief
+now says to run it as one area with one area lead, as for a repo of more than
+about 150 files, and that it still comes back as one report, not a sweep in
+parts. `nesting-smoke` passed 8 of 8 graders in 50 seconds ($0.39), and the
+report is one ordinary report again: it opens `Mode: full sweep, 1 area lead`
+and has no `SWEEP IN PARTS` block. The head-to-head ran 3 times in 2,045
+seconds ($7.79) and scored `BAR MET`. It found 48, 48 and 45 of 48 and made up
+nothing. The third run read every file and left out the three references
+planted as "runbook section" ones. It's the first run on the branch to miss a
+planted fact; the nine before found 48 of 48.
 
 **After a change to `investigate`,** run the nesting smoke and the
 head-to-head again, on top of the loop. They use a repo under 200 files, so

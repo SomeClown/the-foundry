@@ -1377,7 +1377,7 @@ file had one reader started and completed, that each continuing brief is the pre
 the report the agent returned. Without a transcript the summary says
 `readers: not checked`, and the read numbers are the parts' own.
 
-The runs of record are on the final text. Headless runs 9 and 10 both scored
+The runs of record on the text before the review's batch are these. Headless runs 9 and 10 both scored
 `LOOP PROVED`: three parts each (412, 366 and 172 files; then 404, 450 and 96),
 33 of 33 facts, 945 of 945 files read once, nothing asked, in 2,992 s and
 2,974 s. The harness run on the same text took 2,541 s and $9.80, passed all
@@ -1391,12 +1391,41 @@ nine, four failed the scorer and five proved. Every failure was a line's
 format or a number in a report; none was a file left unread or a sweep that
 stopped, and each got a sentence in the agent's text.
 
-Task 8 on the final text: `nesting-smoke` passed 8 of 8 graders (59 s,
+The review's batch changed every command the model runs, so the proofs ran
+again on it: three more headless runs (13, 14 and 15) and a harness run. In
+all four the sweep ran to the end in three parts without asking, every one of
+the 945 readable files had one reader started and completed (the transcript
+check), and the model used the new command forms and none of the old. As the
+case defines a proof, the saved parts scored with the transcript:
+
+- Run 14 (2,793 s) is `LOOP PROVED`: 33 of 33 facts, `readers: 945 of 945,
+  once each`.
+- Runs 13 and 15 (2,892 s and 3,065 s) aren't proofs. A safety classifier
+  stopped the session's write of the last part. Both score `LOOP PROVED` on the
+  reports as the agent returned them.
+- The harness run (2,361 s, $9.58, all six graders passed) is `LOOP FAILED`.
+  Part 1 reported three files unread after an area lead summarised its
+  checklist, though the transcript shows they were read.
+
+So two headless proofs in a row, the plan's bar, was met on the text before
+the batch and once on the text after it. Of fifteen headless runs, six proved
+(4, 5, 6, 9, 10, 14), four failed the scorer (1, 2, 3, 7), three were stopped
+by the classifier (8, 13, 15) and two (11, 12) were stopped by me and not
+used, when a bug came in.
+
+Task 8 on the text before the review's batch: `nesting-smoke` passed 8 of 8 graders (59 s,
 $0.42). The head-to-head found 48 of 48 in all three runs, missed 0 and made
 up 0, and scored `BAR MET` (2,004 s, $7.50). One of the three passes run
 during the build scored `BAR MISSED`: `compare.py` read `fxctl X`, a
 placeholder inside a quoted docstring, as a made-up command. The scorer wasn't
 changed, and the pass on the final text met the bar.
+
+Task 8 on the review's batch: `nesting-smoke` passed 8 of 8 graders (50 s,
+$0.39), and its report is one ordinary report with no `SWEEP IN PARTS` block.
+The head-to-head scored `BAR MET` (2,045 s, $7.79): it found 48, 48 and 45 of
+48 and made up nothing. The third run read every file and left out the three
+references planted as "runbook section" ones. It's the first run on the
+branch to miss a planted fact.
 
 **Calls made during the build** that §4 doesn't say:
 
@@ -1498,15 +1527,27 @@ the message itself.
 - The harness graders are weaker than the scorer (`finished` matches its phrase
   anywhere in the trace, `parts-saved` checks part 1 only), so the headless
   runs scored by the scorer are the proof.
-- The big-sweep scaffold stops inside a repo; the head-to-head's and the
-  smoke's don't.
+- The big-sweep scaffold stops in a folder that isn't empty, and in an empty
+  folder inside a repo that has commits. It builds in an empty folder under a
+  repo with no commits, which is the harness's workspace: the first guard
+  refused every folder in a repo and tripped there. The head-to-head's and the
+  smoke's scaffolds have no guard.
+- A safety classifier stopped the eval session's save of a part in three runs
+  (8, 13 and 15). Nothing was retried or worked around. It's the session
+  copying a report of about 12KB into a file, not `investigate`, and a session
+  that keeps a part in its own context never makes that write.
+- An area lead sometimes returns its checklist as group summaries, not a line a
+  file (runs 2 and 3, and the harness run). The top level then takes its word
+  or, as in the harness run, reports files unread that were read. It's §1's
+  checklist, not something this branch changed, and it's parked as a follow-up.
 - In the loop case the session saves its parts inside the fixture, in
   `parts/`, which the fixture now leaves out of git's untracked list.
 - Nobody checks claims across parts, as the non-goals say.
-- The smoke's brief says to read its six files "exactly as you would above the
-  size limit", and on the final text `investigate` opened that one report with
-  `SWEEP IN PARTS: 0 areas not read`. All 8 graders pass either way. The
-  brief's wording predates parts and is left for a follow-up.
+- The smoke's brief once said to read its six files "exactly as you would
+  above the size limit", and on that text its report opened with
+  `SWEEP IN PARTS: 0 areas not read`. The brief was reworded (as you would for
+  a repo of more than about 150 files, and it still comes back as one report),
+  and on the new text the report is one ordinary report.
 
 **Open items from §4.** The part size is closed: 450. The other three (dense
 repos, the block's growth on very large repos, and claims across parts) stand

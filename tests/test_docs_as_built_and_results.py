@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent
 EXPENSIVE = ROOT / "evals-expensive"
 PLAN = "docs/plans/2026-11-23-big-sweep-in-parts.md"
 AS_BUILT = "### As built (2026-11-24)"
-WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten"}
+WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen"}
 
 
 def raw(rel):
@@ -115,8 +115,22 @@ def evals_section():
     return t[t.index("### A big repo read in parts"): t.index("## How a case is built")]
 
 
+OLD_RESULTS = "**The results, on the text before the review's batch"
+NEW_RESULTS = "**The results, on the review's batch"
+OLD_SMOKE = "**The smoke and the head-to-head, on the text before the review's batch"
+NEW_SMOKE = "**The smoke and the head-to-head, on the review's batch"
+AFTER = "**After a change to `investigate`,**"
+
+
 def readme_results(section):
-    return section[section.index("**The results, on the final text"): section.index("**After a change to `investigate`,**")]
+    """The results on the text before the review's batch: the table and the fix-round paragraphs, then the smoke and head-to-head
+    paragraph for that text (the new results sit between them in the file)."""
+    return section[section.index(OLD_RESULTS): section.index(NEW_RESULTS)] + "\n" + section[section.index(OLD_SMOKE): section.index(NEW_SMOKE)]
+
+
+def readme_new_results(section):
+    """The results on the review's batch: runs 13, 14, 15 and the harness run, then the smoke and head-to-head after it."""
+    return section[section.index(NEW_RESULTS): section.index(OLD_SMOKE)] + "\n" + section[section.index(NEW_SMOKE): section.index(AFTER)]
 
 
 def readme_problems(section, log):
@@ -150,7 +164,7 @@ def readme_problems(section, log):
     # the tally of runs: derive it from the log
     failed, proved = log_run_tally(log)
     started, finished = len(failed) + len(proved) + 1, len(failed) + len(proved)
-    if "%s headless runs were started and %s finished" % (WORDS[started].capitalize(), WORDS[finished]) not in results:
+    if "By run 10, %s headless runs were started and %s finished" % (WORDS[started], WORDS[finished]) not in results:
         problems.append("runs started/finished (log: %d, %d)" % (started, finished))
     if "%s of the %s failed the scorer" % (WORDS[len(failed)].capitalize(), WORDS[finished]) not in results:
         problems.append("runs failed (log: %d of %d)" % (len(failed), finished))
@@ -253,7 +267,7 @@ class ReadmeResultsAgreeWithTheBuildLogTest(unittest.TestCase):
                          ("They ran 7.6KB to 29.1KB", "They ran 7.6KB to 29.2KB"), ("the largest for 340 files", "the largest for 341 files"),
                          ("A full 450-file part\nwas 15.9KB", "A full 450-file part\nwas 15.8KB"),
                          ("found 48, 48 and 48 of 48", "found 48, 48 and 47 of 48"), ("2,004 seconds", "2,005 seconds"),
-                         ("Four of the nine failed", "Three of the nine failed"), ("Ten headless runs were started", "Nine headless runs were started"),
+                         ("Four of the nine failed", "Three of the nine failed"), ("By run 10, ten headless runs were started", "By run 10, nine headless runs were started"),
                          ("($7.50 by the harness)", "($7.51 by the harness)"), ("(1,840 seconds)", "(1,841 seconds)")):
             with self.subTest(change=new):
                 folded_s = s
@@ -313,11 +327,20 @@ class HarnessCommandsTest(unittest.TestCase):
 
 class SmokeSentenceTest(unittest.TestCase):
     PINS = [
-        ("the smoke passed 8 of 8", "`nesting-smoke` passed 8 of 8 graders in 59 seconds ($0.42)"),
+        ("the smoke passed 8 of 8 on the text before the batch", "`nesting-smoke` passed 8 of 8 graders in 59 seconds ($0.42)"),
         ("its one report opened with the 0 line", "That one report opened with `SWEEP IN PARTS: 0 areas not read`"),
-        ("why: the brief's words", "because the smoke's brief says to read its six files \"exactly as you would above the size limit\"."),
-        ("all 8 graders pass either way", "All 8 graders pass either way"),
+        ("why, in the past: the brief's words", "because the smoke's brief said to read its six files \"exactly as you would above the size limit\"."),
+        ("the brief now says as for a repo of more than about 150 files, one report, not a sweep in parts",
+         "The smoke's brief now says to run it as one area with one area lead, as for a repo of more than about 150 files, and that it still comes back as one report, not a sweep in parts."),
+        ("on the new text: 8 of 8 in 50 seconds, and one ordinary report with no parts block",
+         "`nesting-smoke` passed 8 of 8 graders in 50 seconds ($0.39), and the report is one ordinary report again: it opens `Mode: full sweep, 1 area lead` and has no `SWEEP IN PARTS` block."),
     ]
+
+    def test_the_old_behaviour_is_described_as_past(self):
+        t = fold(evals_section())
+        self.assertNotIn("because the smoke's brief says to read its six files", t)
+        self.assertNotIn("All 8 graders pass either way", t)
+        self.assertLess(t.index("because the smoke's brief said to read its six files"), t.index("The smoke's brief now says to run it as one area"))
 
     def test_every_pin_holds(self):
         self.assertEqual(missing(fold(evals_section()), self.PINS), [])
@@ -906,6 +929,252 @@ class DesignAsBuiltPlacementTest(unittest.TestCase):
         self.assertEqual(re.findall(r"^### As built", sec4, re.M), [])
         self.assertEqual(len(re.findall(r"^### As built", self.text, re.M)), 4)
         self.assertEqual(len(re.findall(r"^### As built", sub, re.M)), 1)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# the review batch's results: runs 13, 14, 15 and the harness run, the fourth head-to-head pass, the smoke, the tally of fifteen
+
+def fifteen_tally(log):
+    """(failed, proved, classifier, stopped by me), each a list of run numbers, from the log's 'fifteen loop runs, in one place' line."""
+    line = log_line(log, "The fifteen loop runs, in one place")
+    m = re.search(r"failed the scorer, (\d+) \(runs (\d+(?:, \d+)*)\); proved as saved, (\d+) \((\d+(?:, \d+)*)\); "
+                  r"stopped by a safety classifier at the session's save and not counted, (\d+) \((\d+(?:, \d+)*);.*?\); "
+                  r"stopped by me and not used, (\d+) \((\d+, \d+)\)", line)
+    assert m, line
+    lists = [[int(n) for n in m.group(i).split(", ")] for i in (2, 4, 6, 8)]
+    assert [len(l) for l in lists] == [int(m.group(i)) for i in (1, 3, 5, 7)], "the log's own counts don't match its own lists"
+    return lists
+
+
+def tally_problems(text, log, style):
+    """What a doc says about the fifteen runs that the log's line doesn't. style 'readme' or 'built' (they word it differently)."""
+    failed, proved, classifier, mine = fifteen_tally(log)
+    t = fold(text)
+    total = len(failed) + len(proved) + len(classifier) + len(mine)
+    if style == "readme":
+        want = ("%s were started: %s proved, %s failed the scorer, %s were stopped by the classifier (%s), and %s (%s) were stopped by me"
+                % (WORDS[total], WORDS[len(proved)], WORDS[len(failed)], WORDS[len(classifier)], joined([str(n) for n in classifier]),
+                   WORDS[len(mine)], joined([str(n) for n in mine])))
+    else:
+        want = ("Of %s headless runs, %s proved (%s), %s failed the scorer (%s), %s were stopped by the classifier (%s) and %s (%s) were stopped by me"
+                % (WORDS[total], WORDS[len(proved)], ", ".join(str(n) for n in proved), WORDS[len(failed)], ", ".join(str(n) for n in failed),
+                   WORDS[len(classifier)], ", ".join(str(n) for n in classifier), WORDS[len(mine)], ", ".join(str(n) for n in mine)))
+    problems = [] if want in t else ["the fifteen-run sentence differs from the log's line: %r" % want]
+    for word in re.findall(r"\b(\w+) (?:more )?headless runs", t):
+        if word.lower() in WORDS.values() and word.lower() not in ("ten", "fifteen", "three"):
+            problems.append("a run count the log's lines don't give: %s headless runs" % word)
+    return problems
+
+
+def new_results_problems(text, log):
+    """Everything in the review batch's results (runs 13, 14, 15, the harness run, the smoke, the head-to-head) that the build log doesn't say."""
+    t = fold(text)
+    problems = []
+    m = re.search(r"Run 14 \(([\d,]+) s\): `LOOP PROVED`, (\d+) of (\d+) facts, `readers: 945 of 945, once each`", t)
+    line = log_line(log, "Run 14: exit 0")
+    if not m or "exit 0, %s s" % m.group(1) not in line or "facts found: %s of %s" % (m.group(2), m.group(3)) not in line or \
+            "readers: 945 of 945, once each" not in line or "`LOOP PROVED`" not in line:
+        problems.append("run 14")
+    m = re.search(r"Runs 13 and 15 \(([\d,]+) s and ([\d,]+) s\) aren't proofs", t)
+    if not m or "exit 0, %s s" % m.group(1) not in log_line(log, "Run 13: exit 0") or \
+            "exit 0, %s s" % m.group(2) not in log_line(log, "Run 15 (the review batch's text"):
+        problems.append("runs 13 and 15")
+    for marker in ("Run 13: exit 0", "Run 15 (the review batch's text"):
+        if "safety classifier" not in log_line(log, marker) or "`LOOP PROVED`" not in log_line(log, marker):
+            problems.append("the log's line for %s no longer says classifier and LOOP PROVED" % marker)
+    m = re.search(r"The harness run \(([\d,]+) s, \$([\d.]+), all six graders passed\): `LOOP FAILED`\. Part 1 reported (\w+) files unread", t)
+    line = log_line(log, "The harness loop run on the review batch's text, with the corrected guard")
+    if not m or "exit 0, %s s, $%s, all six graders passed" % (m.group(1), m.group(2)) not in line or \
+            "unread: %d" % {v: k for k, v in WORDS.items()}.get(m.group(3), -1) not in line or "`LOOP FAILED`" not in line:
+        problems.append("the harness run")
+    m = re.search(r"`nesting-smoke` passed (\d+) of (\d+) graders in (\d+) seconds \(\$([\d.]+)\), and the report is one ordinary report", t)
+    line = log_line(log, "Task 8, fourth pass")
+    if not m or "`nesting-smoke` exit 0, %s s, $%s, %s of %s graders" % (m.group(3), m.group(4), m.group(1), m.group(2)) not in line:
+        problems.append("the smoke")
+    m = re.search(r"head-to-head ran 3 times in ([\d,]+) seconds \(\$([\d.]+)\) and scored `BAR MET`\. It found (\d+), (\d+) and (\d+) of (\d+) and made up nothing", t)
+    if not m or "3 runs: exit 0, %s s, $%s by the harness" % (m.group(1), m.group(2)) not in line or \
+            "found %s, %s and %s of %s, missed 0, 0 and 3, made up 0" % m.groups()[2:] not in line or "`BAR MET`" not in line:
+        problems.append("the head-to-head")
+    for need in ("the three planted as \"runbook section\" references", "the nine before found 48 of 48", "the first run on this branch to miss a planted fact"):
+        if need not in line:
+            problems.append("the log's head-to-head line lost %r" % need)
+    if "planted as \"runbook section\" ones" not in t or "first run on the branch to miss a planted fact; the nine before found 48 of 48" not in t:
+        problems.append("the missed facts")
+    problems += ["not in the log: %s" % f for f in figures_not_in_log(t, log)]
+    return problems
+
+
+class ReadmeReviewBatchResultsTest(unittest.TestCase):
+    def setUp(self):
+        self.log = build_log()
+        self.new = readme_new_results(evals_section())
+
+    def test_every_figure_in_the_review_batch_results_is_in_the_build_log(self):
+        self.assertEqual(new_results_problems(self.new, self.log), [])
+
+    def test_a_changed_figure_is_seen(self):
+        t = fold(self.new)
+        for old, new in (("Run 14 (2,793 s)", "Run 14 (2,794 s)"), ("(2,892 s and 3,065 s)", "(2,892 s and 3,066 s)"),
+                         ("(2,361 s, $9.58,", "(2,361 s, $9.59,"), ("graders in 50 seconds ($0.39)", "graders in 51 seconds ($0.39)"),
+                         ("2,045 seconds ($7.79)", "2,045 seconds ($7.78)"), ("48, 48 and 45 of 48", "48, 48 and 46 of 48"),
+                         ("reported three files unread", "reported two files unread"), ("33 of 33 facts", "32 of 33 facts"),
+                         ("the nine before found 48 of 48", "the ten before found 48 of 48")):
+            with self.subTest(change=new):
+                self.assertIn(old, t)
+                self.assertNotEqual(new_results_problems(t.replace(old, new, 1), self.log), [])
+
+    def test_the_old_results_sections_are_still_found_and_are_not_the_new_ones(self):
+        old = fold(readme_results(evals_section()))
+        self.assertIn("Headless 9", old)
+        self.assertNotIn("Run 14", old)
+        self.assertNotIn("Run 14", fold(readme_results(evals_section())))
+        self.assertNotIn("Headless 9", fold(self.new))
+
+    PINS = [
+        ("the batch changed every command, so the proofs ran again", "The batch changed every command the model runs, so the proofs ran again on it."),
+        ("three headless runs and a harness run", "Three headless runs (13, 14 and 15) and one harness run"),
+        ("runs 13 and 15 aren't proofs: a safety classifier stopped the session's write of the last part",
+         "Runs 13 and 15 (2,892 s and 3,065 s) aren't proofs. A safety classifier stopped the session's write of the last part"),
+        ("the session stopped and said so", "and the session stopped and said so."),
+        ("both score LOOP PROVED on the reports as the agent returned them", "Both score `LOOP PROVED` on the reports as the agent returned them."),
+        ("the harness run failed on three files a part reported unread",
+         "The harness run (2,361 s, $9.58, all six graders passed): `LOOP FAILED`. Part 1 reported three files unread after an area lead summarised its checklist in groups."),
+        ("the transcript shows every one was read", "The transcript shows every one of them was read."),
+        ("the bar was met once on the batch's text, twice before it",
+         "So two headless proofs in a row, the bar the plan set, was met on the text before the batch, and once on the text after it."),
+        ("the head-to-head found 45 of 48 in one run and scored BAR MET",
+         "The head-to-head ran 3 times in 2,045 seconds ($7.79) and scored `BAR MET`. It found 48, 48 and 45 of 48 and made up nothing."),
+        ("what the third run missed", "The third run read every file and left out the three references planted as \"runbook section\" ones."),
+        ("the first run on the branch to miss a planted fact", "It's the first run on the branch to miss a planted fact; the nine before found 48 of 48."),
+        ("the smoke's brief now says one area as for a repo of more than about 150 files, one report, not a sweep in parts",
+         "as for a repo of more than about 150 files, and that it still comes back as one report, not a sweep in parts."),
+        ("the smoke report is one ordinary report with no SWEEP IN PARTS block",
+         "the report is one ordinary report again: it opens `Mode: full sweep, 1 area lead` and has no `SWEEP IN PARTS` block."),
+    ]
+
+    def test_every_pin_holds_and_each_fails_on_deletion(self):
+        t = fold(self.new)
+        self.assertEqual(missing(t, self.PINS), [])
+        for name, phrase in self.PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(t, phrase), self.PINS), [name])
+
+    def test_the_fifteen_run_sentence_agrees_with_the_logs_line(self):
+        self.assertEqual(tally_problems(readme_new_results(evals_section()), self.log, "readme"), [])
+
+    def test_the_readme_scaffold_sentence_says_what_the_guard_does(self):
+        PINS = [
+            ("refuses a folder that isn't empty, and an empty one inside a repo that has commits",
+             "Its scaffold stops with exit 1 in a folder that isn't empty, and in an empty folder inside a repo that has commits, so run it in an empty folder outside any repo."),
+            ("an empty folder under an empty repo builds (the harness's workspace)",
+             "An empty folder under an empty repo, which is what the harness's workspace is, builds."),
+        ]
+        t = fold(evals_section())
+        self.assertEqual(missing(t, PINS), [])
+        for name, phrase in PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(t, phrase), PINS), [name])
+        self.assertNotIn("inside a git repo, so run it", t)  # the first guard's sentence
+
+
+class DesignAsBuiltReviewResultsTest(unittest.TestCase):
+    PINS = [
+        ("the proofs ran again on the batch", "The review's batch changed every command the model runs, so the proofs ran again on it: three more headless runs (13, 14 and 15) and a harness run."),
+        ("runs 13 and 15 aren't proofs: the classifier stopped the session's write of the last part",
+         "Runs 13 and 15 (2,892 s and 3,065 s) aren't proofs. A safety classifier stopped the session's write of the last part."),
+        ("both score LOOP PROVED on the reports as returned", "Both score `LOOP PROVED` on the reports as the agent returned them."),
+        ("the harness run failed on three files a part reported unread",
+         "The harness run (2,361 s, $9.58, all six graders passed) is `LOOP FAILED`. Part 1 reported three files unread after an area lead summarised its checklist, though the transcript shows they were read."),
+        ("the bar was met once on the batch's text", "So two headless proofs in a row, the plan's bar, was met on the text before the batch and once on the text after it."),
+        ("the smoke on the batch: 8 of 8, one ordinary report", "`nesting-smoke` passed 8 of 8 graders (50 s, $0.39), and its report is one ordinary report with no `SWEEP IN PARTS` block."),
+        ("the head-to-head found 48, 48 and 45 of 48 and made up nothing", "The head-to-head scored `BAR MET` (2,045 s, $7.79): it found 48, 48 and 45 of 48 and made up nothing."),
+        ("what the third run missed", "The third run read every file and left out the three references planted as \"runbook section\" ones."),
+        ("the first run on the branch to miss a planted fact", "It's the first run on the branch to miss a planted fact."),
+        ("known limit: the classifier stopped the session's save in runs 8, 13 and 15",
+         "A safety classifier stopped the eval session's save of a part in three runs (8, 13 and 15). Nothing was retried or worked around."),
+        ("known limit: it's the session copying a report into a file, not investigate",
+         "It's the session copying a report of about 12KB into a file, not `investigate`, and a session that keeps a part in its own context never makes that write."),
+        ("known limit: a lead's checklist comes back as group summaries",
+         "An area lead sometimes returns its checklist as group summaries, not a line a file (runs 2 and 3, and the harness run)."),
+        ("known limit: the top level then reports files unread that were read, and it's parked",
+         "The top level then takes its word or, as in the harness run, reports files unread that were read. It's §1's checklist, not something this branch changed, and it's parked as a follow-up."),
+        ("known limit: the scaffold guard's two checks and the harness workspace",
+         "The big-sweep scaffold stops in a folder that isn't empty, and in an empty folder inside a repo that has commits. It builds in an empty folder under a repo with no commits, which is the harness's workspace"),
+        ("known limit: the other scaffolds have no guard", "The head-to-head's and the smoke's scaffolds have no guard."),
+        ("known limit: the smoke's old wording is past, and the report is now ordinary",
+         "The smoke's brief once said to read its six files \"exactly as you would above the size limit\", and on that text its report opened with `SWEEP IN PARTS: 0 areas not read`."),
+        ("known limit: the brief was reworded and the report is one ordinary report",
+         "The brief was reworded (as you would for a repo of more than about 150 files, and it still comes back as one report), and on the new text the report is one ordinary report."),
+    ]
+
+    def sub(self):
+        return fold(design_parts(raw("docs/design.md"))[2])
+
+    def test_every_pin_holds_and_each_fails_on_deletion(self):
+        t = self.sub()
+        self.assertEqual(missing(t, self.PINS), [])
+        for name, phrase in self.PINS:
+            with self.subTest(pin=name):
+                self.assertEqual(missing(delete(t, phrase), self.PINS), [name])
+
+    def test_the_fifteen_run_sentence_agrees_with_the_logs_line(self):
+        self.assertEqual(tally_problems(design_parts(raw("docs/design.md"))[2], build_log(), "built"), [])
+
+    def test_every_dollar_kb_and_seconds_figure_in_the_subsection_is_in_the_log(self):
+        self.assertEqual(figures_not_in_log(self.sub(), build_log()), [])
+
+    def test_the_two_new_known_limits_are_bullets_of_that_list(self):
+        sub = design_parts(raw("docs/design.md"))[2]
+        limits = sub[sub.index("**Known limits and what's parked.**"):]
+        bullets = [fold(b) for b in ("\n" + limits).split("\n- ")[1:]]
+        self.assertEqual(len([b for b in bullets if b.startswith("A safety classifier stopped the eval session's save")]), 1)
+        self.assertEqual(len([b for b in bullets if b.startswith("An area lead sometimes returns its checklist as group summaries")]), 1)
+
+
+class FifteenRunTallyTest(unittest.TestCase):
+    def setUp(self):
+        self.log = build_log()
+
+    def test_the_log_line_says_what_the_task_says(self):
+        self.assertEqual(fifteen_tally(self.log), [[1, 2, 3, 7], [4, 5, 6, 9, 10, 14], [8, 13, 15], [11, 12]])
+
+    def test_the_fifteen_are_each_run_once(self):
+        failed, proved, classifier, mine = fifteen_tally(self.log)
+        self.assertEqual(sorted(failed + proved + classifier + mine), list(range(1, 16)))
+
+    def test_the_ten_run_tally_is_the_fifteen_run_tally_cut_at_run_10_less_the_classifier_run(self):
+        failed10, proved10 = log_run_tally(self.log)
+        failed, proved, classifier, _mine = fifteen_tally(self.log)
+        self.assertEqual(sorted(failed10), sorted(n for n in failed if n <= 10))
+        self.assertEqual(sorted(proved10), sorted(n for n in proved if n <= 10))
+        self.assertIn(8, classifier)
+
+    def test_the_docs_count_runs_the_way_the_log_does(self):
+        self.assertEqual(tally_problems(readme_new_results(evals_section()), self.log, "readme"), [])
+        self.assertEqual(tally_problems(design_parts(raw("docs/design.md"))[2], self.log, "built"), [])
+
+    def test_a_doc_that_miscounts_is_seen(self):
+        readme = readme_new_results(evals_section())
+        built = design_parts(raw("docs/design.md"))[2]
+        for old, new in (("six proved", "seven proved"), ("three were stopped by the classifier (8, 13 and 15)", "two were stopped by the classifier (8 and 15)"),
+                         ("two (11 and 12)", "two (11 and 13)"), ("fifteen were started", "fourteen were started")):
+            with self.subTest(change=new):
+                self.assertNotEqual(tally_problems(fold(readme).replace(old, new, 1), self.log, "readme"), [])
+        for old, new in (("six proved (4, 5, 6, 9, 10, 14)", "six proved (4, 5, 6, 9, 10, 13)"), ("Of fifteen headless runs", "Of fourteen headless runs"),
+                         ("four failed the scorer (1, 2, 3, 7)", "five failed the scorer (1, 2, 3, 7)")):
+            with self.subTest(change=new):
+                self.assertNotEqual(tally_problems(fold(built).replace(old, new, 1), self.log, "built"), [])
+        self.assertNotEqual(tally_problems(fold(readme) + " Twelve headless runs were started.", self.log, "readme"), [])
+
+
+class ChangelogScaffoldSentenceTest(unittest.TestCase):
+    def test_the_unreleased_entry_says_what_the_scaffold_guard_does(self):
+        PINS = [("the guard refuses a folder that isn't empty and an empty one inside a repo that has commits",
+                 "The big-sweep scaffold and its six copies stop with exit 1 in a folder that isn't empty, and in an empty folder inside a repo that has commits.")]
+        entry = fold(ChangelogTest.unreleased(raw("CHANGELOG.md")))
+        self.assertEqual(missing(entry, PINS), [])
+        self.assertEqual(missing(delete(entry, PINS[0][1]), PINS), [PINS[0][0]])
+        self.assertNotIn("inside a git repo.", entry)
 
 
 class ChangelogReviewBatchTest(unittest.TestCase):
