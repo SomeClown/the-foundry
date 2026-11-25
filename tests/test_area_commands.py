@@ -189,8 +189,9 @@ def byte_key(s):
 
 
 def split_lines(paths):
-    """The listing as the commands see it: `git ls-files -z | tr '\\0' '\\n'`, one awk record per line."""
-    return "\n".join(paths).split("\n") if paths else []
+    """The listing as the commands see it: `git ls-files -z | tr '\\n\\0' '\\001\\n'`. Every path is one line, a line break inside
+    a path shown as the byte \\001."""
+    return [p.replace("\n", "\x01") for p in paths]
 
 
 def out_lines(out):
@@ -251,7 +252,22 @@ INJECT = "x'; echo MARKER; '"
 HOSTILE_EXTRA = [
     "README.md", "END", "sub/END", "-rootdash.txt", " lead-root.txt", "trail-root.txt ", "tab\there.txt",
     "docs/a.md", "docs/nl\nx.md", "docs/z.md", "files/sub/b.txt", "src/main.py", "src/core/a.py",
+    # the second review's hole: under a folder named "a" plus a line break, a file named END, a line break, a command, a line
+    # break and x. The old listing printed it as four lines, the second of them /END, which closed a here-document.
+    "a\n/END\ntouch PWNED3\nx",
+    # a name that begins with a line break, one that ends with one, one that is only a line break and /END, and more
+    "\nlead.txt", "trail.txt\n", "\n/END", "nl\n", "trail\n/END", "docs/\n/END\ntouch PWNED4\n/q.md",
+    "both\r\nz.txt", "c\r/END", "d/ /END",
+    # a real \001 byte beside its line-break twin: both list as the same line
+    "sp\x01x/y.txt", "sp\nx/y.txt",
+    # two root files that list out of byte order once a line break becomes \001 (it sorts before a tab)
+    "a\tb.txt", "a\nb.txt",
 ]
+# a file that git doesn't track: the untracked listing and a scoped follow-up's paste see it
+CONTROL_FOLDERS = ["a\x01/", "\x01/", "trail\x01/", "sp\x01x/", "c\r/", "d/"]
+UNTRACKED_EXTRA = ["un\n/END\ntouch PWNEDU\nz"]
+# files a command planted would be called these
+PLANTS = ("PWNED", "PWNED3", "PWNED4", "PWNEDU", "PLANTED", "MARKER")
 
 
 def hostile_paths():
@@ -259,6 +275,12 @@ def hostile_paths():
     for h in HOSTILE:
         paths += [h + "/a.txt", h + "/sub/b.txt", "files/" + h, "nest/" + h + "/c.txt"]
     return paths
+
+
+def drop_end_lines(lines):
+    """The agent file's rule: a line that reads /END, once its backticks and the spaces at its ends are off, is never pasted into a
+    here-document."""
+    return [line for line in lines if line.strip(" `") != "/END"]
 
 
 def lines_of_file(path):
@@ -290,7 +312,7 @@ class Helpers(unittest.TestCase):
         }
 
     @classmethod
-    def build(cls, paths, prune=True):
+    def build(cls, paths, prune=True, untracked=()):
         """Create the repo and the plain copy. A name the filesystem refuses is skipped with a message."""
         cls.tmp = Path(tempfile.mkdtemp(prefix="area-cmds-")).resolve()
         cls.repo = cls.tmp / "repo"
@@ -311,6 +333,17 @@ class Helpers(unittest.TestCase):
             cls.paths.append(name)
         cls.git(cls.repo, "add", "-A")
         cls.git(cls.repo, "commit", "-q", "-m", "all")
+        cls.untracked = []
+        for name in untracked:
+            try:
+                (cls.repo / name).parent.mkdir(parents=True, exist_ok=True)
+                (cls.repo / name).write_text("u\n", encoding="utf-8")
+            except OSError as err:
+                cls.skipped_names.append(name)
+                sys.stderr.write("skipped %r: the filesystem refuses it (%s)\n" % (name, err))
+                continue
+            cls.untracked.append(name)
+        cls.untracked_lines = split_lines(cls.untracked)
         listed = cls.git_z(cls.repo)
         cls.lines = split_lines(listed)
         assert sorted(listed, key=byte_key) == sorted(cls.paths, key=byte_key), "git doesn't list what was created"
@@ -346,7 +379,12 @@ class Helpers(unittest.TestCase):
         self.before = self.snapshot()
 
     def tearDown(self):
-        self.assertEqual(self.snapshot(), self.before, "a command left something behind in the repo or its parent")
+        found = self.snapshot()
+        self.assertEqual(found, self.before, "a command left something behind in the repo or its parent")
+        # nothing a planted command would create exists anywhere under the scratch folder (the hostile folders whose names merely
+        # contain the words are not files of that name)
+        planted = [p for p in found if os.path.basename(p.rstrip("/")) in PLANTS or os.path.basename(p.rstrip("/")).startswith("PWNED")]
+        self.assertEqual(planted, [], "a planted command ran")
 
     def snapshot(self):
         """Every path under the temp folder (the repo's parent), the repo's own .git left out."""
@@ -409,8 +447,8 @@ class Helpers(unittest.TestCase):
         a, b = byte_key(first), byte_key(last)
         return [p for p in paths if a <= byte_key(p) <= b]
 
-    def expected_top(self):
-        return dict(Counter(p.split("/")[0] + "/" if "/" in p else "(root)" for p in self.lines))
+    def expected_top(self, lines=None):
+        return dict(Counter(p.split("/")[0] + "/" if "/" in p else "(root)" for p in (self.lines if lines is None else lines)))
 
     def expected_down(self, d):
         expected = Counter()
@@ -474,8 +512,8 @@ class FenceShapeTest(AreaRepo):
     def test_the_variable_block_is_three_lines_with_no_indent(self):
         self.assertEqual(var_block(), [VAR_FIRST, "<path>", "/END"])
 
-    def test_the_file_lists_with_z_and_turns_the_zero_bytes_into_line_breaks(self):
-        self.assertEqual(LIST, "git ls-files -z | tr '\\0' '\\n'")
+    def test_the_file_lists_with_z_and_turns_a_line_break_in_a_path_into_the_byte_001_and_the_zero_bytes_into_line_breaks(self):
+        self.assertEqual(LIST, "git ls-files -z | tr '\\n\\0' '\\001\\n'")
 
     def test_the_fixture_repo_lists_what_python_built(self):
         listed = self.git_z(self.repo)
@@ -796,7 +834,7 @@ class HostileRepo(Helpers):
 
     @classmethod
     def setUpClass(cls):
-        cls.build(hostile_paths())
+        cls.build(hostile_paths(), untracked=UNTRACKED_EXTRA)
 
     def carriable(self, name):
         return "\n" not in name
@@ -849,21 +887,35 @@ class HostileRepo(Helpers):
         self.check_paths(self.dir_piece("files/"), self.under("files/"))
         self.check_paths(self.direct_piece("files/"), [p for p in self.direct("files/")])
 
-    def test_the_root_piece_holds_the_root_files_including_one_named_END_and_the_second_half_of_a_line_break_path(self):
+    def test_the_root_piece_holds_the_root_files_including_one_named_END_and_the_root_files_with_a_line_break_in_their_names(self):
         self.check_paths(self.root_piece(), self.root_files())
         self.assertIn("END", self.root_files())
-        self.assertIn("x.md", self.root_files())  # docs/nl\nx.md: the second line of the listing
+        for name in ("\x01lead.txt", "trail.txt\x01", "nl\x01", "a\x01b.txt", "both\r\x01z.txt"):
+            self.assertIn(name, self.root_files())
+        self.assertNotIn("x.md", self.root_files())  # docs/nl<LF>x.md is one line now, not two
 
     def test_a_folder_holding_a_file_named_END_gives_that_file(self):
         self.check_paths(self.dir_piece("sub/"), ["sub/END"])
         self.check_paths(self.direct_piece("sub/"), ["sub/END"])
 
-    def test_a_path_with_a_line_break_shows_as_two_lines_and_the_folder_piece_gets_the_first(self):
-        self.assertIn("docs/nl", self.lines)
-        self.assertIn("x.md", self.lines)
+    def test_a_path_with_a_line_break_is_one_line_with_a_control_byte_and_its_folder_piece_gets_it_whole(self):
+        self.assertIn("docs/nl\x01x.md", self.lines)
+        self.assertNotIn("docs/nl", self.lines)
+        self.assertNotIn("x.md", self.lines)
         self.check_paths(self.dir_piece("docs/"), self.under("docs/"))
-        self.assertIn("docs/nl", self.under("docs/"))
-        self.assertNotIn("x.md", self.under("docs/"))
+        self.assertIn("docs/nl\x01x.md", self.under("docs/"))
+        self.assertIn("docs/\x01/END\x01touch PWNED4\x01/q.md", self.under("docs/"))
+
+    def test_no_line_of_the_git_listing_starts_with_a_slash_or_is_END_slash(self):
+        for line in self.lines:
+            self.assertFalse(line.startswith("/"), repr(line))
+            self.assertNotEqual(line.strip(" `"), "/END", repr(line))
+        self.assertIn("a\x01/END\x01touch PWNED3\x01x", self.lines)  # the hostile file, as one line
+        self.assertIn("\x01/END", self.lines)
+
+    def test_a_real_control_byte_and_a_line_break_list_as_the_same_line_twice(self):
+        self.assertEqual(self.lines.count("sp\x01x/y.txt"), 2)
+        self.check_paths(self.dir_piece("sp\x01x/"), ["sp\x01x/y.txt", "sp\x01x/y.txt"])
 
     # ---- except
 
@@ -912,7 +964,7 @@ class HostileRepo(Helpers):
     def test_a_range_over_the_whole_listing_ending_on_the_file_named_END_and_on_root_files(self):
         root = self.root_piece()
         for first, last in (("END", "README.md"), ("-rootdash.txt", "END"), (" lead-root.txt", "trail-root.txt "),
-                            ("END", "END"), ("README.md", "x.md"), ("tab\there.txt", "trail-root.txt ")):
+                            ("END", "END"), ("README.md", "zzz"), ("tab\there.txt", "trail-root.txt ")):
             with self.subTest(first=first, last=last):
                 self.check_paths(self.range_of(root, first, last), self.between(self.root_files(), first, last))
 
@@ -946,7 +998,7 @@ class HostileRepo(Helpers):
                         self.assertEqual(lines, [paths[n - 1]])
 
     def test_the_find_listing_gives_the_same_set_as_git(self):
-        expected = sorted(self.lines, key=byte_key)
+        expected = sorted(self.lines + self.untracked_lines, key=byte_key)
         for name, lines in self.each_shell(find_command(), cwd=self.plain):
             with self.subTest(shell=name):
                 self.assertEqual(sorted(lines, key=byte_key), expected)
@@ -963,7 +1015,7 @@ class HostileRepo(Helpers):
     def test_the_find_listing_counts_match_git(self):
         for name, lines in self.each_shell(self.t(C_TOP, find_command()), cwd=self.plain):
             with self.subTest(shell=name):
-                self.assertEqual(self.parse_counts(lines), self.expected_top())
+                self.assertEqual(self.parse_counts(lines), self.expected_top(self.lines + self.untracked_lines))
 
     def test_the_injection_folder_and_bob_s_notes_each_give_their_one_direct_file_on_the_find_listing(self):
         for d in (INJECT + "/", "bob's notes/"):
@@ -1038,6 +1090,137 @@ class HostileRepo(Helpers):
                 with self.subTest(shell=name, lines=count):
                     self.assertEqual(out.strip(), str(count))
 
+    # ---- the second review's hole: a line of a listing that reads /END
+
+    def delimiters(self):
+        found = set(re.findall(r"<<'([^']+)'", agent_text()))
+        self.assertEqual(found, {"/END"})
+        return found
+
+    def listing_commands(self):
+        """Every listing command the agent file names, extracted: (name, command, directory to run it in)."""
+        untracked = re.findall(r"`(git ls-files --others --exclude-standard -z \| tr [^`]*)`", file_list_section())
+        self.assertEqual(len(untracked), 1, untracked)
+        return [("git", LIST, self.repo), ("untracked", untracked[0], self.repo), ("find", find_command(), self.plain)]
+
+    def expected_listing_count(self, name):
+        tracked = len(self.git_z(self.repo))
+        if name == "git":
+            return tracked
+        others = [p for p in self.git(self.repo, "ls-files", "--others", "--exclude-standard", "-z").split("\0") if p]
+        return len(others) if name == "untracked" else tracked + len(others)
+
+    def listing_lines(self, name, command, cwd, argv):
+        done = subprocess.run(argv + [command], cwd=str(cwd), env=self.env, capture_output=True, stdin=subprocess.DEVNULL, timeout=60)
+        self.assertEqual((done.returncode, done.stderr), (0, b""), "%s: %s" % (name, command))
+        return out_lines(done.stdout.decode("utf-8"))
+
+    def paste(self, argv, script):
+        """Run a pasted script in an empty scratch folder, with no X11 or user tools on the PATH (a planted `x` must not find a program),
+        and return (exit code, stdout, stderr, files left in the folder)."""
+        env = dict(self.env)
+        env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
+        with tempfile.TemporaryDirectory(dir=str(self.tmp)) as run_dir:
+            done = subprocess.run(argv + [script], cwd=run_dir, env=env, capture_output=True, stdin=subprocess.DEVNULL, timeout=60)
+            left = sorted(os.listdir(run_dir))
+        return done.returncode, done.stdout.decode("utf-8", "replace"), done.stderr.decode("utf-8", "replace"), left
+
+    @staticmethod
+    def here_document_forms(lines):
+        """The here-document forms the agent file has, each filled with these lines pasted as they are. Names the form and gives the script."""
+        header = wc_heredoc_template()[0]
+        return [
+            ("the three-line read block", "\n".join("\n".join(["IFS= read -r p%d <<'/END'" % i, line, "/END"]) for i, line in enumerate(lines))),
+            ("the wc -l pasted-paths fence", "\n".join([header] + lines + ["/END"])),
+            ("the plain wc -l form", "\n".join([block_count_header()] + lines + ["/END"])),
+            ("the block's area-line count", "\n".join([block_count_header()] + ["- a: `%s` (1 files)" % line for line in lines] + ["/END"])),
+        ]
+
+    def test_every_listing_has_one_line_per_nul_path_and_no_line_reads_as_a_delimiter(self):
+        delimiters = self.delimiters()
+        for name, command, cwd in self.listing_commands():
+            for shell, argv in self.shells():
+                with self.subTest(listing=name, shell=shell):
+                    lines = self.listing_lines(name, command, cwd, argv)
+                    self.assertEqual(len(lines), self.expected_listing_count(name))
+                    for line in lines:
+                        self.assertNotIn(line.strip(" `"), delimiters, repr(line))
+                        self.assertFalse(line.startswith("/"), repr(line))
+
+    def test_every_line_of_every_listing_pasted_into_every_here_document_form_plants_nothing(self):
+        self.delimiters()
+        for name, command, cwd in self.listing_commands():
+            lines = self.listing_lines(name, command, cwd, ["bash", "-c"])
+            for form, script in self.here_document_forms(lines):
+                for shell, argv in self.shells():
+                    with self.subTest(listing=name, form=form, shell=shell):
+                        code, out, err, left = self.paste(argv, script)
+                        self.assertEqual(left, [], "a planted command ran")
+                        if form in ("the plain wc -l form", "the block's area-line count"):
+                            self.assertEqual((code, out.strip(), err), (0, str(len(lines)), ""))
+                        if form == "the three-line read block":
+                            self.assertEqual((code, err), (0, ""))
+
+    OLD_LIST = "git ls-files -z | tr '\\0' '\\n'"   # the listing before the fix, kept as a test-only literal
+
+    def test_the_old_listing_prints_the_hostile_file_as_four_lines_and_one_of_them_reads_END(self):
+        old = self.listing_lines("old", self.OLD_LIST, self.repo, ["bash", "-c"])
+        self.assertGreater(len(old), len(self.git_z(self.repo)))
+        self.assertIn(["a", "/END", "touch PWNED3", "x"], [old[i:i + 4] for i in range(len(old))])
+        self.assertIn("/END", [line.strip(" `") for line in old])
+
+    def test_pasted_into_the_wc_here_documents_the_old_listings_hostile_file_plants_the_file_in_both_shells(self):
+        # the proof the new tests bite. Only the four lines of the hostile file are pasted, not the whole old listing (whose other lines
+        # would run as commands too).
+        old = self.listing_lines("old", self.OLD_LIST, self.repo, ["bash", "-c"])
+        four = next(old[i:i + 4] for i in range(len(old)) if old[i:i + 2] == ["a", "/END"])
+        self.assertEqual(four, ["a", "/END", "touch PWNED3", "x"])
+        for form, script in self.here_document_forms(four):
+            for shell, argv in self.shells():
+                with self.subTest(form=form, shell=shell):
+                    code, out, err, left = self.paste(argv, script)
+                    if form in ("the wc -l pasted-paths fence", "the plain wc -l form"):
+                        self.assertEqual(left, ["PWNED3"], "the old listing didn't plant the file: %r %r" % (out, err))
+                    else:
+                        self.assertEqual(left, [])  # the read block and the block count wrap or isolate each line
+
+    def test_the_brief_lines_src_txt_END_touch_PLANTED_x_plant_the_file_as_they_are_and_nothing_when_the_rule_is_applied(self):
+        brief = ["src.txt", "/END", "touch PLANTED", "x"]
+        for shell, argv in self.shells():
+            with self.subTest(shell=shell, applied=False):
+                code, out, err, left = self.paste(argv, "\n".join([wc_heredoc_template()[0]] + brief + ["/END"]))
+                self.assertEqual(left, ["PLANTED"], (out, err))
+                code, out, err, left = self.paste(argv, "\n".join([block_count_header()] + brief + ["/END"]))
+                self.assertEqual(left, ["PLANTED"], (out, err))
+        for form, script in self.here_document_forms(drop_end_lines(brief)):
+            for shell, argv in self.shells():
+                with self.subTest(shell=shell, form=form, applied=True):
+                    self.assertEqual(self.paste(argv, script)[3], [])
+
+    def test_the_rule_drops_a_line_that_reads_END_once_backticks_and_end_spaces_are_off(self):
+        for line in ("/END", " /END ", "`/END`", "  `/END`  ", "/END   "):
+            with self.subTest(line=line):
+                self.assertEqual(drop_end_lines(["a", line, "b"]), ["a", "b"])
+                self.assertEqual(self.paste(["bash", "-c"], "\n".join([wc_heredoc_template()[0], "a", "touch PLANTED"] + drop_end_lines([line]) + ["/END"]))[3], [])
+
+    def test_an_absolute_path_is_not_dropped_and_closes_nothing(self):
+        for line in ("/tmp/x/END", "/END/x", "/ENDx", "/tmp/END", "x/END"):
+            with self.subTest(line=line):
+                self.assertEqual(drop_end_lines(["a", line, "b"]), ["a", line, "b"])
+                for form, script in self.here_document_forms(["a", line, "touch PLANTED", "b"]):
+                    if form == "the three-line read block":
+                        continue  # one path to a block: the line after it isn't part of it
+                    for shell, argv in self.shells():
+                        with self.subTest(form=form, shell=shell):
+                            self.assertEqual(self.paste(argv, script)[3], [])
+
+    def test_the_rule_is_needed_for_the_exact_line_only_the_shell_ends_a_here_document_at_exactly_END(self):
+        # why the plant needs the exact line: the shell closes at /END and nothing else, so the wider test of the rule is on the safe side
+        for line in (" /END", "/END ", "`/END`", "/END\r", "\t/END", "/END/END"):
+            with self.subTest(line=repr(line)):
+                code, out, err, left = self.paste(["bash", "-c"], "\n".join([wc_heredoc_template()[0], "a", line, "touch PLANTED", "/END"]))
+                self.assertEqual(left, [])
+
     # ---- the exactly-once check
 
     SKIP = (INJECT + "/", "sub/")
@@ -1058,6 +1241,8 @@ class HostileRepo(Helpers):
             "{ %s; }" % "; ".join(d(g) if i % 2 == 0 else dr(g) + "; " + d(g + "sub/") for i, g in enumerate(group)),
         ]
         areas += [d(h) for h in singles]
+        # top-level folders whose names hold a line break (listed with \001): the model can't type those, a test can
+        areas += [d(f) for f in CONTROL_FOLDERS]
         return areas
 
     def once(self, areas, skipped=None, sort_listing=True):
@@ -1088,8 +1273,10 @@ class HostileRepo(Helpers):
                 self.assertNotIn(ONCE_MESSAGE, out)
 
     def test_the_check_fails_on_a_gap(self):
-        areas = self.partition()[:-1]
         left_out = [h for h in self.hostile_dirs() if h != INJECT + "/"][-1]
+        areas = self.partition()
+        self.assertIn(self.dir_piece(left_out), areas)
+        areas.remove(self.dir_piece(left_out))
         for name, code, out, err in self.run_all(self.once(areas)):
             with self.subTest(shell=name):
                 self.assertNotEqual(code, 0)
@@ -1103,14 +1290,16 @@ class HostileRepo(Helpers):
                 self.assertNotEqual(code, 0)
                 self.assertIn("> " + INJECT + "/a.txt", out)
 
-    def test_without_the_sort_on_the_listing_side_a_line_break_path_makes_the_check_fail(self):
-        # the mutation: the same command with its listing-side sort cut out
+    def test_without_the_sort_on_the_listing_side_the_pair_a_tab_b_and_a_line_break_b_makes_the_check_fail(self):
+        # the mutation: the same command with its listing-side sort cut out. At the root, a<TAB>b.txt and a<LF>b.txt come out of git in that
+        # order, and with the line break shown as \001 (which sorts before a tab) the listing is out of byte order.
+        self.assertEqual([l for l in self.lines if l.startswith("a") and l.endswith("b.txt") and "/" not in l], ["a\tb.txt", "a\x01b.txt"])
         mutated = self.once(self.partition(), sort_listing=False)
         for name, code, out, err in self.run_all(mutated):
             with self.subTest(shell=name):
-                self.assertNotEqual(code, 0, "the check passes without the sort; the line-break path no longer bites")
+                self.assertNotEqual(code, 0, "the check passes without the sort; the pair no longer bites")
                 self.assertNotIn(ONCE_MESSAGE, out)
-                self.assertIn("x.md", out)
+                self.assertIn("a\tb.txt", out)  # diff names the pair's out-of-place line
 
     def test_the_sorted_check_passes_where_the_unsorted_one_fails(self):
         for name, code, out, err in self.run_all(self.once(self.partition(), sort_listing=True)):
@@ -1292,6 +1481,19 @@ def coupling_sentence(text):
     return found
 
 
+def listing_commands_without_the_mapping(text):
+    """Every listing command in the text (`git ls-files ...`, `find . \\(...`) that doesn't carry the line-break mapping, and every find that
+    doesn't print with -print0."""
+    bad = []
+    for m in re.finditer(r"git ls-files(?! -- )[^`]*", text):  # the pathspec example `git ls-files -- 'docs/*'` is a non-example
+        if "tr '\\n\\0' '\\001\\n'" not in m.group(0):
+            bad.append(m.group(0)[:70])
+    for m in re.finditer(r"find \. \\\([^`]*", text):
+        if "-print0 | tr '\\n\\0' '\\001\\n'" not in m.group(0):
+            bad.append(m.group(0)[:70])
+    return bad
+
+
 class NegativeTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -1335,6 +1537,26 @@ class NegativeTest(unittest.TestCase):
         self.assertEqual(violations_of_guarded_reads(self.text), [])
         names = set(re.findall(r'ENVIRON\["([a-z])"\]', self.text))
         self.assertEqual(names, {"d", "x", "a", "b"})
+
+    def test_the_old_listing_is_gone_from_the_file(self):
+        self.assertNotIn("tr '\\0' '\\n'", self.text)
+        self.assertNotRegex(self.text, r"tr\s+'\\0'\s+'\\n'")
+        self.assertNotIn("no listed path starts with `/`", " ".join(self.text.split()))
+
+    def test_every_listing_command_carries_the_line_break_mapping_and_find_prints_with_print0(self):
+        self.assertEqual(listing_commands_without_the_mapping(self.text), [])
+        flat = self.text
+        self.assertGreaterEqual(len(re.findall(r"git ls-files(?! -- )", flat)), 3)   # the sentence, the untracked listing, <list>
+        self.assertEqual(len(re.findall(r"find \. \\\(", flat)), 1)
+        self.assertEqual(len(re.findall(r"-print0", flat)), 1)
+        self.assertEqual(len(re.findall(r"tr '\\n\\0' '\\001\\n'", flat)), 4)  # three git listings and the find
+
+    def test_the_listing_checks_bite_on_text_that_breaks_them(self):
+        good = self.text
+        self.assertTrue(listing_commands_without_the_mapping(good.replace("tr '\\n\\0' '\\001\\n'", "tr '\\0' '\\n'", 1)))
+        self.assertTrue(listing_commands_without_the_mapping(good.replace("-print0 | tr", "-print | tr", 1)))
+        self.assertTrue(listing_commands_without_the_mapping(good + " `git ls-files -z`"))
+        self.assertTrue(re.search(r"tr\s+'\\0'\s+'\\n'", good + " tr '\\0' '\\n'"))
 
     def test_the_negative_checks_bite_on_text_that_breaks_them(self):
         good = self.text

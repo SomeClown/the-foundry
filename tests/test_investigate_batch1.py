@@ -78,7 +78,7 @@ PINS = [
     # 8. leads don't split
     ("8 lead skips split paragraph", "Run the Readers", r"an area lead skips this paragraph, whatever its file count"),
     # 9. untracked files
-    ("9 full sweep lists untracked as unread", "Build the File List", r"On a full sweep, list untracked files \(`git ls-files --others --exclude-standard -z \| tr '\\0' '\\n'`\) in Coverage as unread, and don't read them"),
+    ("9 full sweep lists untracked as unread", "Build the File List", r"On a full sweep, list untracked files \(`git ls-files --others --exclude-standard -z \| tr '\\n\\0' '\\001\\n'`\) in Coverage as unread, and don't read them"),
     ("9 scoped reads relevant untracked", "Build the File List", r"In a scoped read, an untracked file the brief names, or that your search finds relevant, is read like any other and marked untracked in Coverage"),
     # 10. first-line contract
     ("10 flags stay the first line", "When You Can't Spawn", r"flags .{0,60}stay the first line"),

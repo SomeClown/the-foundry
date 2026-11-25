@@ -46,9 +46,12 @@ on without asking.
   recon line says a sweep can come back in parts.
 - `investigate` never types a path from the repo into a command: each path
   goes into a shell variable through a here-document, `awk` reads it from its
-  environment, and the listing is `git ls-files -z`, so a name with a quote, a
-  backslash, `$(…)` or a leading dash can't break the area commands or run as
-  one. Line counts and the block's count take their paths the same way.
+  environment, and the listing is `git ls-files -z` with a line break in a path
+  printed as the byte `\001`, so every path is one line and no line of a
+  listing can end a here-document. A name with a quote, a backslash, `$(…)` or
+  a leading dash can't break the area commands or run as one, and a line
+  reading `/END` is never pasted into a here-document. Line counts and the
+  block's count take their paths the same way.
 - A `CONTINUE SWEEP` brief that arrives cut off is answered without reading,
   and the session copies the block again; an area line that can't be read is
   dropped and quoted in Coverage; a `Read only these files:` list replaces any

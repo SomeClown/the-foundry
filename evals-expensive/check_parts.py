@@ -10,6 +10,7 @@ Reads DIR/part-<n>.md in number order and checks, against the key and the fixtur
                     and each part's "Areas read:" lines are exactly what the block dropped
   4. notation       every area line parses and its definition rebuilds to the stated count
   5. exactly once   the areas read hold every tracked file outside the whole-folder skips, once each
+                    (listed as the agent lists them, a line break in a path as `\\x01`)
   6. coverage       the Mode, Files listed, Areas read, Areas not read and Whole repo lines, looked up after the report's
                     last "8. Coverage" heading
   7. facts          every key fact is found, and no decoy appears in any part; a fact is found in the part whose areas
@@ -114,7 +115,7 @@ def tracked_files(repo):
         raise CantCheck("could not run %s (%s)" % (git, err))
     if done.returncode != 0:
         raise CantCheck("git ls-files failed in %s: %s" % (repo, done.stderr.decode("utf-8", "replace").strip()))
-    return [p for p in done.stdout.split(b"\0") if p]
+    return [p.replace(b"\n", b"\x01") for p in done.stdout.split(b"\0") if p]
 
 
 def read_parts(parts_dir):

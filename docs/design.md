@@ -1225,9 +1225,10 @@ here):
 - **How a path gets in.** One path to a variable, through a three-line
   here-document: `IFS= read -r p1 <<'/END'`, the path on a line of its own
   exactly as the listing printed it, then `/END`. The quoted delimiter makes
-  the shell take the line as it is. The delimiter starts with `/` because no
-  listed path does, so no file's name can end it early (a plain word could:
-  a root file called `END` would). The command gets the variable in its
+  the shell take the line as it is. The delimiter starts with `/` so that no
+  file's name can be the delimiter (a plain word could be: a root file
+  called `END` would end it early). The correction below says what that
+  does and doesn't cover. The command gets the variable in its
   environment, written `d="${p1:?}"`, so an empty or unset one stops the
   command with an error where it would otherwise match every file, and
   `awk` reads it from `ENVIRON`, which leaves backslashes alone. There's no
@@ -1241,11 +1242,13 @@ here):
   looked up with the Grep tool, never a `grep` with the name typed in.
 - **The listing prints every path as it is.** In git it becomes
   `git ls-files -z | tr '\0' '\n'` (with the brief's wrapper in place of
-  `git`), which never quotes. This replaces Part 3's "with git's path
+  `git`), which never quotes. (The `tr` changed the same day: see the
+  correction below.) This replaces Part 3's "with git's path
   quoting off". For ordinary paths it's the same listing byte for byte (it
   was compared on the 990-file test repo), so areas already written in a
-  brief still rebuild. The `find` listing outside git already prints paths
-  as they are.
+  brief still rebuild. (The first version of this said the `find` listing
+  outside git already printed paths as they are. It had the same hole; see
+  the correction below.)
 - **What still can't be carried.** An area line writes its paths between
   backticks, one line each, so a path with a backtick or a control
   character in it (a tab, a line break) is never a piece, a skipped folder
@@ -1261,6 +1264,71 @@ here):
 - The notation in Part 3 doesn't change, and neither does what an area
   means. Only the commands that rebuild one do. The scorer rebuilds areas
   from the same listing.
+
+**Corrected on 2026-11-24, after a second review of the fix itself.** The
+calls above let a path with a line break in it show as two lines of the
+listing, and said no listed path starts with `/`. Both are true of paths and
+neither is true of the lines a listing prints: a tracked file under a folder
+named `a` plus a line break, itself named `END`, a line break, a command, a
+line break and `x`, lists as four lines, the second of them `/END`. A lead
+that pasted its brief's paths into the line-count here-document closed it
+there, and the next line ran. The reviewer ran it in both shells and I ran
+it again: the planted file was created.
+
+**Calls I made** (same standing; cold-read before any builder was briefed):
+
+- **Every path is one line of the listing.** The listing turns a line break
+  inside a path into the byte `\001`: in git,
+  `git ls-files -z | tr '\n\0' '\001\n'`; outside git, the `find` command
+  prints with `-print0` and goes through the same `tr`. So no path is ever
+  split, and no line of a listing is anything but one whole path. This
+  replaces "a path with a line break shows as two lines" above. Such a path
+  now shows as one line with a control character in it, which the rule
+  above already covers: it is never a piece, a skipped folder or a range
+  end, the reader sent for it reports no such file, and Coverage names it
+  unread.
+- **A line that reads exactly `/END` is never pasted into a here-document.**
+  It can't come from a listing any more, but a brief is text, and the check
+  costs nothing: such a line is left out and named unread. The sentence
+  that said no listed path starts with `/` goes; what holds is that a
+  here-document ends only at a line that is exactly its delimiter, and no
+  path is one.
+- **The untracked listing gets the same mapping,** since a scoped
+  follow-up can copy an unread untracked path into a `Read only these
+  files:` list that the next run pastes.
+- **The `/END` test is made on the line as a person would read it:** with
+  the backticks around it and the spaces at its ends taken off. That is
+  wider than what the shell would act on, which is the safe side. Absolute
+  paths in a brief are untouched, since none of them reads `/END`.
+- The scorer lists the same way, so it rebuilds an area as the agent does.
+
+What the cold read (by `the-foundry:architect`, which ran 28 hostile paths
+through every use of a listing's lines in bash 3.2 and `zsh -f`) found and
+this leaves as it is:
+
+- **The model can't see the byte.** A `\001` or a carriage return shows as
+  nothing in what the model reads, so a top-level folder with one in its
+  name looks ordinary and can't be typed into the check's `except`. On a
+  repo built that way the first run's exactly-once check can fail every
+  time, and the run reads nothing. It fails closed: nothing is read and
+  nothing runs. Known limit, no new words for the agent.
+- **Two names can list as one.** A repo holding both `x`, a line break, `y`
+  and `x`, `\001`, `y` lists them as the same line twice. Both sides of
+  the check hold the duplicate, so counts agree; the line-break file can be
+  reported read when it wasn't. Its folder holds a control character, so it
+  is never named in an area line anyway.
+- The exactly-once check still sorts its listing side, now for another
+  reason: `\001` sorts before a tab, so a listing with control characters
+  in it can be out of byte order.
+
+**Owner decision (2026-11-24), relayed by the session preparing the
+release:** "Narrow fix, ship." This correction is built on its own, with
+the hostile-name tests in both shells and the gate as its proof. No loop,
+head-to-head or smoke run is made for it. The second review's smaller
+points are parked: the scaffold guard and an inherited `GIT_DIR`; a
+continuing brief with `END OF BLOCK` twice, an area line twice, or no
+readable area line; what the session does when its count check fails
+twice; a top-level folder that appears between parts.
 
 **A continuing brief that arrives broken.** Part 5 says what a continuing
 run does with the brief it should get. It didn't say what to do with one
@@ -1462,12 +1530,13 @@ branch to miss a planted fact.
   where `awk` would match every file. The one pipeline that ends in `uniq -c`
   swallowed the stop (the shell's error, exit 0, nothing listed), so a guard,
   `: "${<dir var>:?}" &&`, goes in front of it.
-- The listing is `git ls-files -z | tr '\0' '\n'`: git quotes a path with a
-  backslash or a double quote even with `core.quotepath` off, and `-z` never
-  quotes. On the 990-file repo it's byte for byte the old listing.
-- The exactly-once check sorts the listing side as well. A path with a line
-  break shows as two lines out of byte order, and without the sort the `diff`
-  failed forever.
+- The listing is `git ls-files -z | tr '\n\0' '\001\n'`: git quotes a path
+  with a backslash or a double quote even with `core.quotepath` off, `-z`
+  never quotes, and a line break in a path becomes `\001`, so every path is
+  one line. On the 990-file repo it's byte for byte the old listing.
+- The exactly-once check sorts the listing side as well, since `\001` sorts
+  before a tab and a listing with control characters can be out of byte
+  order.
 - Line counts take their paths from a listing piped through
   `tr '\n' '\0' | xargs -0 wc -l --`, or from a here-document, and the block's
   count from the area lines pasted between `wc -l <<'/END'` and `/END`. The old
@@ -1501,6 +1570,17 @@ to close the quote ran a planted command, `bob's notes/` was a syntax error,
 and a path with a backslash matched nothing. No run of the loop had hit it,
 because the test repo has no such names.
 
+A second review, of the fix itself, found that a path with a line break and
+`/END` in it closed the here-document a path is pasted into, and the next
+line ran. It was reproduced in both shells: a planted file was created. The
+listing now maps the line break to `\001`, and a line reading `/END` is never
+pasted. The first fix's tests had a line-break path whose fragment didn't
+start with `/`, which is why they missed it.
+
+By the owner's choice ("Narrow fix, ship") that last fix was shipped on its
+tests and the gate, with no new loop, head-to-head or smoke run. The runs of
+record are on the text before it.
+
 **The harness.** It refuses a `timeout_seconds` over 3600, so the loop case
 has an hour at most. `--keep-temp` keeps each workspace with the session's own
 folder sealed, so the parts were rebuilt from the Write calls in the kept
@@ -1514,10 +1594,18 @@ the message itself.
 
 - A path with a backtick or a control character can't be written in an area
   line, so it is covered by a parent piece, or skipped whole when it's a
-  top-level folder in part 1. A path with a line break shows as two lines and
-  is reported unread. The tests cover quotes, backslashes, `$(…)`, spaces,
+  top-level folder in part 1. A path with a line break lists as one line with
+  `\001` in its place and is reported unread; a repo holding both names lists
+  them as one line twice. A control character shows as nothing in what the
+  model reads, so a top-level folder with one in its name looks ordinary,
+  can't be typed to skip it, and can stall the first run's check, which fails
+  closed. The tests cover quotes, backslashes, `$(…)`, spaces,
   dashes, non-ASCII, a carriage return and a line break, on the stock macOS
   awk, bash 3.2 and zsh only; gawk and mawk are untried.
+- The second review left these parked, in the build log's Parked list: the
+  scaffold and an inherited `GIT_DIR`; a continuing brief with `END OF BLOCK`
+  twice, an area line twice or no readable area line; the session's count
+  check failing twice; a top-level folder that appears between parts.
 - Density: a report's size depends on what the files hold, and a repo denser
   than the test repo could overflow a part. The open item stands.
 - The block grows with the repo, as the open item says. Nothing has been tried

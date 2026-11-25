@@ -3857,6 +3857,109 @@ class HostileNamesTest(unittest.TestCase):
         self.assertIn('"a\\\\tb/y.py"', quoted)
 
 
+class LineBreakNamesTest(unittest.TestCase):
+    """The scorer lists as the agent does: a line break inside a path becomes the byte \x01, so every path is one entry."""
+
+    NAMES = ["a\n/END\ntouch PWNED3\nx", "docs/nl\nx.md", "docs/plain.md", "\nlead.txt", "trail.txt\n", "sp\x01x/y.txt", "sp\nx/y.txt", "ok/z.txt"]
+
+    @classmethod
+    def setUpClass(cls):
+        real = shutil.which("git")
+        if not real:
+            raise unittest.SkipTest("no git")
+        cls.base = Path(tempfile.mkdtemp(prefix="linebreak-scorer-")).resolve()
+        cls.repo = cls.base / "repo"
+        (cls.repo / "bin").mkdir(parents=True)
+        wrapper = cls.repo / "bin" / "git"
+        wrapper.write_text("#!/bin/sh\nexec \"" + real + "\" \"$@\"\n", encoding="utf-8")
+        wrapper.chmod(0o755)
+        cls.env = {"PATH": os.environ["PATH"], "HOME": str(cls.base), "GIT_CONFIG_GLOBAL": "/dev/null", "GIT_CONFIG_SYSTEM": "/dev/null",
+                   "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com", "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com"}
+        cls.created = []
+        cls.git("init", "-q", "-b", "main")
+        for name in cls.NAMES:
+            path = cls.repo / name
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x = 1\n", encoding="utf-8")
+            except OSError:
+                continue
+            cls.created.append(name)
+        cls.git("add", *cls.created)
+        cls.git("commit", "-q", "-m", "all")
+        cls.scorer = load_scorer_module()
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(str(cls.base), ignore_errors=True)
+
+    @classmethod
+    def git(cls, *args):
+        done = subprocess.run(["git", *args], cwd=str(cls.repo), env=cls.env, capture_output=True)
+        assert done.returncode == 0, done.stderr
+        return done.stdout
+
+    def test_the_hostile_file_and_the_line_break_names_were_created(self):
+        for must in ("a\n/END\ntouch PWNED3\nx", "docs/nl\nx.md", "\nlead.txt", "trail.txt\n"):
+            self.assertIn(must, self.created)
+
+    def test_tracked_files_gives_the_x01_forms_one_entry_per_nul_separated_path(self):
+        got = self.scorer.tracked_files(str(self.repo))
+        raw = [p for p in self.git("ls-files", "-z").split(b"\0") if p]
+        self.assertEqual(len(got), len(raw))
+        self.assertEqual(got, [p.replace(b"\n", b"\x01") for p in raw])
+        self.assertIn(b"a\x01/END\x01touch PWNED3\x01x", got)
+        self.assertIn(b"docs/nl\x01x.md", got)
+        for path in got:
+            self.assertNotIn(b"\n", path)
+            self.assertFalse(path.startswith(b"/"))
+
+    def test_a_real_x01_byte_and_its_line_break_twin_list_as_the_same_entry_twice(self):
+        got = self.scorer.tracked_files(str(self.repo))
+        self.assertEqual(got.count(b"sp\x01x/y.txt"), 2)
+
+    def test_the_docs_folder_rebuilds_to_include_the_line_break_path_whole(self):
+        tracked = self.scorer.tracked_files(str(self.repo))
+        pieces = self.scorer.parse_definition("`docs/`")
+        self.assertEqual(self.scorer.rebuild(pieces, tracked), {b"docs/nl\x01x.md", b"docs/plain.md"})
+
+    def test_a_folder_with_a_line_break_in_its_name_rebuilds_through_its_x01_form(self):
+        tracked = self.scorer.tracked_files(str(self.repo))
+        pieces = self.scorer.parse_definition("`a\x01/`")
+        self.assertIsInstance(pieces, list, pieces)
+        self.assertEqual(self.scorer.rebuild(pieces, tracked), {b"a\x01/END\x01touch PWNED3\x01x"})
+
+    def test_the_root_area_holds_the_root_files_with_a_line_break_in_their_names(self):
+        tracked = self.scorer.tracked_files(str(self.repo))
+        root = self.scorer.rebuild(self.scorer.parse_definition("`(root)`"), tracked)
+        self.assertEqual(root, {b"\x01lead.txt", b"trail.txt\x01"})
+
+    def test_the_script_maps_the_line_break_in_its_source(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('p.replace(b"\\n", b"\\x01")', source)
+        self.assertIn('[git, "ls-files", "-z"]', source)
+
+    def test_the_fixture_list_is_still_990_files_and_its_commit_is_d12b0aa(self):
+        got = self.scorer.tracked_files(str(Fixture.repo))
+        self.assertEqual(len(got), 990)
+        self.assertEqual(got, [p.encode("utf-8") for p in Fixture.tracked])
+        head = subprocess.run([str(Fixture.repo / "bin" / "git"), "rev-parse", "--short", "HEAD"], cwd=str(Fixture.repo), capture_output=True, text=True)
+        self.assertEqual(head.stdout.strip(), "d12b0aa")
+
+    def test_a_mutant_scorer_that_keeps_the_line_break_would_return_the_path_with_its_line_breaks_in_it(self):
+        source = SCRIPT.read_text(encoding="utf-8")
+        old = 'p.replace(b"\\n", b"\\x01") for p in done.stdout.split(b"\\0")'
+        self.assertEqual(source.count(old), 1)
+        mutant = self.base / "check_parts_plain_listing.py"
+        mutant.write_text(source.replace(old, 'p for p in done.stdout.split(b"\\0")'), encoding="utf-8")
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("check_parts_mutant_listing", str(mutant))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        got = mod.tracked_files(str(self.repo))
+        self.assertIn(b"a\n/END\ntouch PWNED3\nx", got)   # a raw path with its line breaks: the shape the fix removes from the listing
+
+
 @unittest.skipUnless(Path("/usr/bin/python3").exists(), "no stock python")
 class StockPythonTest(Base):
     def test_the_script_runs_on_the_stock_interpreter_and_agrees(self):

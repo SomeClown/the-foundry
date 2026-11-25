@@ -103,8 +103,8 @@ PINS = [
     ("what was read and skipped goes on Files listed and the skip reasons", "Areas", r"What was read and what was skipped go on the `Files listed:` line and the skip reasons after it"),
     ("only paths go in backticks, root and direct are bare", "Areas", r"Only folder and file paths go in backticks\. `\(root\)` and `\(direct\)` are written bare"),
     ("areas ordered by byte order of the first path", "Areas", r"Order the areas by the byte order of each area's first path"),
-    ("list command and wrapper", "Areas", r"`<list>` below is `git ls-files -z \| tr '\\0' '\\n'`, with the brief's wrapper in place of `git`"),
-    ("outside git the default find command", "Areas", r"`find \. \\\( -name \.git -o -name node_modules -o -name venv -o -name \.venv \\\) -prune -o -type f -print \| sed 's\|\^\\\./\|\|' \| LC_ALL=C sort`"),
+    ("list command and wrapper", "Areas", r"`<list>` below is `git ls-files -z \| tr '\\n\\0' '\\001\\n'`, with the brief's wrapper in place of `git`"),
+    ("outside git the default find command", "Areas", r"`find \. \\\( -name \.git -o -name node_modules -o -name venv -o -name \.venv \\\) -prune -o -type f -print0 \| tr '\\n\\0' '\\001\\n' \| sed 's\|\^\\\./\|\|' \| LC_ALL=C sort`"),
     ("outside git, a bounded variant is allowed", "Areas", r"Outside a git repo it's this command, or a bounded variant of it"),
     ("the find command, default included, goes on Environment", "Areas", r"The find command you use, the default one included, goes on the `Environment:` line so every run lists the same way"),
     ("each piece runs the command under its own comment", "Areas", r"Each piece runs the command under its own comment"),
@@ -228,22 +228,22 @@ PINS = [
     ("a Read only these files line is exactly the scope and replaces any other file list or scope", "Pick a Mode", r"A brief with a `Read only these files:` line reads exactly the paths under it; that list replaces any other file list or scope in the brief"),
 
     # Build the File List
-    ("the file list prints every path as it is: git ls-files -z through tr", "Build the File List", r"Use `git ls-files -z \| tr '\\0' '\\n'`, which prints every path exactly as it is, or a bounded `find` outside a git repo"),
-    ("the untracked listing is -z too", "Build the File List", r"\(`git ls-files --others --exclude-standard -z \| tr '\\0' '\\n'`\) in Coverage as unread"),
+    ("the file list prints every path on a line of its own: git ls-files -z through the line-break mapping", "Build the File List", r"Use `git ls-files -z \| tr '\\n\\0' '\\001\\n'`, which prints every path exactly as it is on a line of its own, a line break inside a path printed as the byte `\\001`, or a bounded `find` outside a git repo"),
+    ("the untracked listing has the same mapping", "Build the File List", r"\(`git ls-files --others --exclude-standard -z \| tr '\\n\\0' '\\001\\n'`\) in Coverage as unread"),
     ("never type a path into a command, between quotes or not", "Build the File List", r"Never type a path into a command, between quotes or not"),
     ("the reason: a quote, a dollar-paren, a backtick or a backslash is read as code", "Build the File List", r"Paths come from the repo, and a quote, `\$\(`, a backtick or a backslash in one would be read by the shell or by `awk` as code"),
-    ("paths come from a listing or a here-document whose quoted /END ends only on a line no path can be", "Build the File List", r"A command gets its paths from a listing, or from a here-document like the ones below, whose quoted `'/END'` makes the shell take every line as it is; no listed path starts with `/`, so none can end it early"),
+    ("paths come from a listing or a here-document that ends only at a line that is exactly /END, which no path is", "Build the File List", r"whose quoted `'/END'` makes the shell take every line as it is until a line that is exactly `/END`, which no path is"),
     ("line counts: a listing piped through tr and xargs -0, or paths pasted one per line with no indent", "Build the File List", r"Line counts go the same way: pipe a listing in, `<listing> \| tr '\\n' '\\0' \| xargs -0 wc -l --`, or, for paths you were given, paste them one per line, with no indent"),
 
     # Areas
-    ("each path goes into a variable of its own, three lines per path, the trailing slash kept, no indent", "Areas", r"Put each path a command needs into a variable of its own, `p1`, `p2` and so on, as \"Build the File List\" says of every path: one block of three lines per path, with the path on the middle line exactly as the listing printed it or the area line gives it, a folder's trailing `/` included, and no indent"),
+    ("each path goes into a variable of its own, three lines per path, the trailing slash kept, no indent, never a line that reads /END", "Areas", r"Put each path a command needs into a variable of its own, `p1`, `p2` and so on, as \"Build the File List\" says of every path: one block of three lines per path, with the path on the middle line exactly as the listing printed it or the area line gives it, a folder's trailing `/` included, no indent, and never a path that reads `/END` \(see \"Build the File List\"\):"),
     ("the variables are set in the same Bash call as the commands", "Areas", r"Set the variables in the same Bash call as the commands that use them"),
     ("a command names its variable where the fence has a var placeholder", "Areas", r"with a variable's name where the command says `<dir var>`, `<folder var>`, `<first var>`, `<last var>` or `<skipped var>`"),
     ("awk reads the path from ENVIRON and the colon-question-mark stops the command on an empty variable", "Areas", r"`awk` reads the path from `ENVIRON`, which leaves backslashes alone, and `:\?` stops the command when a variable is empty"),
     ("a path with a backtick or a control character is never a piece, a skipped folder or a range end", "Areas", r"A path with a backtick or a control character in it \(a tab, a line break\) can't be written in an area line, so it is never a piece, a skipped folder or a range end"),
     ("use a piece that holds it without naming it, or end the range beside it", "Areas", r"Use a piece that holds it without naming it, such as the folder above it, or end the range on the path beside it"),
     ("a top-level folder named so is skipped whole in part 1 with that reason", "Areas", r"A top-level folder with such a name is skipped whole in part 1, with the reason \"name can't be written in an area line\""),
-    ("a line-break path is two lines of the listing, each in whatever area its text falls in", "Areas", r"A path with a line break shows in the listing as two lines that aren't real paths: each goes in whatever area its text falls in, and the reader sent for it reports no such file"),
+    ("a line break in a path shows as the byte 001, so the path is one line like any other", "Areas", r"A line break in a path shows in the listing as `\\001`, so the path is one line like any other: it goes in whatever area holds it, and `wc -l` and the reader sent for it report no such file"),
 
     # Reading a Part
     ("an area line that can't be read as one is dropped, with the Area dropped form for such a line", "Reading a Part", r"An area line that can't be read as one \(no `\(<n> files\)` at its end, or a definition that doesn't follow \"Areas\"\) is dropped the same way, with the `Area dropped:` form for such a line \(see \"8\. Coverage\"\)"),
@@ -266,7 +266,9 @@ PINS = [
     ("coupling claims are checked with the Grep tool, never a grep with the name typed in", "Check Before You Compile", r"check coupling claims with the Grep tool for the referenced name, never a `grep` with the name typed into it"),
 
     # When You're an Area Lead
-    ("a lead's line counts take its brief's paths in a here-document", "When You're an Area Lead", r"Get line counts with `wc -l` for the big-file rule, with your brief's paths in a here-document as \"Build the File List\" shows"),
+    ("a lead's line counts take its brief's paths in a here-document, and never a path that reads /END", "When You're an Area Lead", r"Get line counts with `wc -l` for the big-file rule, with your brief's paths in a here-document as \"Build the File List\" shows, and never a path that reads `/END`"),
+    ("the rule: never paste a line that reads /END, once its backticks and the spaces at its ends are off, into a here-document", "Build the File List", r"Never paste a line that reads `/END`, once its backticks and the spaces at its ends are off, into a here-document"),
+    ("why: it can only come from text changed on the way, so leave it out and name it unread", "Build the File List", r"it can only come from text changed on the way, so leave it out and name it unread"),
 
     # 8. Coverage
     ("the one reply without Coverage is the one for a cut-off continuing brief", "8. Coverage", r"The one reply without it is the one for a cut-off `CONTINUE SWEEP` brief \(see \"If Your Brief Continues a Sweep\"\)"),

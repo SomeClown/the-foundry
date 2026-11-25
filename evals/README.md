@@ -217,8 +217,9 @@ none starts a model session.
   `CAN'T MEASURE:` when it didn't.
 - `check_parts.py --key KEY --repo FIXTURE_DIR --parts DIR [--min-parts N]
   [--part-size N] [--transcript FILE]` scores the saved parts. From the parts
-  it establishes that every tracked file outside the folder skipped whole is
-  in exactly one area; that the parts say unread and failed are 0 and their
+  it establishes that every tracked file (listed as the agent lists them, a
+  line break in a path as `\001`) outside the folder skipped whole is in
+  exactly one area; that the parts say unread and failed are 0 and their
   skipped and read numbers add up to the key's; that every area line rebuilds
   to its count and no area holds more than 165 files; that each block is the
   one before it minus the areas just read, with the Coverage lines, the block

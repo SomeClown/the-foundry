@@ -121,7 +121,8 @@ or under it is one report, built as before. Above it, see "A Sweep in Parts"
 anything walks the whole list: on a full sweep, count first, and above the part size
 go to "A Sweep in Parts" without building the list or running `wc -l` over it.
 
-Use `git ls-files -z | tr '\0' '\n'`, which prints every path exactly as it is, or a
+Use `git ls-files -z | tr '\n\0' '\001\n'`, which prints every path exactly as it is on
+a line of its own, a line break inside a path printed as the byte `\001`, or a
 bounded `find` outside a git repo. If the brief names a git
 wrapper, use that, and tell anyone you brief to use it too. This list is what the
 gap check reconciles against later. In scoped mode the list is the scoped set. The
@@ -130,7 +131,7 @@ all count the current mode's list, never the whole repo.
 
 Skip lock files, generated and build output, vendored dependencies, data and fixture
 files, and binaries, and count each skip by reason for Coverage. On a full sweep, list untracked
-files (`git ls-files --others --exclude-standard -z | tr '\0' '\n'`) in Coverage as
+files (`git ls-files --others --exclude-standard -z | tr '\n\0' '\001\n'`) in Coverage as
 unread, and don't
 read them (a continuing run doesn't list them; see "If Your Brief Continues a
 Sweep"). They don't count toward the part size or
@@ -146,8 +147,11 @@ file counts as read only when every one of its sections has reported.
 Never type a path into a command, between quotes or not. Paths come from the repo, and a
 quote, `$(`, a backtick or a backslash in one would be read by the shell or by `awk` as
 code. A command gets its paths from a listing, or from a here-document like the ones
-below, whose quoted `'/END'` makes the shell take every line as it is; no listed path
-starts with `/`, so none can end it early. Line counts go the same way: pipe a listing
+below, whose quoted `'/END'` makes the shell take every line as it is until a line that
+is exactly `/END`, which no path is. Never paste a line that reads `/END`, once its
+backticks and the spaces at its ends are off, into a here-document: it can only come
+from text changed on the way, so leave it out and name it unread. Line counts go the
+same way: pipe a listing
 in, `<listing> | tr '\n' '\0' | xargs -0 wc -l --`, or, for paths you were given, paste
 them one per line, with no indent:
 
@@ -204,15 +208,16 @@ never `(70 files; 69 read)`. What was read and what was skipped go on the `Files
 line and the skip reasons after it. Order the areas by the byte order of each area's
 first path.
 
-`<list>` below is `git ls-files -z | tr '\0' '\n'`, with the brief's wrapper in place of `git`. Outside a git repo it's this command, or a bounded variant of it:
-`find . \( -name .git -o -name node_modules -o -name venv -o -name .venv \) -prune -o -type f -print | sed 's|^\./||' | LC_ALL=C sort`.
+`<list>` below is `git ls-files -z | tr '\n\0' '\001\n'`, with the brief's wrapper in place of `git`. Outside a git repo it's this command, or a bounded variant of it:
+`find . \( -name .git -o -name node_modules -o -name venv -o -name .venv \) -prune -o -type f -print0 | tr '\n\0' '\001\n' | sed 's|^\./||' | LC_ALL=C sort`.
 The find command you use, the default one included, goes on the `Environment:` line
 so every run lists the same way.
 
 Put each path a command needs into a variable of its own, `p1`, `p2` and so on, as
 "Build the File List" says of every path: one block of three lines per path, with the
 path on the middle line exactly as the listing printed it or the area line gives it,
-a folder's trailing `/` included, and no indent:
+a folder's trailing `/` included, no indent, and never a path that reads `/END` (see
+"Build the File List"):
 
 ```
 IFS= read -r p1 <<'/END'
@@ -253,9 +258,9 @@ A path with a backtick or a control character in it (a tab, a line break) can't 
 written in an area line, so it is never a piece, a skipped folder or a range end. Use a
 piece that holds it without naming it, such as the folder above it, or end the range on
 the path beside it. A top-level folder with such a name is skipped whole in part 1,
-with the reason "name can't be written in an area line". A path with a line break shows
-in the listing as two lines that aren't real paths: each goes in whatever area its text
-falls in, and the reader sent for it reports no such file.
+with the reason "name can't be written in an area line". A line break in a path shows
+in the listing as `\001`, so the path is one line like any other: it goes in whatever
+area holds it, and `wc -l` and the reader sent for it report no such file.
 
 On a first run, before you read anything, run the last command. If it fails, fix the areas and check
 again. Don't read while it fails.
@@ -462,7 +467,7 @@ Never trim an inventory to save space, at any layer.
 Your brief lists your files. Don't build a list, apply the part size, or split
 further, and start no agent but `file-reader`. Get line counts with `wc -l` for the
 big-file rule, with your brief's paths in a here-document as "Build the File List"
-shows. Run readers in batches of 10 as above, including that rule, and do
+shows, and never a path that reads `/END`. Run readers in batches of 10 as above, including that rule, and do
 the three checks above for your area. Then return, under your area's name: the
 inventories whole, your coupling and gotcha findings with `path:line`, the files
 each one refers to, and your Coverage counts. Also return a **file checklist**:
