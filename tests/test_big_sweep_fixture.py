@@ -1662,14 +1662,15 @@ def clean_env(home):
 
 
 def snapshot(folder):
-    """Every path under the folder, .git included (its object store left out: git's own background maintenance repacks it), with a
-    hash of each file: what a run left behind."""
+    """Every path under the folder with a hash of each file: what a run left in the working tree. A `.git` folder is listed as a path
+    but never opened: git's own background maintenance writes into it (`info/refs`, `gc.log`, packed refs) for a while after a
+    commit, so hashing it races. What matters inside it is compared through git's own answers (see `git_facts`)."""
     found = {}
     for base, dirs, names in os.walk(str(folder)):
-        if base.endswith(os.sep + ".git"):
-            dirs[:] = [d for d in dirs if d != "objects"]
-        for name in dirs:
+        for name in list(dirs):
             found[str((Path(base) / name).relative_to(folder)) + "/"] = ""
+            if name == ".git":
+                dirs.remove(name)
         for name in names:
             path = Path(base) / name
             found[str(path.relative_to(folder))] = sha(path)
@@ -1711,7 +1712,12 @@ class ScaffoldGuardTest(unittest.TestCase):
     def repo_state(self, repo):
         has_head = subprocess.run(["git", "rev-parse", "--verify", "-q", "HEAD"], cwd=str(repo), env=self.env, capture_output=True, text=True)
         return {"head": has_head.stdout, "index": self.git_in(repo, "ls-files", "-s"), "status": self.git_in(repo, "status", "--porcelain"),
-                "branches": self.git_in(repo, "branch", "--list"), "files": snapshot(repo)}
+                "branches": self.git_in(repo, "branch", "--list"), "refs": self.git_in(repo, "for-each-ref"), "files": snapshot(repo)}
+
+    def state(self, folder):
+        """What a refused run must leave as it was: the working tree and git's answers about HEAD, the index, the status and the refs.
+        Nothing here reads a file under .git, so git's background maintenance can't change it."""
+        return {"files": snapshot(folder), "git": self.repo_state(folder) if (Path(folder) / ".git").exists() else None}
 
     def scaffold(self, cwd, *args, script=SCAFFOLD, env=None):
         return subprocess.run(["bash", str(script), *args], cwd=str(cwd), env=env or self.env, capture_output=True, text=True)
@@ -1764,12 +1770,13 @@ class ScaffoldGuardTest(unittest.TestCase):
     def test_a_second_run_in_the_built_fixture_is_refused_and_changes_nothing(self):
         dest = self.empty("rerun")
         self.assertBuilt(self.scaffold(dest), dest)
-        before, head = snapshot(dest), self.short_head(dest)
+        before, head = self.state(dest), self.short_head(dest)
         full_head = self.git_in(dest, "rev-parse", "HEAD")
+        self.assertEqual(len(before["git"]["index"].splitlines()), 990)
         for args in ((), ("--subset", "150")):
             with self.subTest(args=args):
                 self.assertRefused(self.scaffold(dest, *args), NOT_EMPTY_MESSAGE, dest)
-                self.assertEqual(snapshot(dest), before)
+                self.assertEqual(self.state(dest), before)
                 self.assertEqual(self.git_in(dest, "rev-parse", "HEAD"), full_head)
                 self.assertEqual(self.short_head(dest), head)
 
@@ -1786,17 +1793,17 @@ class ScaffoldGuardTest(unittest.TestCase):
     def test_a_folder_with_one_stray_file_is_refused_and_the_file_is_untouched(self):
         dest = self.empty("stray")
         (dest / "stray").write_text("mine\n", encoding="utf-8")
-        before = snapshot(dest)
+        before = self.state(dest)
         self.assertRefused(self.scaffold(dest), NOT_EMPTY_MESSAGE, dest)
-        self.assertEqual(snapshot(dest), before)
+        self.assertEqual(self.state(dest), before)
         self.assertEqual((dest / "stray").read_text(encoding="utf-8"), "mine\n")
 
     def test_a_folder_holding_only_a_dotfile_is_refused(self):
         dest = self.empty("dot")
         (dest / ".hidden").write_text("x\n", encoding="utf-8")
-        before = snapshot(dest)
+        before = self.state(dest)
         self.assertRefused(self.scaffold(dest), NOT_EMPTY_MESSAGE, dest)
-        self.assertEqual(snapshot(dest), before)
+        self.assertEqual(self.state(dest), before)
         self.assertFalse((dest / "bin").exists())
 
     def test_the_root_of_a_repo_with_commits_is_refused_on_either_check_and_writes_nothing(self):
@@ -1815,6 +1822,37 @@ class ScaffoldGuardTest(unittest.TestCase):
         self.assertRefused(self.scaffold(dest, env=env), HAS_COMMITS_MESSAGE, dest)
         self.assertEqual(list(dest.iterdir()), [])
         self.assertEqual(self.repo_state(repo), before)
+
+    # ---- the comparison is steady against git's background writes, and still sees real damage
+
+    def test_the_state_comparison_ignores_what_git_writes_under_dot_git_by_itself(self):
+        repo = self.make_repo("steady")
+        before = self.state(repo)
+        (repo / ".git" / "info").mkdir(exist_ok=True)
+        (repo / ".git" / "info" / "refs").write_text("noise\n", encoding="utf-8")   # what maintenance writes after a commit
+        (repo / ".git" / "gc.log").write_text("noise\n", encoding="utf-8")
+        self.assertEqual(self.state(repo), before)
+
+    def test_the_state_comparison_sees_a_written_file_a_staged_file_a_moved_head_and_a_new_branch(self):
+        for label, damage in (
+            ("a file written", lambda r: (r / "new.txt").write_text("x\n", encoding="utf-8")),
+            ("a file changed", lambda r: (r / "keep.txt").write_text("changed\n", encoding="utf-8")),
+            ("a file staged", lambda r: self.git_in(r, "add", "dirty.txt")),
+            ("HEAD moved", lambda r: self.git_in(r, "commit", "-q", "--allow-empty", "-m", "two")),
+            ("a branch made", lambda r: self.git_in(r, "branch", "other")),
+            ("a folder made", lambda r: (r / "bin").mkdir()),
+        ):
+            with self.subTest(damage=label):
+                repo = self.make_repo("damage-" + label.replace(" ", "-"))
+                before = self.state(repo)
+                damage(repo)
+                self.assertNotEqual(self.state(repo), before)
+
+    def test_the_state_comparison_sees_a_dot_git_made_where_there_was_none(self):
+        dest = self.empty("gitless")
+        before = self.state(dest)
+        subprocess.run(["git", "init", "-q"], cwd=str(dest), env=self.env, check=True, capture_output=True)
+        self.assertNotEqual(self.state(dest), before)
 
     # ---- --emit-key works anywhere
 
