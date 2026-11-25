@@ -4,7 +4,7 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [2.3.0] — 2026-11-24
 
 `investigate` no longer stops above 500 files to have your session ask you
 first. A repo too big for one report is read in parts, and the session carries
