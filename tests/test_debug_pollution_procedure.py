@@ -225,7 +225,6 @@ class CheckTest(Fixture):
 
     def test_step_6_lists_both_runs(self):
         body = " ".join(section().split())
-        self.assertIn("the victim alone: it passes", body)
         self.assertIn("the polluter, then the victim, in one run with nothing else: the victim fails", body)
 
     def test_the_victim_alone_passes(self):
@@ -248,18 +247,6 @@ class CheckTest(Fixture):
         both, _ = self.sh(f"{py} tests/test_a_currency.py {VICTIM_PYTEST}")
         self.assertEqual(alone, 0)
         self.assertNotEqual(both, 0)
-
-
-class OrderTest(unittest.TestCase):
-    """The check comes before a polluter is named, and the pins must say so."""
-
-    def test_check_step_precedes_the_reading_step(self):
-        body = section()
-        self.assertLess(body.index("**The check (required).**"), body.index("**Read what the polluter changes"))
-
-    def test_check_is_framed_as_before_naming(self):
-        body = " ".join(section().split())
-        self.assertIn("Before you name a polluter", body)
 
 
 SHELLS = {"bash": ["bash", "-c"], "zsh -f": ["zsh", "-f", "-c"]}

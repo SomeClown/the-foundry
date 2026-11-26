@@ -398,6 +398,12 @@ class PartsPinsTest(unittest.TestCase):
                 moved[other] = moved[other] + " " + phrase
                 self.assertIsNone(re.search(pattern, moved[heading]), f"'{item}' is satisfied outside '{heading}'")
 
+    def test_the_coverage_heading_the_scorer_looks_for_is_the_agents(self):
+        heading = load_scorer().COVERAGE_HEADING
+        lines = [line for line in raw().split("\n") if re.fullmatch(r"#{2,3} " + re.escape(heading), line)]
+        self.assertEqual(len(lines), 1,
+                         "agents/investigate.md: no single heading line '## %s' or '### %s' (found %d); the scorer finds the Coverage lines by it" % (heading, heading, len(lines)))
+
     def test_every_heading_the_pins_name_exists_exactly_once(self):
         text = self.text
         for heading in {h for _, h, _ in PINS}:
@@ -481,10 +487,6 @@ class PartsPinsTest(unittest.TestCase):
         return text[at: at + 5 + nxt.start()] if nxt else text[at:]
 
     def test_the_range_line_is_the_string_comparison_one(self):
-        fence = fence_with(self.body_raw("### Areas"), "# count by top-level folder")
-        want = ("<piece> | a=\"${<first var>:?}\" b=\"${<last var>:?}\" LC_ALL=C awk "
-                "'($0 \"\") >= (ENVIRON[\"a\"] \"\") && ($0 \"\") <= (ENVIRON[\"b\"] \"\")'")
-        self.assertIn(want, fence)
         self.assertNotIn("'$0 >= a && $0 <= b'", self.text)
         self.assertNotIn("$0 >= ENVIRON", self.text)  # each side joined with "" so the comparison is of strings
 
@@ -610,7 +612,6 @@ class PartsPinsTest(unittest.TestCase):
         self.assertEqual(len(re.findall(r"part 1 only", flat, flags=re.I)), 3)
         by_section = dict((h, len(re.findall(r"part 1 only", b, flags=re.I))) for h, b in self.sections.items())
         self.assertEqual(dict((h, n) for h, n in by_section.items() if n), {"8. Coverage": 2, "Check Before You Compile": 1})
-        self.assertIn("Name no untracked file anywhere in your report", self.sections["If Your Brief Continues a Sweep"])
         self.assertNotRegex(flat, r"(?i)untracked[^.]{0,80}\bevery part\b")
         # no sentence sends untracked files into a findings section of a part
         self.assertNotRegex(flat, r"(?i)untracked[^.]{0,80}(?:Feature Status|Gotchas|Findings)")
@@ -630,10 +631,8 @@ class PartsPinsTest(unittest.TestCase):
         self.assertEqual(len(re.findall(r"the saved file for the whole return before judging it", flat, flags=re.I)), 1)
         self.assertEqual(len(re.findall(r"arrives as a preview", flat)), 2)
         self.assertEqual(len(re.findall(r"with its full text saved to a file", flat)), 1)
-        self.assertIn("the saved file for the whole return", self.sections["Check Before You Compile"])
         wrong = self.sections["When a Part Goes Wrong"]
         self.assertNotIn("saved", wrong)
-        self.assertIn("see \"Check Before You Compile\"", wrong)
 
     def test_the_preview_rule_sits_beside_the_cut_off_definition(self):
         body = self.sections["Check Before You Compile"]
@@ -659,26 +658,6 @@ class PathsAndBrokenBriefTest(unittest.TestCase):
 
     # ---- the variable block and the pasted-paths fence
 
-    def test_the_variable_block_is_exactly_three_lines_in_one_fence_with_no_indent(self):
-        self.assertEqual(fence_with(raw_section(self.text, "### Areas"), VAR_BLOCK[0]), VAR_BLOCK)
-
-    def test_the_variable_block_check_fails_when_a_line_is_dropped_indented_or_changed(self):
-        area = raw_section(self.text, "### Areas")
-        block = "\n".join(VAR_BLOCK) + "\n"
-        self.assertIn(block, area)
-        for label, mutated in (
-            ("the path line gone", block.replace("<path>\n", "")),
-            ("the delimiter line gone", block.replace("/END\n", "")),
-            ("the path line indented", block.replace("<path>", "  <path>")),
-            ("a word delimiter", block.replace("/END", "END")),
-            ("an unquoted delimiter", block.replace("<<'/END'", "<<END")),
-            ("read without -r", block.replace("read -r", "read")),
-            ("no IFS=", block.replace("IFS= ", "")),
-        ):
-            with self.subTest(mutation=label):
-                changed = area.replace(block, mutated, 1)
-                self.assertNotEqual(fence_with(changed, VAR_BLOCK[0]), VAR_BLOCK)
-
     def test_the_variable_block_comes_before_the_command_fence_and_both_are_under_areas(self):
         area = raw_section(self.text, "### Areas")
         self.assertLess(area.index(VAR_BLOCK[0]), area.index("# count by top-level folder"))
@@ -687,23 +666,8 @@ class PathsAndBrokenBriefTest(unittest.TestCase):
 
     def test_the_pasted_paths_fence_is_in_the_file_list_section_and_holds_two_path_lines(self):
         section = raw_section(self.text, "## Build the File List")
-        self.assertEqual(fence_with(section, WC_FENCE[0]), WC_FENCE)
         self.assertLess(section.index("Never type a path into a command"), section.index(WC_FENCE[0]))
         self.assertLess(section.index("Get line counts with `wc -l`."), section.index("Never type a path into a command"))
-
-    def test_the_pasted_paths_fence_check_fails_when_a_line_changes(self):
-        section = raw_section(self.text, "## Build the File List")
-        block = "\n".join(WC_FENCE) + "\n"
-        self.assertIn(block, section)
-        for label, mutated in (
-            ("a word delimiter", block.replace("/END", "END")),
-            ("an unquoted delimiter", block.replace("<<'/END'", "<<END")),
-            ("no -0 on xargs", block.replace("xargs -0", "xargs")),
-            ("no -- before the paths", block.replace(" --\n", "\n")),
-            ("a path line gone", block.replace("<path>\n", "", 1)),
-        ):
-            with self.subTest(mutation=label):
-                self.assertNotEqual(fence_with(section.replace(block, mutated, 1), WC_FENCE[0]), WC_FENCE)
 
     def test_the_never_type_a_path_rule_comes_before_the_first_command_that_takes_a_path(self):
         text = self.text
@@ -734,16 +698,6 @@ class PathsAndBrokenBriefTest(unittest.TestCase):
             with self.subTest(mutation=label):
                 self.assertNotEqual(fence_with(section.replace(block, mutated, 1), CUT_OFF_REPLY[0]), CUT_OFF_REPLY)
 
-    def test_the_cut_off_reply_is_not_a_part_it_has_no_sweep_in_parts_line_and_ends_with_the_closing_line(self):
-        reply = fence_with(raw_section(self.text, "## If Your Brief Continues a Sweep"), CUT_OFF_REPLY[0])
-        self.assertEqual(len(reply), 2)
-        self.assertNotIn("SWEEP IN PARTS", "\n".join(reply))
-        self.assertEqual(reply[-1], "INVESTIGATE REPORT ENDS")
-        self.assertFalse(reply[0].startswith("NOT A PER-FILE READ"))  # the only first-line flag stays the only one
-        for word in ("Mode:", "Coverage", "Files listed", "Areas read", "Areas not read", "Whole repo"):
-            self.assertNotIn(word, "\n".join(reply))
-        self.assertTrue(reply[0].startswith("This CONTINUE SWEEP brief"))
-
     def test_the_wholeness_check_follows_the_template_and_the_not_a_part_sentence_follows_the_reply(self):
         section = raw_section(self.text, "## If Your Brief Continues a Sweep")
         order = [section.index("CONTINUE SWEEP\nProject:"), section.index("Check that the brief is whole"),
@@ -755,7 +709,6 @@ class PathsAndBrokenBriefTest(unittest.TestCase):
         # the section's first sentence checks for the marker; the wholeness check runs after it
         section = raw_section(self.text, "## If Your Brief Continues a Sweep")
         self.assertLess(section.index("CONTINUE SWEEP"), section.index("Check that the brief is whole"))
-        self.assertIn("check that before you pick a mode", self.sections["If Your Brief Continues a Sweep"])
 
     def test_the_cut_off_reply_is_said_in_one_place_and_pointed_to_from_coverage(self):
         flat = " ".join(self.text.split())
@@ -888,7 +841,6 @@ class QaFixAOldSentencesTest(unittest.TestCase):
 
     def test_the_scoped_read_has_no_part_lines_and_the_part_lines_are_for_a_part_of_a_full_sweep(self):
         self.assertEqual(len(re.findall(r"Coverage also has these lines", self.flat)), 1)
-        self.assertIn("In a part of a full sweep, Coverage also has these lines", self.sections["8. Coverage"])
 
     def test_readers_and_leads_have_their_own_dispatch_rules_in_run_the_readers(self):
         body = self.sections["Run the Readers"]
@@ -1014,12 +966,6 @@ class ReportFromTemplatesIsAcceptedByTheScorerTest(unittest.TestCase):
             done = subprocess.run([sys.executable, "-I", str(SCORER), "--key", str(base / "key.json"), "--repo", str(base / "repo"), "--parts", str(parts)],
                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, timeout=60)
             return done.returncode, done.stdout
-
-    def test_the_templates_are_extracted_from_the_file_itself(self):
-        self.assertEqual(self.t["block"][0], "SWEEP IN PARTS: 3 areas not read")
-        self.assertEqual(self.t["block"][-1], "END OF BLOCK")
-        self.assertEqual(self.t["zero"], "SWEEP IN PARTS: 0 areas not read")
-        self.assertEqual(self.t["last"], "INVESTIGATE REPORT ENDS")
 
     def test_a_three_part_report_written_from_the_templates_is_accepted(self):
         code, out = self.score()

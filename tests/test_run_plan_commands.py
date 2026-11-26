@@ -18,6 +18,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "run-plan" / "SKILL.md"
 SHELLS = [("bash", ["bash", "-c"]), ("zsh -f", ["zsh", "-f", "-c"])]
 
+# The five places in SKILL.md the extractors below look for the blocks by.
+QA_PASS_START = "Package the whole branch:"
+QA_PASS_END = "Then dispatch `the-foundry:qa`"
+LITERAL_SHA_START = "Before packaging, check that"
+LITERAL_SHA_END = "For a task that later tasks build on"
+PLAIN_STEP_4_START = "Package the task's diff every time"
+
 
 def blocks_between(start_marker, end_marker):
     text = SKILL.read_text(encoding="utf-8")
@@ -27,19 +34,19 @@ def blocks_between(start_marker, end_marker):
 
 
 def qa_pass_block():
-    blocks = blocks_between("Package the whole branch:", "Then dispatch `the-foundry:qa`")
+    blocks = blocks_between(QA_PASS_START, QA_PASS_END)
     assert len(blocks) == 1, blocks
     return blocks[0]
 
 
 def literal_sha_block():
-    blocks = blocks_between("Before packaging, check that", "For a task that later tasks build on")
+    blocks = blocks_between(LITERAL_SHA_START, LITERAL_SHA_END)
     assert len(blocks) == 1, blocks
     return blocks[0]
 
 
 def plain_step_4_block():
-    blocks = blocks_between("Package the task's diff every time", "Before packaging, check that")
+    blocks = blocks_between(PLAIN_STEP_4_START, LITERAL_SHA_START)
     assert len(blocks) == 1, blocks
     return blocks[0]
 
@@ -212,6 +219,34 @@ class Step4BlockTest(Repo):
         done = self.run_block(["bash", "-c"], self.fill(plain_step_4_block()))
         self.assertEqual(done.returncode, 0, done.stderr)
         self.assertEqual(literal, self.package())
+
+
+class AnchorTextTest(unittest.TestCase):
+    """The extractors above find each block by a sentence in SKILL.md. If one is reworded, the test for it says
+    which, instead of an index error somewhere else."""
+
+    def assertAnchor(self, anchor, *extractors):
+        for extractor in extractors:
+            try:
+                extractor()
+            except (AssertionError, ValueError, IndexError) as error:
+                self.fail("skills/run-plan/SKILL.md: %r is gone or reworded; %s finds the block by it (%s)"
+                          % (anchor, extractor.__name__, type(error).__name__))
+
+    def test_the_qa_pass_start_is_there(self):
+        self.assertAnchor(QA_PASS_START, qa_pass_block)
+
+    def test_the_qa_pass_end_is_there(self):
+        self.assertAnchor(QA_PASS_END, qa_pass_block)
+
+    def test_the_literal_sha_start_is_there(self):
+        self.assertAnchor(LITERAL_SHA_START, literal_sha_block, plain_step_4_block)
+
+    def test_the_literal_sha_end_is_there(self):
+        self.assertAnchor(LITERAL_SHA_END, literal_sha_block)
+
+    def test_the_plain_step_4_start_is_there(self):
+        self.assertAnchor(PLAIN_STEP_4_START, plain_step_4_block)
 
 
 if __name__ == "__main__":

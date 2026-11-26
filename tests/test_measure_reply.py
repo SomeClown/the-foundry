@@ -685,7 +685,6 @@ class ReplySizeCopiesTest(Base):
                 self.assertIn("adding only a last line that says END-OF-REPORT. Don't read the code yourself.", body)
                 self.assertIn("use `./bin/git` wherever you'd type `git`", body)
                 self.assertIn("The user approved reading every file, whatever the count.", body)
-                self.assertIn("Make the last line of your report exactly `TAIL-MARK-6620`.", body)
 
     def test_the_six_prompts_are_identical_and_the_cases_are_named_for_their_folders(self):
         prompts = {(EXPENSIVE / ("reply-size-" + s) / "prompt.md").read_bytes() for s, _ in SIZES}

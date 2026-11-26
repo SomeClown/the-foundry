@@ -16,6 +16,7 @@ that these tests would have caught it.
 
 Standard library only; git, awk, tr, xargs, wc, sort, uniq, sed, diff and find are the tools used. No network.
 """
+import functools
 import os
 import re
 import shutil
@@ -106,7 +107,10 @@ def list_command():
     return matches[0]
 
 
-LIST = list_command()
+@functools.lru_cache(maxsize=None)
+def list_listing():
+    """The `<list>` command, read when first needed, so a reworded sentence fails one test and not the import."""
+    return list_command()
 
 
 def find_command():
@@ -124,6 +128,13 @@ def sed_template():
 def file_list_section():
     text = agent_text()
     return text[text.index("\n## Build the File List\n"): text.index("\n## A Sweep in Parts\n")]
+
+
+def untracked_listing_command():
+    """The one command the file gives for listing untracked files."""
+    found = re.findall(r"`(git ls-files --others --exclude-standard -z \| tr [^`]*)`", file_list_section())
+    assert len(found) == 1, found
+    return found[0]
 
 
 def wc_pipe_template():
@@ -171,7 +182,7 @@ class Prog:
 
 def fill(prog, command, lister=None, **kw):
     """Fill the placeholders of one fence command. `piece` is a command string that already holds its lister."""
-    lister = LIST if lister is None else lister
+    lister = list_listing() if lister is None else lister
     for key in ("dir", "folder", "first", "last", "skipped"):
         if key in kw:
             command = command.replace("<%s var>" % key, prog.var(kw[key]))
@@ -483,7 +494,7 @@ class Helpers(unittest.TestCase):
         listing = m.group(1)
         chained = listing.replace("<skipped var>", self.prog.var(skipped[0]))
         for folder in skipped[1:]:
-            chained = self.except_of(chained.replace("<list>", LIST), folder)
+            chained = self.except_of(chained.replace("<list>", list_listing()), folder)
         command = tmpl.replace(listing, chained)
         if not sort_listing:
             assert " | LC_ALL=C sort) <(" in command
@@ -513,12 +524,12 @@ class FenceShapeTest(AreaRepo):
         self.assertEqual(var_block(), [VAR_FIRST, "<path>", "/END"])
 
     def test_the_file_lists_with_z_and_turns_a_line_break_in_a_path_into_the_byte_001_and_the_zero_bytes_into_line_breaks(self):
-        self.assertEqual(LIST, "git ls-files -z | tr '\\n\\0' '\\001\\n'")
+        self.assertEqual(list_listing(), "git ls-files -z | tr '\\n\\0' '\\001\\n'")
 
     def test_the_fixture_repo_lists_what_python_built(self):
         listed = self.git_z(self.repo)
         self.assertEqual(listed, TRACKED)
-        self.assertEqual(self.run_in(["bash", "-c"], LIST)[1].split("\n")[:-1], TRACKED)
+        self.assertEqual(self.run_in(["bash", "-c"], list_listing())[1].split("\n")[:-1], TRACKED)
 
     def test_without_z_a_non_ascii_name_comes_back_quoted(self):
         plain = self.git(self.repo, "ls-files").splitlines()
@@ -595,9 +606,9 @@ class ExceptTest(AreaRepo):
         self.check_paths(piece, ["web/index.html", "web/app.js"])
 
     def test_an_except_does_not_take_a_folder_that_starts_with_the_same_name(self):
-        self.check_paths(self.except_of(LIST, "api/"), [p for p in TRACKED if not p.startswith("api/")])
-        self.assertIn("api2/c.py", self.run_lines(self.except_of(LIST, "api/")))
-        self.check_paths(self.except_of(LIST, "we/"), TRACKED)  # "we/" is a folder that does not exist
+        self.check_paths(self.except_of(list_listing(), "api/"), [p for p in TRACKED if not p.startswith("api/")])
+        self.assertIn("api2/c.py", self.run_lines(self.except_of(list_listing(), "api/")))
+        self.check_paths(self.except_of(list_listing(), "we/"), TRACKED)  # "we/" is a folder that does not exist
 
     def run_lines(self, command):
         return [line for _, lines in self.each_shell(command) for line in lines]
@@ -608,7 +619,7 @@ class ExceptTest(AreaRepo):
 
     def test_except_of_a_folder_with_brackets_and_a_star_is_literal(self):
         self.check_paths(self.except_of(self.dir_piece("we[ir]d*/"), "we[ir]d*/"), [])
-        self.check_paths(self.except_of(LIST, "we[ir]d*/"),
+        self.check_paths(self.except_of(list_listing(), "we[ir]d*/"),
                          [p for p in TRACKED if not p.startswith("we[ir]d*/")])
 
     def test_except_after_direct_and_after_root(self):
@@ -854,7 +865,7 @@ class HostileRepo(Helpers):
     def test_the_listing_is_what_python_computes_from_the_z_listing(self):
         for name, argv in self.shells():
             with self.subTest(shell=name):
-                code, out, err = self.run_in(argv, LIST)
+                code, out, err = self.run_in(argv, list_listing())
                 self.assertEqual((code, err), (0, ""))
                 self.assertEqual(out_lines(out), self.lines)
 
@@ -922,7 +933,7 @@ class HostileRepo(Helpers):
     def test_except_of_each_hostile_folder_after_the_whole_listing(self):
         for d in self.hostile_dirs():
             with self.subTest(dir=d):
-                self.check_paths(self.except_of(LIST, d), [p for p in self.lines if not p.startswith(d)])
+                self.check_paths(self.except_of(list_listing(), d), [p for p in self.lines if not p.startswith(d)])
 
     def test_except_chained_twice_with_hostile_folders(self):
         dirs = self.hostile_dirs()
@@ -930,7 +941,7 @@ class HostileRepo(Helpers):
                  ("-dash/", " lead/"), ("trail /", "n" * 200 + "/")]
         for a, b in pairs:
             with self.subTest(first=a[:20], second=b[:20]):
-                piece = self.except_of(self.except_of(LIST, a), b)
+                piece = self.except_of(self.except_of(list_listing(), a), b)
                 self.check_paths(piece, [p for p in self.lines if not p.startswith(a) and not p.startswith(b)])
 
     def test_except_inside_a_hostile_piece_and_after_direct_and_root(self):
@@ -1099,9 +1110,7 @@ class HostileRepo(Helpers):
 
     def listing_commands(self):
         """Every listing command the agent file names, extracted: (name, command, directory to run it in)."""
-        untracked = re.findall(r"`(git ls-files --others --exclude-standard -z \| tr [^`]*)`", file_list_section())
-        self.assertEqual(len(untracked), 1, untracked)
-        return [("git", LIST, self.repo), ("untracked", untracked[0], self.repo), ("find", find_command(), self.plain)]
+        return [("git", list_listing(), self.repo), ("untracked", untracked_listing_command(), self.repo), ("find", find_command(), self.plain)]
 
     def expected_listing_count(self, name):
         tracked = len(self.git_z(self.repo))
@@ -1314,8 +1323,8 @@ class HostileRepo(Helpers):
         cases["down"] = self.t(C_DOWN, dir="files/")
         cases["dir"] = self.t(C_DIR, dir="files/")
         cases["direct"] = self.t(C_DIRECT, dir="files/")
-        cases["except"] = self.t(C_EXCEPT, piece=LIST, folder="files/")
-        cases["range"] = self.t(C_RANGE, piece=LIST, first="files/a", last="files/z")
+        cases["except"] = self.t(C_EXCEPT, piece=list_listing(), folder="files/")
+        cases["range"] = self.t(C_RANGE, piece=list_listing(), first="files/a", last="files/z")
         return cases
 
     def variants(self, command):
@@ -1383,7 +1392,7 @@ class HostileRepo(Helpers):
 
     def test_an_empty_variable_would_have_matched_every_file_without_the_guard(self):
         # why the guard is there: awk with an empty needle takes index($0, "") == 1 on every line
-        command = "<list> | d=\"\" LC_ALL=C awk 'index($0, ENVIRON[\"d\"]) == 1'".replace("<list>", LIST)
+        command = "<list> | d=\"\" LC_ALL=C awk 'index($0, ENVIRON[\"d\"]) == 1'".replace("<list>", list_listing())
         for name, lines in self.each_shell(command):
             with self.subTest(shell=name):
                 self.assertEqual(sorted(lines, key=byte_key), sorted(self.lines, key=byte_key))
@@ -1413,7 +1422,7 @@ class OldFormTest(Helpers):
         cls.build(hostile_paths(), prune=False)
 
     def old(self, folder, template_text=OLD_DIR):
-        return template_text.replace("<list>", LIST).replace("<dir>", folder).replace("<folder>", folder)
+        return template_text.replace("<list>", list_listing()).replace("<dir>", folder).replace("<folder>", folder)
 
     def test_the_injection_folder_prints_MARKER_under_the_old_form(self):
         for name, argv in self.shells():
@@ -1442,7 +1451,7 @@ class OldFormTest(Helpers):
                 self.check_paths(self.dir_piece(d), self.under(d))
 
     def test_the_old_form_except_also_fails_on_the_injection_folder(self):
-        command = self.old(INJECT, OLD_FOLDER_ARG.replace("<piece>", LIST))
+        command = self.old(INJECT, OLD_FOLDER_ARG.replace("<piece>", list_listing()))
         for name, argv in self.shells():
             with self.subTest(shell=name):
                 code, out, err = self.run_in(argv, command)
@@ -1576,6 +1585,53 @@ class NegativeTest(unittest.TestCase):
         self.assertTrue(violations_of_guarded_reads(good.replace(guard, "echo " + guard, 1)))              # guard not in front
         self.assertTrue(re.search(r"awk\s+-v\b", good + "\nawk -v d='x'"))
         self.assertEqual(len(re.findall(r"\bgrep\b", good + " grep foo")), 2)
+
+
+class AnchorTextTest(unittest.TestCase):
+    """The extractors above find the commands by a heading or a sentence in agents/investigate.md. If one is
+    reworded, the test that notices says which anchor, instead of an index error somewhere else."""
+
+    def assertFound(self, anchor, extractor, *args):
+        try:
+            extractor(*args)
+        except (AssertionError, ValueError, IndexError, AttributeError) as error:
+            self.fail("agents/investigate.md: %s is gone or reworded; %s finds the commands by it (%s)"
+                      % (anchor, extractor.__name__, type(error).__name__))
+
+    def test_the_areas_heading_is_there(self):
+        self.assertFound("the `### Areas` heading", section_text, "### Areas")
+
+    def test_the_build_the_file_list_heading_is_there(self):
+        self.assertFound("the `## Build the File List` heading", file_list_section)
+
+    def test_the_a_sweep_in_parts_heading_is_there(self):
+        self.assertFound("the `## A Sweep in Parts` heading", file_list_section)
+
+    def test_the_block_heading_and_its_count_header_are_there(self):
+        self.assertFound("the `### The Block` heading and its count header", block_count_header)
+
+    def test_the_list_sentence_is_there(self):
+        self.assertFound("the sentence that says what `<list>` is", list_command)
+
+    def test_the_find_command_is_there(self):
+        self.assertFound("the find command", find_command)
+
+    def test_the_sed_template_is_there(self):
+        self.assertFound("the sed template", sed_template)
+
+    def test_the_wc_pipe_sentence_is_there(self):
+        self.assertFound("the wc pipe sentence", wc_pipe_template)
+
+    def test_the_pasted_paths_fence_head_is_there(self):
+        self.assertFound("the pasted-paths fence head", wc_heredoc_template)
+
+    def test_the_untracked_listing_is_there(self):
+        self.assertFound("the untracked listing", untracked_listing_command)
+
+    def test_the_coupling_sentence_is_there(self):
+        found = coupling_sentence(agent_text())
+        self.assertEqual(len(found), 1,
+                         "agents/investigate.md: the coupling sentence is gone or reworded; coupling_sentence finds the commands by it (found %d)" % len(found))
 
 
 if __name__ == "__main__":

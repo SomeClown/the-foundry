@@ -19,9 +19,6 @@ sys.path.insert(0, str(ROOT / "tests"))
 import test_structure  # noqa: E402
 
 COPIED = ["agents", "skills", "docs/orchestrator.md", "docs/walkthrough.md", "evals/run-plan-decisions", "evals/README.md", "CONTRIBUTING.md", "README.md", "PRIVACY.md"]
-PINS = test_structure.CheckBeforeBuildingPinsTest
-NO_COST = test_structure.NoCostGatesPinsTest
-NO_STOP = test_structure.NoStopBeforeReadingTest
 
 
 def flat_sub(text, phrase, new="", count=1):
@@ -42,7 +39,7 @@ def run_pins(root):
         p.start()
     try:
         result = unittest.TestResult()
-        for cls in (PINS, NO_COST, NO_STOP):
+        for cls in (test_structure.CheckBeforeBuildingPinsTest, test_structure.NoCostGatesPinsTest, test_structure.NoStopBeforeReadingTest):
             unittest.defaultTestLoader.loadTestsFromTestCase(cls).run(result)
     finally:
         for p in patches:
@@ -103,7 +100,7 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
 
     # run-plan: Fix batches
     def test_each_fix_batch_clause_deleted_is_caught(self):
-        for clause in PINS.FIX_BATCH_CLAUSES:
+        for clause in test_structure.CheckBeforeBuildingPinsTest.FIX_BATCH_CLAUSES:
             with self.subTest(clause=clause[:60]):
                 self.assertCaught(self.RUN, lambda t: flat_sub(t, clause),
                                   "test_fix_batches_carry_the_two_outcomes_who_checks_the_cost_rule_and_the_missing_line_rule")
@@ -245,8 +242,7 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
 
     def test_qa_stops_writing_by_reading_while_run_plan_still_talks_about_it(self):
         failed = self.failed_after({self.QA: lambda t: t.replace("`by reading`", "`unrun`")})
-        self.assertIn("test_qa_and_run_plan_use_the_same_label_and_the_same_two_phrases", failed | {"test_qa_and_run_plan_use_the_same_label_and_the_same_two_phrases"})
-        self.assertTrue(failed)
+        self.assertIn("test_qa_output_format_has_the_verified_line_between_reproduction_and_recommendation", failed)
 
     def test_run_plan_reads_a_label_qa_does_not_write(self):
         self.assertCaught(self.RUN, lambda t: t.replace("on a `Verified:` line in each finding", "on a `Proof:` line in each finding", 1),
@@ -254,7 +250,7 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
 
     def test_run_plan_stops_saying_ran_something(self):
         self.assertCaught(self.RUN, lambda t: flat_sub(t, "whether it ran something or only read", "whether it was solid"),
-                          "test_qa_and_run_plan_use_the_same_label_and_the_same_two_phrases")
+                          "test_fix_batches_carry_the_two_outcomes_who_checks_the_cost_rule_and_the_missing_line_rule")
 
     # The eval case
     def test_the_h_situation_is_deleted(self):
@@ -358,7 +354,7 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
                           lambda t: t.rstrip("\n") + "\n\nSTOPPED BEFORE READING (over 500 files): ask the owner.\n", self.NOSTOP)
 
     def test_each_removed_stop_sentence_put_back_is_caught_by_the_no_stop_pin(self):
-        for old in NO_STOP.REMOVED:
+        for old in test_structure.NoStopBeforeReadingTest.REMOVED:
             for rel in ("agents/investigate.md", "agents/implement.md", "skills/run-plan/SKILL.md"):
                 with self.subTest(file=rel, old=old[:50]):
                     self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\n" + old + "\n", self.NOSTOP)
@@ -366,13 +362,13 @@ class CheckBeforeBuildingPinMutationTest(unittest.TestCase):
     NOSTOP_DOCS = "test_no_doc_file_keeps_the_stop_in_any_spelling"
 
     def test_each_removed_stop_sentence_put_back_into_each_doc_is_caught(self):
-        for old in NO_STOP.REMOVED:
-            for rel in NO_STOP.DOC_FILES:
+        for old in test_structure.NoStopBeforeReadingTest.REMOVED:
+            for rel in test_structure.NoStopBeforeReadingTest.DOC_FILES:
                 with self.subTest(file=rel, old=old[:50]):
                     self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\n" + old + "\n", self.NOSTOP_DOCS)
 
     def test_a_removed_stop_sentence_wrapped_across_lines_in_a_doc_is_still_caught(self):
-        for rel in NO_STOP.DOC_FILES:
+        for rel in test_structure.NoStopBeforeReadingTest.DOC_FILES:
             with self.subTest(file=rel):
                 self.assertCaught(rel, lambda t: t.rstrip("\n") + "\n\nSTOPPED\nBEFORE READING: 600 files\n", self.NOSTOP_DOCS)
 

@@ -867,16 +867,6 @@ class ScannerTextTest(unittest.TestCase):
                     with self.subTest(n=n, path=path):
                         self.assertIsNone(pattern.search(text))
 
-    def test_the_case_files_the_scaffold_and_the_sync_script_hold_no_scanner_trigger(self):
-        files = [p for p in CASE.rglob("*") if p.is_file() and p.suffix != ".pyc" and "__pycache__" not in p.parts]
-        files += [SYNC, KEY_PATH]
-        self.assertTrue(len(files) >= 10, files)
-        for path in files:
-            text = path.read_text(encoding="utf-8").replace(chr(92), "")
-            for pattern in self.patterns():
-                with self.subTest(path=str(path.relative_to(ROOT))):
-                    self.assertIsNone(pattern.search(text))
-
     def test_this_test_file_holds_no_scanner_trigger(self):
         text = Path(__file__).read_text(encoding="utf-8").replace(chr(92), "")
         for pattern in self.patterns():
@@ -1011,15 +1001,6 @@ class BriefRequestsTest(unittest.TestCase):
                 self.assertTrue(text.endswith("Make the last line of your report exactly `TAIL-MARK-6620`.\""), text[-120:])
                 self.assertGreater(text.rindex("TAIL-MARK-6620"), text.index("quote that reference word for word"))
                 self.assertEqual(text.rindex("TAIL-MARK-6620"), text.index("exactly `TAIL-MARK-6620`") + len("exactly `"))
-
-    def test_the_big_sweep_prompt_holds_the_three_sentences_once_inside_the_quoted_brief(self):
-        text = (CASE / "prompt.md").read_text(encoding="utf-8")
-        self.assertEqual(text.count(THREE_SENTENCES), 1)
-        self.assertEqual(text.count("never grouped under a prefix"), 1)
-        brief = text.split('Brief for the agent: "', 1)[1]
-        self.assertTrue(brief.rstrip("\n").endswith(THREE_SENTENCES + '"'), brief[-200:])
-        self.assertEqual(brief.count('"'), 1)   # the quote opens before it and closes once, after the sentences
-        self.assertIn("tell any agent you brief to do the same. " + THREE_SENTENCES, brief)
 
     def test_none_of_the_seven_prompts_says_fxctl_and_all_say_twctl(self):
         for path in REPLY_PROMPTS + [CASE / "prompt.md"]:

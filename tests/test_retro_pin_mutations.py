@@ -270,8 +270,6 @@ class RetroPinMutationTest(unittest.TestCase):
                             "test_each_skill_points_at_the_retro_from_where_it_stops_resumes_and_closes")
 
     def test_debug_loses_the_pointer_at_cant_reproduce(self):
-        def edit(t):
-            return t.replace(' Write the retro before you stop (see "The retro" in section 7).\n\n## 3.', "\n\n## 3.", 1)
         self.assertCaughtBy(self.DEBUG, lambda t: flat_sub(t, "Write the retro before you stop (see \"The retro\" in section 7).", "", count=1),
                             "test_debug_stops_write_the_retro_first_at_both_stops")
 
@@ -542,7 +540,6 @@ class RetroPinMutationTest(unittest.TestCase):
             for needle in ("~/.foundry/retro.md", "FOUNDRY_RETRO_FILE"):
                 with self.subTest(doc=rel, needle=needle):
                     def edit(t):
-                        first = t.index("one file outside") if False else 0
                         return t.replace(needle, "X", 1) if t.count(needle) == 1 else t.replace(needle, "X")
                     self.assertCaughtBy(rel, edit, "test_readme_and_privacy_say_where_and_what")
 

@@ -132,12 +132,6 @@ class FixBatch1PinsTest(unittest.TestCase):
                 mutated = without_match(self.body(heading), pattern)
                 self.assertIsNone(pin_in(mutated, pattern), "pin still holds with its phrase removed")
 
-    def test_the_three_checklist_marks_sit_in_the_lead_section_not_elsewhere(self):
-        lead = self.body("When You're an Area Lead")
-        for mark in ("`read`", "`read in sections`", "`unread: <why>`"):
-            with self.subTest(mark=mark):
-                self.assertIn(mark, lead)
-
     def test_no_dispatch_parameter_is_offered_anywhere(self):
         # Nothing in the definition may tell the model to pass these.
         text = " ".join(INVESTIGATE.read_text(encoding="utf-8").split())

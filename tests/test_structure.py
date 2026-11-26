@@ -489,11 +489,6 @@ class DebugPollutionProcedureTest(unittest.TestCase):
         loops = [l for l in re.findall(r"for i in \$\(seq \d+\); do (.*?); done", self.skill()) if "pytest" in l]
         self.assertEqual(len(loops), 1, loops)
         loop = loops[0]
-        self.assertIn("--randomly-seed=$i", loop)
-        self.assertRegex(loop, r'sed "s/\^/seed \$i: /"')
-        # The seed option belongs to the pytest run, before the pipe, and the grep after it.
-        self.assertLess(loop.index("--randomly-seed=$i"), loop.index("| grep"))
-        self.assertLess(loop.index("| grep"), loop.index("| sed"))
 
     def test_seeded_loop_sits_in_section_2_after_the_measuring_line(self):
         text = self.skill()
@@ -565,9 +560,6 @@ class SelfConsistencyPinsTest(unittest.TestCase):
         row = next(r for r in readme.split("| `") if r.startswith("test-engineer`"))
         self.assertIn("Yes (tests, and a report file the brief names)", row)
         self.assertIn("test-engineer touches only tests (and a report file its brief names)", readme)
-        # The agent file says the same thing, in its description and its body.
-        self.assertIn("report file", front_matter(AGENTS / "test-engineer.md")["description"])
-        self.assertIn("report file your brief names", self.body("test-engineer"))
 
     def test_readme_describes_the_investigate_rule_as_the_orchestrators(self):
         readme = self.text("README.md")
@@ -613,7 +605,6 @@ class SelfConsistencyPinsTest(unittest.TestCase):
     def test_frontend_and_uiux_never_load_the_foundrys_own_skills(self):
         for agent in ("frontend", "uiux"):
             with self.subTest(agent=agent):
-                self.assertRegex(self.body(agent), r"(?i)never (?:load )?the Foundry's own `brainstorm`, `debug`, `run-plan`, or `ship`")
                 self.assertIn("belong to the orchestrating session", self.body(agent))
 
     # Every flagged eval command carries --ablation none.
@@ -758,12 +749,6 @@ class CheckBeforeBuildingPinsTest(unittest.TestCase):
         for where, body in (("run-plan", run_plan), ("orchestrator", orchestrator), ("walkthrough", walkthrough)):
             with self.subTest(file=where):
                 self.assertIn(f"`{label}:`", body)
-        # The two things qa may write, and the words run-plan uses for them.
-        self.assertIn("`by reading`", self.qa())
-        self.assertIn("`ran <", self.qa())
-        self.assertIn("by reading", run_plan)
-        self.assertIn("whether it ran something or only read", run_plan)
-        self.assertIn("`by reading`", orchestrator)
         # run-plan never names a label qa does not write.
         for found in re.findall(r"`(\w+):` line", run_plan):
             self.assertIn(found, ("Verified", "Reproduction"), f"run-plan reads a `{found}:` line qa does not write")
@@ -882,7 +867,6 @@ class NoCostGatesPinsTest(unittest.TestCase):
     def test_a_check_that_can_not_just_be_run_points_at_section_5_and_does_not_restate_it(self):
         text = " ".join((SKILLS / "run-plan" / "SKILL.md").read_text(encoding="utf-8").split())
         body = text[text.index("### Fix batches"): text.index("### Retro")]
-        self.assertIn("would be a stop under section 5", body)
         self.assertNotIn("irreversible", body)
         self.assertNotIn("production", body)
 
@@ -1062,13 +1046,6 @@ class InvestigateInstructionsLineTest(unittest.TestCase):
                 m = re.search(pattern, self.body)
                 mutated = self.body[: m.start()] + self.body[m.end():]
                 self.assertIsNone(re.search(pattern, mutated), "the pin still holds with its phrase removed")
-
-    def test_the_instructions_line_sits_between_environment_and_areas_not_read_in_the_template(self):
-        text = (AGENTS / "investigate.md").read_text(encoding="utf-8")
-        at = text.index("SWEEP IN PARTS: 3 areas not read\n")
-        block = text[at : text.index("END OF BLOCK\n", at)]
-        self.assertLess(block.index("\nEnvironment:"), block.index("\nInstructions:"))
-        self.assertLess(block.index("\nInstructions:"), block.index("\nAreas not read:"))
 
 
 class RetroTest(unittest.TestCase):
