@@ -26,12 +26,14 @@ permissions you've set:
   sends it anywhere.
 - **The web:** two agents (`qa` and `uiux`) can use Claude Code's own web search
   and page fetching, and two (`frontend` and `uiux`) can drive the Claude
-  desktop app's built-in browser, mostly against your own dev server.
+  desktop app's built-in browser, mostly against your own dev server. None of them puts your files, code,
+  secrets or anyone's details into a search, a URL or a form on another site.
 - **Your remote:** the `ship` skill pushes, opens pull requests, merges, and
   tags in your own repository, using the git and GitHub CLI login you already
   have, and only after you approve the exact steps.
-- **Credentials:** the plugin ships none and reads no credential files or
-  tokens. `ship` (and `devops`, when you ask it to run a deploy) use the git,
+- **Credentials:** the plugin ships none and `investigate` doesn't open files named
+  like credential stores, and every agent reports a secret it comes on by file
+  and line, never by value. `ship` (and `devops`, when you ask it to run a deploy) use the git,
   `gh`, SSH, or cloud CLI logins you already have; those tools handle the
   token, and the plugin never sees it.
 
