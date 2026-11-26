@@ -40,6 +40,8 @@ line (met, not met, untested, can't verify, dropped), and `run-plan` keeps
 the count and lists every id's state at the end. Work with no ids runs as
 before. `brainstorm-writes-design`, `architect-plan-format` and
 `qa-spec-check-planted` now carry ids.
+The four opening lines now say `Status:` comes first, with no summary sentence
+above it; in 2 of 20 runs an agent had put one there.
 
 ## [2.4.0] — 2026-11-26
 
