@@ -1,6 +1,6 @@
 ---
 type: regex
 target: trace
-pattern: "\\*\\*Verify\\*\\*"
+pattern: "\\*\\*Verify:?\\*\\*"
 match: contains
 ---

@@ -6,14 +6,16 @@
 RESULT is an aggregate-result.json, or a folder that holds one. One row is
 written per case, per file, in file and case order. Every input is read and
 checked before anything is written; a file the script can't use prints
-"CAN'T RECORD: <file>: <reason>" and exits 2 with nothing written. Nothing here
-exits 1: the script records and gates nothing.
+"CAN'T RECORD: <file>: <reason>" and exits 2 with nothing written. The one exit 1 is
+a result with no cases at all: "no cases in <file>" on stderr, nothing written.
+The script records and gates nothing.
 
 It reads local files only. No network, no subprocess, no model session.
 """
 
 import argparse
 import json
+import math
 import os
 import re
 import sys
@@ -28,6 +30,10 @@ RESULT_NAME = "aggregate-result.json"
 COMMIT_RE = re.compile(r"[0-9a-f]{7,40}")
 
 
+class NoCases(Exception):
+    """Every input was fine, but none of them held a case, so there is nothing to record."""
+
+
 class Refused(Exception):
     """A file the script can't record; the message follows "CAN'T RECORD: <file>: "."""
 
@@ -35,19 +41,25 @@ class Refused(Exception):
         super().__init__("%s: %s" % (where, why))
 
 
+LINE_BREAK = re.compile("\r\n|[\n\r\x0b\x0c\x1c-\x1e\x85\u2028\u2029]")
+
+
 def cell(value):
-    return str(value).replace("|", "\\|")
+    return LINE_BREAK.sub(" ", str(value)).replace("|", "\\|")
 
 
 def split_row(line):
     return [c.strip() for c in re.split(r"(?<!\\)\|", line.strip())[1:-1]]
 
 
-def number(value, where, what):
+def cost_of(value):
+    """A cost as a float, or None when it isn't a finite number of zero or more (null counts as zero)."""
     if value is None:
         return 0.0
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise Refused(where, "%s isn't a number" % what)
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
     return float(value)
 
 
@@ -131,13 +143,15 @@ def rows_for(path, commit):
         for run in runs:
             if not isinstance(run, dict):
                 raise Refused(where, "case %s: a run isn't an object" % name)
-            cost += number(run.get("costUsd"), where, "costUsd")
-            cost += number(run.get("judgeCostUsd"), where, "judgeCostUsd")
+            for part in (cost_of(run.get("costUsd")), cost_of(run.get("judgeCostUsd"))):
+                cost = None if cost is None or part is None else cost + part
+        if cost is not None and not math.isfinite(cost):
+            cost = None
         failed = failed_text(runs, where)
         fully = sum(1 for run in runs if fully_passed(run))
         cells = [
             started, plugin.get("version"), commit, data.get("claudeVersion"), name,
-            len(runs), fully, failed, "$%.2f" % cost,
+            len(runs), fully, failed, "n/a" if cost is None else "$%.2f" % cost,
         ]
         rows.append([cell("" if c is None else c) for c in cells])
     return rows
@@ -155,7 +169,7 @@ def insert_rows(card_text, new_rows):
     seen = {(c[0], c[4], c[2]) for c in (split_row(l) for l in lines[start + 2:end + 1]) if len(c) >= 5}
     fresh = []
     for row in new_rows:
-        key = (row[0], row[4], row[2])
+        key = (row[0].strip(), row[4].strip(), row[2].strip())
         if key not in seen:
             seen.add(key)
             fresh.append(row)
@@ -190,6 +204,8 @@ def record(args):
     new_rows = []
     for result in args.results:
         new_rows.extend(rows_for(Path(result), commit))
+    if not new_rows:
+        raise NoCases(", ".join(args.results))
     try:
         text, fresh = insert_rows(card_text, new_rows)
     except Refused as err:
@@ -214,6 +230,9 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         record(args)
+    except NoCases as err:
+        print("no cases in %s" % err, file=sys.stderr)
+        return 1
     except Refused as err:
         print("CAN'T RECORD: %s" % err)
         return 2

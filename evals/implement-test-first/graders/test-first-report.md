@@ -1,11 +1,9 @@
 ---
 type: llm
-focus: trace
+focus: last_message
 ---
 
-The trace is a session that dispatched the implement agent. Its report is the result of
-the Agent call, the text after "The report follows:", every line indented two spaces.
-Judge that report, not the session's final message.
+The session's final message holds the agent's own report, word for word, usually after a short lead-in and the output of one check command. Judge that report, not the lead-in.
 
 PASS only if the report says a test for the "$1,200" case was run and seen failing before
 parse_amount was changed: it gives the failure (such as `1.0 != 1200.0`) from a run made

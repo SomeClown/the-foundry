@@ -109,6 +109,7 @@ python3 evals/scorecard.py --commit "$(git rev-parse --short HEAD)" "$WORK/resul
 ```
 
 Run on a clean tree, so the commit is the one that ran: the result file doesn't hold it, so the script takes it from `--commit`. Each argument after the options is an `aggregate-result.json` or a folder that holds one. The script checks every input before it writes anything, and refuses with a `CAN'T RECORD:` line and exit 2 when a file is missing or isn't JSON, its `schemaVersion` isn't 1, the run is partial, the plugin `the-foundry` isn't listed, a case has no `arms.with` list, the commit isn't 7 to 40 hex digits, or the scorecard has lost its table header. A row whose started time, case and commit are already in the table is skipped, so running it twice adds nothing. `--dry-run` prints the rows and writes nothing, and `--scorecard PATH` points at another file. It uses no network and starts no model session.
+A result with no cases in it prints `no cases in <file>` on stderr and exits 1.
 
 ## The expensive cases: `evals-expensive/`
 
@@ -430,6 +431,8 @@ rejected, which makes a typo loud):
 - Every type takes `weight` (default 1), which the score is weighted by.
 
 **Grading what an agent did.** Three points hold for the `agents` cases. An agent's report is matched in the trace after `The report follows:`, every line indented two spaces and line breaks written `\n`. What an agent must not change is checked by outcome: one fixed command the session runs after the report, which `tests/test_eval_cases.py` runs on a fresh fixture and a changed one. And hard lines carry `weight: 3`.
+The exact report graders read the trace after `The report follows:`; the judged ones read the session's final message, which carries the report word for word.
+A report much longer than the others (the uiux direction brief) is judged from the trace instead, since a long final message was judged unevenly.
 
 Two sandbox quirks the fixtures work around:
 
