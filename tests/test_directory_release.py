@@ -24,7 +24,8 @@ sys.path.insert(0, str(ROOT / "tests"))
 import test_structure  # noqa: E402
 
 SHELLS = ("bash", "zsh")
-DEV_DIRS = ("tests", "evals", "evals-expensive", "docs/plans")
+DEV_DIRS = ("tests", "evals", "evals-expensive", "docs/plans", ".github")
+DEV_PREFIXES = tuple(d + "/" for d in DEV_DIRS)
 
 
 def refused(paths):
@@ -69,12 +70,12 @@ class RefusedGuardTest(unittest.TestCase):
                 self.assertKept(p)
 
     def test_lookalike_dev_only_prefixes_are_not_exempt(self):
-        for p in ("tests-old/x.py", "docs/plans-archive/x.sh", "evalsx/x.sh", "evals-expensive2/x.py", "Tests/x.py", "docs/x.sh"):
+        for p in ("tests-old/x.py", "docs/plans-archive/x.sh", "evalsx/x.sh", "evals-expensive2/x.py", "Tests/x.py", "docs/x.sh", ".github-old/x.sh", ".githubx/x.sh"):
             with self.subTest(p=p):
                 self.assertRefused(p)
 
     def test_real_dev_only_prefixes_are_exempt(self):
-        for p in ("tests/x.py", "evals/a/scaffold.sh", "evals-expensive/compare.py", "docs/plans/x.sh"):
+        for p in ("tests/x.py", "evals/a/scaffold.sh", "evals-expensive/compare.py", "docs/plans/x.sh", ".github/workflows/x.sh"):
             with self.subTest(p=p):
                 self.assertKept(p)
 
@@ -141,6 +142,7 @@ def default_files(version="1.0.0"):
         "docs/guide.md": "g\n", "docs/plans-archive/old.md": "o\n", "tests-old/notes.md": "n\n",
         "tests/test_a.py": "t\n", "evals/c/case.yaml": "c\n", "evals/README.md": "e\n",
         "evals-expensive/compare.py": "c\n", "docs/plans/p.md": "p\n",
+        ".github/workflows/ci.yml": "c\n", ".github-old/notes.md": "n\n",
     }
 
 
@@ -274,10 +276,10 @@ class ReleaseCommandsTest(unittest.TestCase):
 
     def expected_dist_files(self, repo):
         out = self.git(repo, "ls-tree", "-r", "--name-only", "main").splitlines()
-        return {f for f in out if not f.startswith(("tests/", "evals/", "evals-expensive/", "docs/plans/"))}
+        return {f for f in out if not f.startswith(DEV_PREFIXES)}
 
     def leaked(self, repo):
-        return {f for f in self.dist_files(repo) if f.startswith(("tests/", "evals/", "evals-expensive/", "docs/plans/"))}
+        return {f for f in self.dist_files(repo) if f.startswith(DEV_PREFIXES)}
 
     def assert_built(self, repo, r):
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -346,6 +348,7 @@ class ReleaseCommandsTest(unittest.TestCase):
             self.assertEqual(self.dist_files(repo), self.expected_dist_files(repo))
             self.assertIn("docs/plans-archive/old.md", self.dist_files(repo))
             self.assertIn("tests-old/notes.md", self.dist_files(repo))
+            self.assertIn(".github-old/notes.md", self.dist_files(repo))
             self.assertEqual(self.git(repo, "log", "-1", "--format=%s", "dist"),
                              f"dist: v1.0.0 from {self.git(repo, 'rev-parse', '--short', 'main')}")
             self.assertEqual(self.git(repo, "rev-list", "--count", "dist"), "1")

@@ -4,6 +4,14 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+The test files now run side by side (`tests/run_tests.py`, about 85 s where it
+took 283 s), and `python3 -m unittest discover -s tests -q` still runs them in
+one process. CI runs the gate on macOS for every push to `main` and every pull
+request: the tests on the stock Python and a current one, and the three plugin
+validates. `dist` also drops `.github/`.
+
 ## [2.4.0] — 2026-11-26
 
 Every agent that holds Bash now carries the same rules for what it reads, and

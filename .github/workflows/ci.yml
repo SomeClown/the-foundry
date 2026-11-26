@@ -1,0 +1,126 @@
+# The Foundry's own gate, on GitHub's macOS machines: the tests side by side
+# on the stock /usr/bin/python3 and on a current Python, once in one process,
+# and the plugin validates. Read-only: no secrets, no model sessions.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  tests:
+    name: tests (${{ matrix.label }})
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: stock python, side by side
+            python: stock
+            how: runner
+          - label: current python, side by side
+            python: current
+            how: runner
+          - label: current python, one process
+            python: current
+            how: discover
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      WHICH_PYTHON: ${{ matrix.python }}
+      HOW: ${{ matrix.how }}
+    steps:
+      - name: Check out the repo with its whole history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Give the checkout a local main for the changelog tests
+        run: git show-ref --verify --quiet refs/heads/main || git branch main refs/remotes/origin/main
+
+      - name: Set up a current Python
+        id: setup
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.14"
+
+      - name: Put pytest in a venv of its own, for the debug procedure's tests
+        env:
+          CURRENT: ${{ steps.setup.outputs.python-path }}
+        run: |
+          "$CURRENT" -m venv "$RUNNER_TEMP/pytest-venv"
+          "$RUNNER_TEMP/pytest-venv/bin/python" -m pip install --disable-pip-version-check --quiet pytest==9.2.0 pytest-randomly==5.1.0
+          echo "FOUNDRY_PYTEST_PYTHON=$RUNNER_TEMP/pytest-venv/bin/python" >> "$GITHUB_ENV"
+
+      - name: Pick the interpreter and show the tools the tests run
+        env:
+          CURRENT: ${{ steps.setup.outputs.python-path }}
+        run: |
+          if [ "$WHICH_PYTHON" = stock ]; then PY=/usr/bin/python3; else PY="$CURRENT"; fi
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          "$PY" --version
+          /usr/bin/python3 --version
+          bash --version | head -n 1
+          zsh --version
+          awk --version
+          git --version
+          sw_vers
+          if [ "$WHICH_PYTHON" = stock ]; then
+            "$PY" -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 9) else "the stock python is not 3.9, the floor the tests promise")'
+          fi
+
+      - name: Run the tests
+        run: |
+          if [ "$HOW" = discover ]; then
+            "$PY" -m unittest discover -s tests -q
+          else
+            "$PY" tests/run_tests.py
+          fi
+
+  validate:
+    name: plugin validate
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      DISABLE_UPDATES: "1"
+      DISABLE_TELEMETRY: "1"
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node for the CLI
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+
+      - name: Install the Claude Code CLI
+        run: npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.318
+
+      - name: Validate the plugin
+        run: |
+          if ! command -v claude >/dev/null 2>&1; then
+            echo "::error::claude is not on PATH after the install step"
+            exit 1
+          fi
+          claude --version
+          status=0
+          claude plugin validate --strict . || status=1
+          claude plugin validate --strict .claude-plugin/plugin.json || status=1
+          claude plugin validate --profile directory . || status=1
+          exit "$status"

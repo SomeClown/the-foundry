@@ -1582,7 +1582,7 @@ class DirectoryScannerTest(unittest.TestCase):
 class DirectoryFileRulesTest(unittest.TestCase):
     """The plugin directory takes only some file types; `dist` is `main` minus the dev-only folders."""
 
-    DEV_ONLY = ("tests/", "evals/", "evals-expensive/", "docs/plans/")
+    DEV_ONLY = ("tests/", "evals/", "evals-expensive/", "docs/plans/", ".github/")
     ALLOWED_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico"}
     ALLOWED_NAMES = {"LICENSE", ".gitignore"}
 
@@ -1606,7 +1606,7 @@ class DirectoryFileRulesTest(unittest.TestCase):
 
     def test_contributing_builds_dist_without_exactly_the_dev_only_folders(self):
         text = (ROOT / "CONTRIBUTING.md").read_text()
-        line = "git rm -r -q -f --cached --ignore-unmatch tests evals evals-expensive docs/plans"
+        line = "git rm -r -q -f --cached --ignore-unmatch tests evals evals-expensive docs/plans .github"
         self.assertIn(line, text.splitlines())
         names = line.split("--ignore-unmatch ", 1)[1].split()
         self.assertEqual(names, [d.rstrip("/") for d in self.DEV_ONLY])
