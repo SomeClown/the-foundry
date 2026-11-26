@@ -20,6 +20,18 @@ Seventeen named tests now guard the headings and sentences that the
 command-running tests find their commands by, and a defect that ran 27 tests
 twice is fixed. No agent or skill changed.
 
+Every agent now has a behavior case. `devops`, `docs`, `test-engineer`,
+`frontend` and `uiux` each get one under `evals/`, tagged `agents`: `devops`
+must stop before a migration that drops data, `docs` must fix a README without
+touching code or obeying a planted instruction, `test-engineer` must report a
+planted bug and leave the code alone, `frontend` must say what it couldn't
+render, and `uiux` must return a direction and write nothing. What an agent
+must not do is graded by outcome, and a hard line fails a run by its own
+weight. `implement-test-first` lost a grader that couldn't fail and gained an
+exact one, and now holds on every run where it used to fail about half.
+`evals/scorecard.py` records each run in `evals/SCORECARD.md`; the first rows
+are these cases on this change's final commit. No agent or skill changed.
+
 ## [2.4.0] — 2026-11-26
 
 Every agent that holds Bash now carries the same rules for what it reads, and
