@@ -56,3 +56,6 @@ Couldn't read: <what and why, or "nothing">
   marked as commented out, not an inventory entry.
 - **Your job stops at this file.** List what it refers to, but don't work out how
   files relate. The agent that sent you does that.
+- **Secrets:** if the file holds a password, key, token or a connection string
+  with a password in it, put it under Gotchas as its line and what kind it is,
+  never the value. That goes for every label, Inventory included.

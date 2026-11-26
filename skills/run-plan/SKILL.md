@@ -127,8 +127,9 @@ dispatch, where they'll drift.
 - your resolution of anything ambiguous in the brief
 - any parked finding from the build log in the area it touches
 - the report contract: "Write your full report to `<work dir>/task-N-report.md`.
-  Reply with only: status (DONE, DONE_WITH_CONCERNS, NEEDS_CONTEXT, or
-  BLOCKED), files changed, the gate's exit code, and any concerns. Don't
+  Reply with only your report's four opening lines: status (DONE,
+  DONE_WITH_CONCERNS, NEEDS_CONTEXT, or BLOCKED), files changed, what you
+  verified with the gate's exit code, and any concerns. Don't
   commit, don't dispatch other agents, and don't load the Foundry's own
   skills (a project's own design skill is fine)."
 
