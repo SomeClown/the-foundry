@@ -12,6 +12,14 @@ one process. CI runs the gate on macOS for every push to `main` and every pull
 request: the tests on the stock Python and a current one, and the three plugin
 validates. `dist` also drops `.github/`.
 
+The tests lost about 318 wording pins that guarded nothing: pure copies of
+another pin, and pins on results prose, the design's "As built" history,
+changelog entries and build-log lines. An audit sorted all 1,510 pins first,
+and every one on a contract, a safety rule or live instruction text stays.
+Seventeen named tests now guard the headings and sentences that the
+command-running tests find their commands by, and a defect that ran 27 tests
+twice is fixed. No agent or skill changed.
+
 ## [2.4.0] — 2026-11-26
 
 Every agent that holds Bash now carries the same rules for what it reads, and
