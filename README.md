@@ -371,6 +371,7 @@ version, so you don't have to take my word for it:
   starts a model session. Installing from this GitHub
   repository's own marketplace brings them along; they still run only when you
   run them.
+  `evals/scorecard.py` (Python) is run by hand too: it reads result JSON and adds rows to `evals/SCORECARD.md`, uses no network, and starts no model session.
 
 None of it sends your code or data anywhere beyond what any Claude Code
 session already does with the files it reads. The

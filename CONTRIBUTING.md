@@ -60,6 +60,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    A new behavior worth keeping gets a case of its own. See
    [evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) for how to read a failure and how a
    case is built.
+   Before a release, run the `agents` cases and the cases of every skill the release changes, and add their rows to `evals/SCORECARD.md` with `evals/scorecard.py` ([evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) says how, under "Recording results").
 4. Update the [CHANGELOG](CHANGELOG.md) under an Unreleased heading.
 5. Open a PR describing what behavior changed and how you verified it.
 

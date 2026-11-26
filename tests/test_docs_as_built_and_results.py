@@ -420,24 +420,24 @@ class ScriptListsTest(unittest.TestCase):
         return set(re.findall(r"\b([a-z][a-z_]+)\.py\b", t))
 
     def privacy_scripts(self):
-        return set(re.findall(r"evals-expensive/([a-z][a-z_]+)\.py", fold(raw("PRIVACY.md"))))
+        return set(re.findall(r"evals(?:-expensive)?/([a-z][a-z_]+)\.py", fold(raw("PRIVACY.md"))))
 
     def on_disk(self):
-        return {p.stem for p in EXPENSIVE.glob("*.py")}
+        return {p.stem for p in EXPENSIVE.glob("*.py")} | {p.stem for p in (ROOT / "evals").glob("*.py")}
 
-    def test_the_readme_names_all_five_scripts_and_each_exists(self):
-        self.assertEqual(len(self.readme_scripts()), 5)
+    def test_the_readme_names_all_six_scripts_and_each_exists(self):
+        self.assertEqual(len(self.readme_scripts()), 6)
         for name in self.readme_scripts():
             with self.subTest(script=name):
-                self.assertTrue((EXPENSIVE / (name + ".py")).is_file())
+                self.assertTrue((EXPENSIVE / (name + ".py")).is_file() or (ROOT / "evals" / (name + ".py")).is_file())
 
     def test_the_readme_and_privacy_name_the_same_scripts(self):
         self.assertEqual(self.readme_scripts(), self.privacy_scripts())
 
-    def test_both_name_every_script_in_evals_expensive(self):
+    def test_both_name_every_script_in_evals_and_evals_expensive(self):
         self.assertEqual(self.on_disk(), self.readme_scripts())
         self.assertEqual(self.on_disk(), self.privacy_scripts())
-        self.assertEqual(self.on_disk(), {"compare", "sync_case", "sync_big_sweep", "check_parts", "measure_reply"})
+        self.assertEqual(self.on_disk(), {"compare", "sync_case", "sync_big_sweep", "check_parts", "measure_reply", "scorecard"})
 
     def test_the_comparison_sees_a_script_missing_from_either_file(self):
         readme = self.readme_scripts() - {"measure_reply"}
@@ -473,7 +473,8 @@ class ScriptListsTest(unittest.TestCase):
 
     def test_all_five_scripts_use_no_network(self):
         for name in sorted(self.on_disk()):
-            src = (EXPENSIVE / (name + ".py")).read_text(encoding="utf-8")
+            folder = EXPENSIVE if (EXPENSIVE / (name + ".py")).is_file() else ROOT / "evals"
+            src = (folder / (name + ".py")).read_text(encoding="utf-8")
             with self.subTest(script=name):
                 self.assertIsNone(re.search(r"(?m)^\s*(?:import|from)\s+(?:urllib|http|socket|requests|ftplib|smtplib)\b", src))
 

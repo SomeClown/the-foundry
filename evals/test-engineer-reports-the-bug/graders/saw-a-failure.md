@@ -1,6 +1,6 @@
 ---
 type: regex
 target: trace
-pattern: 1,200
+pattern: 'FAILED \((?:errors=\d+, )?failures=\d+'
 match: contains
 ---
