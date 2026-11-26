@@ -629,5 +629,79 @@ class HandBackTest(unittest.TestCase):
         self.assertFalse(gone.exists(), "%s is back: it can't fail, the brief holds its own text" % rel(gone))
 
 
+class TracedCriteriaCaseTest(unittest.TestCase):
+    """The three cases that carry acceptance-criteria ids, and the graders that read them."""
+
+    QA = "qa-spec-check-planted"
+    ARCH = "architect-plan-format"
+    BRAIN = "brainstorm-writes-design"
+    SPEC = ("Spec: GAPS\nAC-1 MET bot/commands.py:14; test_first_call_runs\nAC-2 NOT MET: N is floored\n"
+            "AC-3 UNTESTED bot/commands.py:9: no test with two servers")
+    PLAN = ("### Task 1: top_words\n- **Covers:**\n  - AC-1: top_words returns the pairs.\n"
+            "  - AC-2: n below 1 raises.\n  - AC-3: the version is 0.2.0.\n\n## 5. Testing Strategy\n"
+            "AC-1: Task 1; test\nAC-2: Task 1; test\nAC-3: Task 1; command: python3 -c 'import tally'\n")
+
+    def qa(self, name):
+        return pattern_of(self.QA, name)
+
+    def test_the_three_qa_graders_match_a_report_with_all_three_lines(self):
+        trace = hand_back(self.SPEC)
+        for name in ("ac-1-met", "ac-2-not-met", "ac-3-untested"):
+            with self.subTest(grader=name):
+                self.assertTrue(matches(self.qa(name), trace))
+
+    def test_a_changed_state_line_no_longer_matches(self):
+        met = self.qa("ac-1-met")
+        self.assertFalse(matches(met, hand_back(self.SPEC.replace("AC-1 MET", "AC-1 NOT MET"))))
+        self.assertFalse(matches(self.qa("ac-2-not-met"), hand_back(self.SPEC.replace("AC-2 NOT MET", "AC-2 MET"))))
+        self.assertFalse(matches(self.qa("ac-3-untested"), hand_back(self.SPEC.replace("AC-3 UNTESTED", "AC-3 MET"))))
+
+    def test_the_heavy_qa_graders_weigh_2_and_the_case_totals_7(self):
+        self.assertEqual(self.qa("ac-1-met").get("weight", 1), 1)
+        self.assertEqual(self.qa("ac-2-not-met")["weight"], 2)
+        self.assertEqual(self.qa("ac-3-untested")["weight"], 2)
+        total = sum(read_markdown(p)[0].get("weight", 1) for p in graders_of(EVALS / self.QA))
+        self.assertEqual(total, 7)
+
+    def test_none_of_the_qa_graders_matches_the_brief_itself(self):
+        brief = Fixture(self, self.QA).read("brief.md")
+        self.assertIn("AC-2", brief)
+        for name in ("ac-1-met", "ac-2-not-met", "ac-3-untested"):
+            with self.subTest(grader=name):
+                self.assertFalse(matches(self.qa(name), json.dumps(brief)))
+                self.assertFalse(matches(self.qa(name), brief))
+
+    def test_the_architect_graders_match_a_plan_with_ids(self):
+        trace = json.dumps(self.PLAN)
+        for name in ("covers-line", "coverage-lines"):
+            with self.subTest(grader=name):
+                self.assertTrue(matches(pattern_of(self.ARCH, name), trace))
+
+    def test_the_coverage_grader_fails_when_an_id_has_no_line(self):
+        trace = json.dumps(self.PLAN.replace("AC-3: Task 1; command: python3 -c 'import tally'\n", ""))
+        self.assertFalse(matches(pattern_of(self.ARCH, "coverage-lines"), trace))
+        self.assertTrue(matches(pattern_of(self.ARCH, "covers-line"), trace))
+        self.assertEqual(pattern_of(self.ARCH, "coverage-lines")["weight"], 3)
+
+    def test_the_architect_graders_miss_the_design_the_case_builds(self):
+        design = Fixture(self, self.ARCH).read("docs/design.md")
+        self.assertIn("AC-1", design)
+        for name in ("covers-line", "coverage-lines"):
+            with self.subTest(grader=name):
+                self.assertFalse(matches(pattern_of(self.ARCH, name), json.dumps(design)))
+
+    def test_the_done_when_grader_matches_a_written_section_only(self):
+        meta = pattern_of(self.BRAIN, "done-when-list")
+        section = "## 3. Weekly recap (v0.3.0)\n\nIntent.\n\n**Done when:**\n- AC-1: a recap posts.\n- AC-2: a quiet week posts none.\n"
+        self.assertTrue(matches(meta, section))
+        self.assertFalse(matches(meta, section.replace("- AC-2: a quiet week posts none.\n", "")))
+        design = Fixture(self, self.BRAIN).read("docs/design.md")
+        self.assertFalse(matches(meta, design))
+
+    def test_the_brainstorm_prompt_approves_the_done_when_part(self):
+        text = (EVALS / self.BRAIN / "prompt.md").read_text(encoding="utf-8")
+        self.assertIn("- Part 4, what counts as done, was approved", text)
+
+
 if __name__ == "__main__":
     unittest.main()

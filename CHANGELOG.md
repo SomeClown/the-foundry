@@ -32,6 +32,15 @@ exact one, and now holds on every run where it used to fail about half.
 `evals/scorecard.py` records each run in `evals/SCORECARD.md`; the first rows
 are these cases on this change's final commit. No agent or skill changed.
 
+Designs now end with a numbered **Done when** list, ids `AC-1` on, and the
+ids travel. Each plan task names the ids it covers, with their text, and the
+plan says how each is checked; builders say where each is met,
+`test-engineer` writes a test per id, `qa`'s spec check gives every id a
+line (met, not met, untested, can't verify, dropped), and `run-plan` keeps
+the count and lists every id's state at the end. Work with no ids runs as
+before. `brainstorm-writes-design`, `architect-plan-format` and
+`qa-spec-check-planted` now carry ids.
+
 ## [2.4.0] — 2026-11-26
 
 Every agent that holds Bash now carries the same rules for what it reads, and

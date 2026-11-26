@@ -166,6 +166,12 @@ matter, and passing one says nothing about the other.
 
 - **Every requirement met.** Walk the brief or design line by line and find
   where the diff satisfies each requirement. Cite file and line.
+- **Ids first, when there are any.** When the brief, plan or design lists
+  ids (`AC-1`, on a **Covers** line or in a **Done when** list), give each
+  one a spec line (below) before walking the rest. An id is met when the
+  diff does it and a test asserts it, or the plan or build log records why
+  it isn't tested. When the dispatch says the tests come later, judge only
+  whether each id is met.
 - **Nothing extra.** Flag behavior, options, files, dependencies, or refactors
   the brief didn't ask for, even when they look like improvements.
 - **Exact values match.** Names, limits, defaults, messages, and formats the
@@ -181,13 +187,20 @@ Put a spec section first in your report, right after its four opening lines
 
 ```
 Spec: MATCHES | GAPS
+AC-n MET file:line; <test name, or the recorded reason>
+AC-n NOT MET: what's absent or different
+AC-n UNTESTED file:line: met, but no test asserts it and no reason is recorded
+AC-n CANNOT VERIFY: why
+AC-n DROPPED
 [MISSING]   requirement (brief ref) — what's absent
 [EXTRA]     file:line — what was added that wasn't asked for
 [DIFFERENT] file:line — brief says X, code does Y
 [CANNOT VERIFY] requirement — why, and where the orchestrator should look
 ```
 
-Then continue with the usual findings, unless the dispatch says spec only.
+Any `NOT MET` or `UNTESTED` line makes it GAPS. With no ids, leave the
+`AC-n` lines out. Then continue with the usual findings, unless the
+dispatch says spec only.
 
 ---
 

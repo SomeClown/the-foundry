@@ -19,3 +19,4 @@ Approved (the user's decisions unless marked as your guess):
 - Skip the recap in a week with fewer than 3 stories (user: "a recap of two stories is silly").
 - Ties go to the newer story (your guess; approved with Part 3).
 - The user said: don't let this turn into an analytics dashboard.
+- Part 4, what counts as done, was approved as you'd write it from the decisions above.

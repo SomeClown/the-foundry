@@ -371,9 +371,12 @@ Baseline on 6f39625 (2026-11-26): `Ran 2288` on both Pythons, exit 0; the three 
 Stopping rule, stated to the owner before the build: one architect pass, one builder dispatch per task, one test-engineer round with at most three fix rounds, the gate, then real-session runs for only the cases the change touches, with the tuning rounds Task 3 allows.
 
 ### Progress
+- Task 1: built (from dda158e; targeted run of the eight named test files `Ran 365`, exit 0; the builder's whole-suite run `Ran 2309`, exit 0, 21 more than the baseline: 13 in `tests/test_traced_criteria.py`, 8 in `TracedCriteriaCaseTest`). Committed before Task 2 so each can be reverted alone; the adversarial round and the gate run over both; AC-1, AC-2, AC-3, AC-4, AC-5, AC-6, AC-7
 
 ### Decisions made during the build
 - Ruling (plan, §4 question 1): A, the "Done when" part is played back at every size brainstorm handles. The session took the architect's recommendation instead of stopping for the owner. Why: the difference is one clause in one bullet, and the owner asked for bounded rounds. If wrong: brainstorm shows one more short part on small changes until the bullet is narrowed to project size; told to the owner in the final report.
 - Ruling (plan): the two tasks go to the same builder, Task 1 first and committed before Task 2 starts, so Task 2 is its own commit and can be reverted alone.
+- Ruling (Task 1): rule (b) of `tests/test_traced_criteria.py` looks for the prefix `**Done when`, not the literal `**Done when**`. Why: the plan's own inserted text writes `**Done when:**` in brainstorm and architect, so the literal check failed against the plan's text. If wrong: a file could write `**Done whenever` and satisfy the rule; the adversarial round is asked to try it.
+- Ruling (Task 1): five anchors differed from the plan's quotes (items 16, 18, 19, 20, 21: a wrapped anchor, a missing phrase, two mid-line anchors, one 81-column line). The builder inserted at the sentence boundary and reworded nothing; the pinned-paragraph tests still hold. If wrong: nothing lost, the text is as the plan gives it.
 
 ### Parked

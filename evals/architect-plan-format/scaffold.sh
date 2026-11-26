@@ -53,6 +53,11 @@ Owner decisions (2026-10-23):
 - Version 0.2.0 (`tally/__init__.py` gets `__version__ = "0.2.0"`).
 
 Non-goals: stemming, stop words. Anti-goal: a new dependency.
+
+**Done when:**
+- AC-1: `top_words("b a b c", 2)` returns `[("b", 2), ("a", 1)]`.
+- AC-2: `top_words("a", 0)` raises `ValueError("n must be a positive integer")`.
+- AC-3: `tally.__version__` is `"0.2.0"`.
 EOF
 printf '# tally\n\nPython 3, standard library only.\n\n- Gate: `python3 -B -m unittest discover -s tests -q` (must exit 0).\n- Designs in docs/design.md, plans in docs/plans/.\n' > CLAUDE.md
 $G init -q -b main && $G add -A && $G commit -qm "tally 0.1.0"

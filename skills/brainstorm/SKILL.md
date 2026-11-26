@@ -145,6 +145,8 @@ What's wrong or missing?
   part again.
 - **Approval covers what they saw.** Agreeing with an idea in passing is not
   approval of a design you haven't written down.
+- **The last part is "Done when"**: the numbered list section 7 describes,
+  played back and approved like any other part.
 - In batch mode, send all the parts in one message and ask for approval of each
   by number.
 
@@ -190,6 +192,11 @@ project's CLAUDE.md names a different place, that wins. Outside a repo, ask.
 - goals, non-goals, anti-goals
 - constraints (compatibility, cost, performance, privacy, deadlines)
 - the behavior, part by part, as approved
+- **Done when:** a numbered list, each item one thing someone could watch
+  happen or a test could check, in the user's words, with an id: `AC-1`,
+  `AC-2`, and so on. Ids never change once approved: a dropped item stays,
+  marked dropped with the date and why, and a new item takes the next
+  number. Plans, tests and reviews cite items by id.
 - **Calls I made:** every default and every "you decide", marked as yours
 - what's left to the builder (the architect), stated as such so nobody thinks
   it was forgotten

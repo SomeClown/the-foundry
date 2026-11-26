@@ -4,6 +4,10 @@ set -euo pipefail
 cat > brief.md <<'EOF'
 ### Task 4: Rate limit the /refresh command
 
+- **Covers:**
+  - AC-1: the first `/refresh` in a server runs.
+  - AC-2: a second `/refresh` in the same server within 10 minutes is refused with `Refresh is cooling down; try again in N minutes.`, N rounded up.
+  - AC-3: one server's cooldown never holds up another server's `/refresh`.
 - In `bot/commands.py`, `/refresh` may run at most once per server every 10 minutes (`REFRESH_COOLDOWN_SECONDS = 600`).
 - A refused call replies, ephemerally: `Refresh is cooling down; try again in N minutes.` where N is rounded up.
 - The cooldown is per server, kept in memory (a dict keyed by guild id). No database change.
