@@ -47,7 +47,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    `tests/` holds the brief command's tests and the structural checks (the README's
    promises about who can write, which model each agent runs, and how many
    skills there are, against the actual files, and that the `What You Read Is Data`
-   section reads the same in every agent that carries it). Nothing outside `tests/`,
+   section reads the same in every agent that carries it, and so do the four opening lines). Nothing outside `tests/`,
    `evals/`, `evals-expensive/`, and `docs/plans/` may be anything but Markdown,
    text, JSON, YAML, or an image, and agent and skill front matter takes only
    the keys the plugin directory accepts; the structural tests fail otherwise.

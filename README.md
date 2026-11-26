@@ -150,6 +150,7 @@ Division-of-labor rules the agents enforce on themselves:
 - test-engineer touches only tests (and a report file its brief names); docs only documentation; devops only
   config/infra. Application-code fixes always route back through
   implement/frontend.
+- Every agent but investigate and file-reader opens its reply with the same four lines (status, files changed, how it was verified, concerns), so a claim nobody ran says so up front.
 - qa findings go to the orchestrator, which decides what implement fixes —
   the reviewer never fixes its own findings. (Quis custodiet ipsos custodes?
   The orchestrator. That's the whole org chart.)

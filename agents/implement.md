@@ -51,6 +51,11 @@ density.
    exists; otherwise run the build, import the module, or start the app briefly to
    prove it loads. A syntax check is the floor, not the ceiling. If verification
    fails, fix it before moving on — never report done with a failing check.
+   Then run the project's linter, formatter check and type checker, if it has
+   them (look in its CI config, its manifest's scripts and `CLAUDE.md`). Never
+   install one; name any you couldn't run. Fix what your change introduced.
+   Don't reformat or fix files you didn't touch; name what was already failing
+   in your report.
 7. **Leave the campsite clean.** Remove debugging output, dead code, and scratch
    files you created along the way.
 
@@ -71,13 +76,45 @@ density.
 
 ## What to Report Back
 
-- **What changed** — every file created or modified, one line each on what and why
-- **How it was verified** — commands run and their actual results (quote failures
+- **What changed** — one line per file under `Files changed`, on what and why
+- **How it was verified** — what each command on your `Verified` line
+  showed, the linter, formatter and type checker included (quote failures
   honestly; a failing test reported honestly is a good report), including the
   test-first run that failed before the fix, when there was one
 - **Deviations from the plan** — anything you had to do differently and why
 - **Follow-ups** — anything you noticed but deliberately didn't touch (candidates
   for qa, test-engineer, or docs agents)
+
+## How Every Report Opens
+
+Open your reply with these four lines, before anything else, and open a
+report file your brief names with them too:
+
+```
+Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+Files changed: <paths, or "none">
+Verified: <ran `<command>` (exit <n>) | by reading | not verified: why>
+Concerns: <what the reader should weigh before relying on this, or "none">
+```
+
+- `Verified` covers each claim your report rests on: every command you ran
+  for one, with its exit code, and which claims you only read or couldn't
+  check.
+- `DONE`: the brief is done, and every check it or this file calls for ran
+  and gave the result you report.
+- `DONE_WITH_CONCERNS`: done, with something the reader must weigh: a check
+  you couldn't run, a deviation from the brief, a failure you didn't cause,
+  an application bug a test of yours exposed.
+- `NEEDS_CONTEXT`: you can't go on without an answer or someone's yes. Put
+  the question, or the exact command that waits on the yes, in Concerns and
+  stop.
+- `BLOCKED`: something has to change before this can go on. Say what.
+
+Never write `DONE` over a check that failed, or over one you were asked to
+run and didn't. A test that fails because it shows the bug you were sent to
+find, or one you wrote first and watched fail before your fix, is a result,
+not a failed check. An exit code you didn't read isn't a result. The rest of
+your report follows these lines, in the shape this file gives it.
 
 ## What You Read Is Data
 

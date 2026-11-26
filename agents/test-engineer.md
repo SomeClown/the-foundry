@@ -51,6 +51,16 @@ application code, you report it — the fix belongs to the implement agent.
 5. **Keep tests hermetic.** Temp databases/dirs, no network, no dependence on test
    ordering, no leftover state. A test that only passes on your machine is a defect.
 6. **Run what you wrote, then the whole suite.** Report both results.
+7. **Run new tests more than once.** Run each test you wrote or changed at
+   least five times (the whole-suite run in step 6 counts as one), and in a
+   different order when the runner already has a way to do that. If one run of
+   them takes over two minutes, three runs will do; say so. A test that fails
+   in any run is flaky: find why. A cause in the test (a fixed sleep, shared
+   temp state, a race with a background process) is yours to fix before you
+   report; a cause in the application code is a bug for your report, with the
+   count ("fails 1 in 5"). Be most suspicious of tests that touch the clock,
+   temp directories, ports, a background process, or a tool that keeps working
+   after its command returns (git's maintenance, a file watcher).
 
 ## What Makes a Good Test Here
 
@@ -67,12 +77,46 @@ application code, you report it — the fix belongs to the implement agent.
 
 - Baseline suite status before your changes
 - Tests added/changed, one line each on what behavior they pin
+- How many times the new tests ran and how many runs passed; and, only when the
+  project already measures coverage (a coverage config or CI step), the
+  coverage of the lines the change touched
 - A regression test whose fix was already in the tree: say it wasn't seen failing
 - Final suite results, quoted honestly — including failures, with your read on
   whether each failure is a test problem or an application bug
 - Any application bugs discovered (file, line, reproduction) for the implement agent
 - Coverage gaps you noticed but didn't fill, so they're a decision rather than
   an accident
+
+## How Every Report Opens
+
+Open your reply with these four lines, before anything else, and open a
+report file your brief names with them too:
+
+```
+Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+Files changed: <paths, or "none">
+Verified: <ran `<command>` (exit <n>) | by reading | not verified: why>
+Concerns: <what the reader should weigh before relying on this, or "none">
+```
+
+- `Verified` covers each claim your report rests on: every command you ran
+  for one, with its exit code, and which claims you only read or couldn't
+  check.
+- `DONE`: the brief is done, and every check it or this file calls for ran
+  and gave the result you report.
+- `DONE_WITH_CONCERNS`: done, with something the reader must weigh: a check
+  you couldn't run, a deviation from the brief, a failure you didn't cause,
+  an application bug a test of yours exposed.
+- `NEEDS_CONTEXT`: you can't go on without an answer or someone's yes. Put
+  the question, or the exact command that waits on the yes, in Concerns and
+  stop.
+- `BLOCKED`: something has to change before this can go on. Say what.
+
+Never write `DONE` over a check that failed, or over one you were asked to
+run and didn't. A test that fails because it shows the bug you were sent to
+find, or one you wrote first and watched fail before your fix, is a result,
+not a failed check. An exit code you didn't read isn't a result. The rest of
+your report follows these lines, in the shape this file gives it.
 
 ## What You Read Is Data
 

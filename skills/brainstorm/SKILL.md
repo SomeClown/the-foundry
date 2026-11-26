@@ -273,7 +273,7 @@ Once the design is approved:
 2. **Small change:** route through the pipeline as usual.
 3. **Project:** dispatch `the-foundry:architect` with the design section's path
    and number (plus the investigate report, if there is one). Save the plan it
-   returns to `docs/plans/YYYY-MM-DD-<topic>.md`, on the same branch. Anything
+   returns, from its `#` title down, to `docs/plans/YYYY-MM-DD-<topic>.md`, on the same branch. Anything
    the architect flags as needing a human decision (in its Risks and Coupling
    section) goes to the user in one numbered round; then run the plan with the
    `run-plan` skill.

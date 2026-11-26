@@ -48,9 +48,9 @@ Concerns: <what the reader should weigh before relying on this, or "none">
 
 Never write `DONE` over a check that failed, or over one you were asked to
 run and didn't. A test that fails because it shows the bug you were sent to
-find is a result, not a failed check. An exit code you didn't read isn't a
-result. The rest of your report follows these lines, in the shape this file
-gives it.
+find, or one you wrote first and watched fail before your fix, is a result,
+not a failed check. An exit code you didn't read isn't a result. The rest of
+your report follows these lines, in the shape this file gives it.
 ````
 
 **Files:**
@@ -114,9 +114,17 @@ Branch: `feat/agent-security-rules`, from 59a2e0f
 Work dir: `.git/foundry-run/report-header-builder-checks/` in the main checkout
 
 ### Progress
+- Task 1: complete (from f2a4323; gate exit 0; adversarial: 21 tests in `tests/test_report_opening.py`, 10 of 10 clean runs across both Pythons, no bugs; fix round 1/3: the test-first red run named in the shared section, all eight copies). Final gate, read before this line was written: Ran 2115, OK on python3 (1 skip), exit 0; Ran 2115, OK on /usr/bin/python3 (5 skips), exit 0; validates 0/0/0.
+- The three agent cases on the built text (2 runs each): `architect-plan-format` 2 of 2, every grader; `qa-spec-check-planted` 2 of 2; `implement-test-first` 1 of 2 (`ran-tests-before-the-fix` passed in both; the judged `test-first-report` failed one, 0 of 3 votes).
+- `implement-test-first`, 4 runs on 2.3.0's text (a worktree of `main`) and 4 on the built text: `ran-tests-before-the-fix` 4 of 4 on each; `test-first-report` 2 of 4 on each. With the two runs above, the judged grader stands at 3 of 6 on the built text and 2 of 4 on the released one. The grader reads the session's relay of the report, not the report, and fails about half the time on either text. The four opening lines didn't move it.
+- The three agent cases again, on the final text (2 runs each): `architect-plan-format` 2 of 2, `implement-test-first` 2 of 2, `qa-spec-check-planted` 2 of 2. Two clean runs of the implement case don't show the added clause fixed its judged grader, which is noise at about one run in two; they show nothing got worse.
 
 ### Decisions made during the build
 - Ruling (before Task 1): the architect's cold read stands, all eleven points. What it changed from the session's draft: four lines, not five (`Commands run` said what `Verified` says); `DONE` means every check the brief or the agent's file calls for ran and gave the result reported, since "what you ran passed" would bar `architect` and `uiux` from ever reporting it and miscount a test written to fail; a `devops` stop that waits for a yes is `NEEDS_CONTEXT`, which `run-plan` answers by resuming the same agent; a flaky test whose cause is in the application is reported as a bug, since `test-engineer` can't fix application code; qa's copy sits at the end of its file. If wrong: the section is one text in eight files under an identity test, so a change is one edit.
 - Stopping rule, set before the build: one builder dispatch, one test-engineer round with at most three fix rounds, the gate, then `architect-plan-format`, `implement-test-first` and `qa-spec-check-planted` on real sessions. No head-to-head and no smoke: `investigate` and `file-reader` don't change.
+- Ruling (adversarial round, contradiction 3): accepted. `implement` is told to write a test first and watch it fail, and the section's "Never write `DONE` over a check that failed" exempted only "the bug you were sent to find". The section now also names a test "you wrote first and watched fail before your fix". One clause in the shared section, so all eight copies change together. If wrong: nothing; it only widens what counts as a result.
+- Ruling (contradictions 1, 2 and 4): left as they are. 1: three report slots (`docs`, `devops`, `frontend`) ask for the detail behind the `Verified` line; they restate it, they don't conflict. 2: `architect` has no Write tool, so a report file it is told to open can't exist. 4: qa's "No findings." sits before the section in the file; the section's own first sentence says the four lines come before anything else. If wrong: a qa reply of "No findings." with no opening lines, which the orchestrator would notice at once.
 
 ### Parked
+- The `implement-test-first` case's judged grader (`test-first-report`) fails about half its runs on 2.3.0's text and on this branch's alike: it grades the session's paraphrase of the report. It needs a grader that reads the agent's own report from the trace, or a rubric that takes "the new test failed before the fix" as said. A follow-up for the eval work (improvement 5).
+- Left unpinned by choice: the doc and skill sentences this change touched, and the reworded `Files changed` slots.

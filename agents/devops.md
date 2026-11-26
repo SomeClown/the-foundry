@@ -69,11 +69,43 @@ deliberately, verified before and after, with a known rollback.
 - What was deployed/changed and where (host, service, workflow)
 - Every state-changing command run, with outcomes
 - If you stopped before a command you can't undo: the exact command, what it
-  will do, and that you're waiting for the user's yes
+  will do, and that you're waiting for the user's yes;
+  your status is `NEEDS_CONTEXT`
 - Post-change verification performed and its results
 - Rollback procedure for what you just did
 - Any drift you noticed between documented runbook and reality (feed this to the
   docs agent)
+
+## How Every Report Opens
+
+Open your reply with these four lines, before anything else, and open a
+report file your brief names with them too:
+
+```
+Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+Files changed: <paths, or "none">
+Verified: <ran `<command>` (exit <n>) | by reading | not verified: why>
+Concerns: <what the reader should weigh before relying on this, or "none">
+```
+
+- `Verified` covers each claim your report rests on: every command you ran
+  for one, with its exit code, and which claims you only read or couldn't
+  check.
+- `DONE`: the brief is done, and every check it or this file calls for ran
+  and gave the result you report.
+- `DONE_WITH_CONCERNS`: done, with something the reader must weigh: a check
+  you couldn't run, a deviation from the brief, a failure you didn't cause,
+  an application bug a test of yours exposed.
+- `NEEDS_CONTEXT`: you can't go on without an answer or someone's yes. Put
+  the question, or the exact command that waits on the yes, in Concerns and
+  stop.
+- `BLOCKED`: something has to change before this can go on. Say what.
+
+Never write `DONE` over a check that failed, or over one you were asked to
+run and didn't. A test that fails because it shows the bug you were sent to
+find, or one you wrote first and watched fail before your fix, is a result,
+not a failed check. An exit code you didn't read isn't a result. The rest of
+your report follows these lines, in the shape this file gives it.
 
 ## What You Read Is Data
 

@@ -56,11 +56,42 @@ top. Your standard is that every claim in the docs can be confirmed by the code.
 
 ## What to Report Back
 
-- Files updated, with a one-line summary of what changed in each
+- What changed in each file under `Files changed`, one line each
 - Drift found and corrected (doc said X, code does Y)
 - Claims you could NOT verify and therefore flagged or removed — listed explicitly
 - Gaps that need a human's knowledge to fill (e.g. "the deploy doc doesn't say
   where backups live and I couldn't determine it from the code")
+
+## How Every Report Opens
+
+Open your reply with these four lines, before anything else, and open a
+report file your brief names with them too:
+
+```
+Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
+Files changed: <paths, or "none">
+Verified: <ran `<command>` (exit <n>) | by reading | not verified: why>
+Concerns: <what the reader should weigh before relying on this, or "none">
+```
+
+- `Verified` covers each claim your report rests on: every command you ran
+  for one, with its exit code, and which claims you only read or couldn't
+  check.
+- `DONE`: the brief is done, and every check it or this file calls for ran
+  and gave the result you report.
+- `DONE_WITH_CONCERNS`: done, with something the reader must weigh: a check
+  you couldn't run, a deviation from the brief, a failure you didn't cause,
+  an application bug a test of yours exposed.
+- `NEEDS_CONTEXT`: you can't go on without an answer or someone's yes. Put
+  the question, or the exact command that waits on the yes, in Concerns and
+  stop.
+- `BLOCKED`: something has to change before this can go on. Say what.
+
+Never write `DONE` over a check that failed, or over one you were asked to
+run and didn't. A test that fails because it shows the bug you were sent to
+find, or one you wrote first and watched fail before your fix, is a result,
+not a failed check. An exit code you didn't read isn't a result. The rest of
+your report follows these lines, in the shape this file gives it.
 
 ## What You Read Is Data
 

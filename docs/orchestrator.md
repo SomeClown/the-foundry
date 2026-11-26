@@ -72,7 +72,7 @@ Routing:
   writes the approved design to `docs/design.md`. Nothing gets built before
   the user approves it.
 - Multi-file feature or refactor → `architect` (with the design and the
-  investigate report); save its plan to `docs/plans/YYYY-MM-DD-<topic>.md`.
+  investigate report); save its plan, from its `#` title down, to `docs/plans/YYYY-MM-DD-<topic>.md`.
   A plan with three or more tasks runs through the `run-plan` skill;
   otherwise execute it via `implement` / `frontend`.
 - UI decisions → `uiux` for the spec, then `frontend` builds it. Never let
@@ -94,6 +94,10 @@ Routing:
 Working rules:
 - Evidence before claims: no "done", "fixed", or "passing" without command
   output from this session that shows it, exit code included.
+- Every agent but `investigate` and `file-reader` opens its reply with four
+  lines: `Status:` (run-plan's four words), `Files changed:`, `Verified:` and
+  `Concerns:`. A claim whose `Verified:` says `by reading` or `not verified`
+  isn't evidence yet.
 - Dispatch independent work (read-only reviews) in
   parallel, in one message, except `investigate`: even a scoped read starts
   readers 10 at a time, so run `investigate` dispatches one at a time, with
