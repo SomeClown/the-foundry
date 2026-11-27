@@ -610,7 +610,8 @@ fi
 mkdir -p bin
 printf '#!/bin/sh\nexec "%s" "$@"\n' "$real_git" > bin/git
 chmod +x bin/git
-G="./bin/git -c user.name=Owner -c user.email=owner@example.com -c commit.gpgsign=false"
+# maintenance.auto=false: otherwise git starts a detached repack that keeps writing into .git after this script returns
+G="./bin/git -c maintenance.auto=false -c user.name=Owner -c user.email=owner@example.com -c commit.gpgsign=false"
 
 python3 -c "$GEN" build "$SUBSET"
 $G init -q -b main

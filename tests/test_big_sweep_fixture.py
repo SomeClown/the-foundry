@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -1530,6 +1531,43 @@ class FactDistributionTest(unittest.TestCase):
         vendored = [d["path"] for d in decoys if d["why"] == "vendored"]
         self.assertEqual(len(vendored), 2)
         self.assertTrue(all(p.startswith("web/vendor/") for p in vendored))
+
+
+class ScaffoldLeavesGitQuietTest(unittest.TestCase):
+    """The scaffold's last commit must not leave a background git job writing into .git.
+
+    With git's default maintenance, that commit starts a detached repack that rewrites .git/objects for about
+    150 ms after the script returns, so a test that deletes its temp dir right away fails now and then with
+    ENOTEMPTY. Every test that builds the scaffold in a temp dir shares the race, so the scaffold is pinned.
+    """
+
+    @staticmethod
+    def git_paths(dest):
+        found = []
+        for base, dirs, names in os.walk(str(Path(dest) / ".git")):
+            for name in dirs + names:
+                found.append(str((Path(base) / name).relative_to(dest)))
+        return sorted(found)
+
+    def test_nothing_writes_into_dot_git_after_the_scaffold_returns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_scaffold(tmp)
+            before = self.git_paths(tmp)
+            for _ in range(20):
+                time.sleep(0.1)
+                now = self.git_paths(tmp)
+                if now != before:
+                    appeared = sorted(set(now) - set(before))[:5]
+                    went = sorted(set(before) - set(now))[:5]
+                    # Let the writer finish first, or this test's own cleanup races it and the ENOTEMPTY hides the message.
+                    for _ in range(50):
+                        time.sleep(0.1)
+                        later = self.git_paths(tmp)
+                        if later == now:
+                            break
+                        now = later
+                    self.fail("something kept writing into .git after the scaffold returned: appeared %s, went %s"
+                              % (appeared, went))
 
 
 class ReplySizeCopiesTest(unittest.TestCase):
