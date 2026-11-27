@@ -803,13 +803,14 @@ Baseline finished by the session (2026-11-26, on 5d9dc3e, the 2.6.0 release gate
 Stopping rule (for the session to state to the owner before the build): one architect pass, one builder dispatch per task, one test-engineer round with at most three fix rounds, the gate, then real-session runs for only the cases the change touches, with the tuning rounds Task 4 allows.
 
 ### Progress
-- (none yet)
+- Task 1: complete (from 4faa54a; builder's gate exit 0 on all five lines, `Ran 2551` on both Pythons, 26 new tests; the session's targeted run of the touched modules exit 0)
 
 ### Decisions made during the build
 - Ruling (owner question 1): A. devops stops with `NEEDS_CONTEXT` before a data change that breaks the code running now, even when its brief says apply. Why: applying it breaks live requests at once. If wrong: one extra question on such a brief; the owner hasn't confirmed it.
 - Ruling (owner question 2): B. Task 3 runs: one sentence in the architect's section 3. Why: a split caught at ship time costs the plan's work again. If wrong: one sentence and one test to remove.
 - Ruling (owner question 3): A. The second devops case stays. Why: it is the only real-session proof that a tried rollback stays off the live database. If wrong: one case to delete.
 - Ruling (owner question 4): A. The watch's default is 30 minutes when the runbook has none. Why: a fixed number can be followed and the runbook's window always wins. If wrong: one constant in two files and its tests.
+- Ruling (Task 1): the builder narrowed one existing pin in `tests/test_report_opening.py` (`devops slot lost NEEDS_CONTEXT`) to read only the first stop bullet. Why: the new stop slot names `NEEDS_CONTEXT` too, so the pin's mutation no longer failed it. The pin is tighter than before. If wrong: one line to put back.
 - All four are the architect's recommended answers. The session told the owner; none is confirmed.
 
 ### Parked

@@ -830,5 +830,183 @@ class SecurityLineGraderTest(unittest.TestCase):
         self.assertFalse(self.hit(Fixture(self, self.ARCH).read("docs/design.md")))
 
 
+STOPS = EVALS / NEW_CASES["devops"]
+
+
+class MigrationCaseChecks(object):
+    """What the two migration cases share: the fixture, the template files and the regex-grader guard."""
+
+    CASE = ""
+
+    def grader(self, name):
+        return pattern_of(self.CASE, name)
+
+    def edit_config(self, fx):
+        fx.write("config/shop.ini", fx.read("config/shop.ini").replace("data/shop.db", "data/copy.db"))
+
+    def report(self, line):
+        return "Status: DONE\nFiles changed: none\nVerified: by reading\nConcerns: none\n\n" + line
+
+    def test_no_regex_grader_matches_the_fixture_or_the_prompt(self):
+        fx = Fixture(self, self.CASE)
+        texts = [(self.CASE + "/prompt.md", (EVALS / self.CASE / "prompt.md").read_text(encoding="utf-8"))]
+        texts += [(p.name, p.read_bytes().decode("utf-8", "replace")) for p in sorted(fx.dir.rglob("*")) if p.is_file()]
+        for path in graders_of(EVALS / self.CASE):
+            meta = pattern_of(self.CASE, path.stem)
+            if meta["type"] != "regex" or meta["match"] != "contains":
+                continue
+            for label, text in texts:
+                for form in (text, json.dumps(text)):
+                    with self.subTest(grader=path.name, file=label):
+                        self.assertFalse(matches(meta, form))
+
+    def test_the_weights_total_9_and_the_files_are_the_template(self):
+        total = sum(read_markdown(p)[0].get("weight", 1) for p in graders_of(EVALS / self.CASE))
+        self.assertEqual(total, 9)
+        self.assertEqual((EVALS / self.CASE / "case.yaml").read_text(encoding="utf-8"),
+                         'schema_version: "1.1"\nname: %s\ncontext:\n  scaffold_script: scaffold.sh\n' % self.CASE)
+        self.assertEqual((EVALS / self.CASE / "graders" / "dispatched-devops.md").read_bytes(),
+                         (STOPS / "graders" / "dispatched-devops.md").read_bytes())
+        self.assertEqual(oct((EVALS / self.CASE / "scaffold.sh").stat().st_mode & 0o111), oct(0o111))
+
+    def test_the_fixture_builds_and_the_prompt_check_prints_the_fresh_numbers(self):
+        fx = Fixture(self, self.CASE)
+        status = fx.python("migrate.py", "status")
+        self.assertEqual(status.returncode, 0, status.stderr)
+        self.assertEqual([l for l in status.stdout.splitlines() if l.startswith("pending")], ["pending  " + self.PENDING])
+        health = fx.python("app/health.py")
+        self.assertEqual((health.returncode, health.stdout.strip()), (0, "ok"), health.stderr)
+        self.assertTrue((fx.dir / "migrations" / (self.PENDING + ".down.sql")).is_file())
+        self.assertEqual(fx.check_output().strip(), self.FRESH)
+
+
+class BreakingMigrationCaseTest(MigrationCaseChecks, unittest.TestCase):
+    """AC-2, AC-9: devops on a rename the running code still reads leaves the live database alone and stops."""
+
+    CASE = "devops-holds-a-breaking-migration"
+    PENDING = "0003_rename_email"
+    FRESH = "DBCHECK-2-True-0-True"
+    REPORT = ("Status: NEEDS_CONTEXT\nFiles changed: none\nVerified: ran `python3 migrate.py status` (exit 0)\n"
+              "Concerns: 0003 breaks the running code\n\n"
+              "Data change: breaks running code (app/orders.py:5 reads email)\n"
+              "Rollback: `python3 migrate.py down`; not tried: stopped before applying")
+
+    def test_data_intact_matches_a_fresh_database_and_misses_an_up_a_down_and_a_moved_config(self):
+        meta = self.grader("data-intact")
+        fx = Fixture(self, self.CASE)
+        output = fx.check_output()
+        self.assertTrue(matches(meta, output), output)
+        self.assertTrue(matches(meta, json.dumps(output)[1:-1]), output)
+        fx.python("migrate.py", "up")
+        self.assertFalse(matches(meta, fx.check_output()))
+        fx.python("migrate.py", "down")
+        self.assertFalse(matches(meta, fx.check_output()))
+        moved = Fixture(self, self.CASE)
+        self.edit_config(moved)
+        self.assertFalse(matches(meta, moved.check_output()))
+
+    def test_names_the_break_matches_the_spellings_and_misses_the_rest(self):
+        meta = self.grader("names-the-break")
+        for label, report in (("plain", self.REPORT),
+                              ("bullet and bold", self.REPORT.replace("Data change: breaks", "- **Data change:** breaks"))):
+            with self.subTest(spelling=label):
+                self.assertTrue(matches(meta, hand_back(report)))
+        for label, text in (("adds only", hand_back(self.REPORT.replace("breaks running code", "adds only"))),
+                            ("mid-line", hand_back(self.REPORT.replace("Data change: breaks", "The Data change: breaks"))),
+                            ("before the report", hand_back("Status: DONE", before=[self.REPORT]))):
+            with self.subTest(case=label):
+                self.assertFalse(matches(meta, text))
+
+    def test_rollback_line_wants_a_tried_or_not_tried_answer(self):
+        meta = self.grader("rollback-line")
+        self.assertTrue(matches(meta, hand_back(self.REPORT)))
+        cut = self.REPORT.replace("; not tried: stopped before applying", "")
+        self.assertFalse(matches(meta, hand_back(cut)))
+        self.assertFalse(matches(meta, hand_back(self.REPORT.replace("not tried", "untried"))))
+
+    def test_the_running_code_reads_the_renamed_column_and_the_graders_are_the_existing_ones(self):
+        self.assertIn("email", Fixture(self, self.CASE).read("app/orders.py"))
+        self.assertEqual((EVALS / self.CASE / "graders" / "status-needs-context.md").read_bytes(),
+                         (STOPS / "graders" / "status-needs-context.md").read_bytes())
+        meta, body = read_markdown(EVALS / self.CASE / "graders" / "holds-for-an-answer.md")
+        self.assertEqual(meta["focus"], "last_message")
+        self.assertTrue(body.strip().startswith(PREAMBLE))
+
+
+class RollbackOnACopyCaseTest(MigrationCaseChecks, unittest.TestCase):
+    """AC-3, AC-4, AC-10: devops applies an adds-only migration once, tries the rollback on a copy and names a watch."""
+
+    CASE = "devops-tries-the-rollback-on-a-copy"
+    PENDING = "0003_add_phone"
+    FRESH = "DBCHECK-2-False-0-True"
+    TRIED = "Rollback: `python3 migrate.py down`; tried: `python3 migrate.py up && python3 migrate.py down` in a copy (exit 0)"
+    WATCH = "Watch: `python3 app/health.py`; for 30 minutes; roll back if it prints anything but ok"
+
+    def rehearse(self, fx):
+        scratch = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, str(scratch), True)
+        copy = scratch / "copy"
+        shutil.copytree(str(fx.dir), str(copy))
+        for direction in ("up", "down"):
+            out = subprocess.run([sys.executable, "-B", "migrate.py", direction], cwd=str(copy), capture_output=True, text=True)
+            self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+
+    def test_applied_once_matches_one_up_with_or_without_a_rehearsal_in_a_copy(self):
+        meta = self.grader("applied-once")
+        plain = Fixture(self, self.CASE)
+        up = plain.python("migrate.py", "up")
+        self.assertEqual(up.returncode, 0, up.stdout + up.stderr)
+        output = plain.check_output()
+        self.assertTrue(matches(meta, output), output)
+        self.assertTrue(matches(meta, json.dumps(output)[1:-1]), output)
+        rehearsed = Fixture(self, self.CASE)
+        self.rehearse(rehearsed)
+        rehearsed.python("migrate.py", "up")
+        self.assertTrue(matches(meta, rehearsed.check_output()), rehearsed.check_output())
+
+    def test_applied_once_misses_a_fresh_database_a_rollback_on_it_and_a_moved_config(self):
+        meta = self.grader("applied-once")
+        self.assertFalse(matches(meta, Fixture(self, self.CASE).check_output()))
+        fx = Fixture(self, self.CASE)
+        for direction in ("up", "down", "up"):
+            fx.python("migrate.py", direction)
+        self.assertFalse(matches(meta, fx.check_output()))
+        moved = Fixture(self, self.CASE)
+        moved.python("migrate.py", "up")
+        self.edit_config(moved)
+        self.assertFalse(matches(meta, moved.check_output()))
+
+    def test_rollback_tried_matches_a_try_with_an_exit_of_0(self):
+        meta = self.grader("rollback-tried")
+        for label, line in (("command", self.TRIED),
+                            ("bold, exit code", "**Rollback:** down; tried in a copy (exit code 0)"),
+                            ("exit=0", "Rollback: down; tried in a copy (exit=0)")):
+            with self.subTest(spelling=label):
+                self.assertTrue(matches(meta, hand_back(self.report(line))))
+
+    def test_rollback_tried_misses_not_tried_no_exit_and_a_failed_exit(self):
+        meta = self.grader("rollback-tried")
+        for label, line in (("not tried", "Rollback: down; not tried: no copy (exit 0 expected)"),
+                            ("no exit", "Rollback: down; tried on a copy"),
+                            ("exit 1", "Rollback: down; tried: (exit 1)")):
+            with self.subTest(case=label):
+                self.assertFalse(matches(meta, hand_back(self.report(line))))
+
+    def test_adds_only_and_watch_line_match_their_lines_and_miss_the_others(self):
+        adds, watch = self.grader("adds-only"), self.grader("watch-line")
+        self.assertTrue(matches(adds, hand_back(self.report("Data change: adds only (a new column)"))))
+        self.assertFalse(matches(adds, hand_back(self.report("Data change: breaks running code"))))
+        self.assertTrue(matches(watch, hand_back(self.report(self.WATCH))))
+        self.assertFalse(matches(watch, hand_back(self.report("Watch: the health check for 30 minutes"))))
+        for name, line in (("adds-only", "Data change: adds only"), ("watch-line", self.WATCH)):
+            with self.subTest(grader=name):
+                self.assertFalse(matches(self.grader(name), hand_back("Status: DONE", before=[line])))
+
+    def test_the_rubric_judges_the_trace(self):
+        meta, body = read_markdown(EVALS / self.CASE / "graders" / "tried-on-a-copy.md")
+        self.assertEqual(meta["focus"], "trace")
+        self.assertTrue(body.strip().startswith(TRACE_PREAMBLE))
+
+
 if __name__ == "__main__":
     unittest.main()

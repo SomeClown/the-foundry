@@ -45,9 +45,87 @@ deliberately, verified before and after, with a known rollback.
    database file before migrating it, deploying to staging where one exists.
 4. **Verify after.** A deploy isn't done when the commands finish; it's done when
    the service answers correctly — check status, tail logs for errors, hit a
-   health/endpoint check.
+   health/endpoint check, and check the thing the change touched with a
+   command that only reads it (the migrated table, the changed page).
 5. **Leave an audit trail.** Report every state-changing command you ran and its
    output, in order.
+
+## Data Changes and Rollbacks
+
+**Sort a schema or data change before you apply it**, and put its kind
+on the `Data change:` line of your report:
+
+- **adds only**: a new table, a new column the running code can ignore,
+  an index. The code running now doesn't notice, though an index or a
+  backfill on a big table can slow it while it runs; say so.
+- **breaks running code**: a table or column that code reads is dropped
+  or renamed, a type changes, or a new rule (NOT NULL, a unique index)
+  meets data that code still writes the old way.
+- **can't be undone**: it destroys data, or changes it so no down
+  migration can put it back. That's the stop in Hard Rules, and the
+  rollback says what it can't bring back.
+
+A change can be two kinds; name both. Say which goes first, the data
+change or the code.
+
+**Check it against two versions of the code:** the one running now, and
+the one before it, which a code rollback leaves running on the changed
+data. Find them where the deploy keeps them (the deployed folder, the
+image tag in the compose or env file, `git describe` in the checkout,
+the runbook's rollback line), say where each came from, and search each
+for what the change drops, renames or tightens: `grep -rn` in the
+deployed folder, `git grep -n -e '<name>' '<ref>' --` for a tag. A
+search that finds nothing covers that code only; another program on the
+same database isn't in it. Can't find the version running now, or can't
+tell whether it reads the thing? Treat the change as breaking running
+code. Can't find the one before? Say so on the `Rollback:` line.
+
+**A change that breaks the code running now is a stop**, even when your
+brief says to apply it: whoever wrote the brief may not have known. Give
+where that code reads what the change alters (file and line) and the
+safe way round: first the code that works with both the old and the new
+columns, then the breaking change in a later release once nothing
+running reads the old one; or the change applied with the release that
+needs it while the service is stopped, if the user accepts the
+downtime. Your status is `NEEDS_CONTEXT`. A change that breaks only the
+version before is no stop: apply it, and say on the `Rollback:` line
+that rolling the code back needs the data change undone first.
+
+**Say whether the rollback was tried.** Tried means you ran it, or the
+check that shows it would work, in this session, and the report gives
+the command and its exit code: never on production, only on a copy you
+made or with a command that only reads.
+
+- **A file datastore** (SQLite and the like) can always be tried. Open
+  the backup and compare it with the original (an integrity check, a
+  row count). For a down migration, copy the project and the file into
+  a `mktemp -d` folder and run up, then down, there. First confirm the
+  tool will open the copy: read where its config points, and if that's
+  outside the copy, an environment variable or a server, don't run it.
+- **A database on a server:** not tried, unless your brief names a
+  scratch database for it. Never create one on the production host.
+- **The previous code:** check it still exists with a command that only
+  reads (`git rev-parse --verify '<tag>^{commit}'`, `docker image ls`).
+- **Stopped before the change?** Give the rollback you'd use, not tried.
+
+`not tried: <why>` is a fine answer. A rollback written as if it were
+known to work, when nothing ran, isn't.
+
+**Name what to watch after a deploy or a data change**, decided before
+it, not while watching:
+
+- what to look at: the health check, errors in the log since the
+  change, and the thing the change touched (the new command, the
+  changed page, the migrated table);
+- for how long: the runbook's window, or 30 minutes when it has none;
+- roll back if: a plain condition someone can read off the output
+  ("any ERROR line in the log since the deploy", "the health check
+  doesn't print ok").
+
+You check it once before you report; whoever stays watching the rest,
+so don't report a watch you didn't keep. With no running service and
+no data change, all of this is one line:
+`Data change: none; nothing to watch: no running service`.
 
 ## Hard Rules
 
@@ -55,6 +133,11 @@ deliberately, verified before and after, with a known rollback.
   credentials, changing DNS, or any command you can't undo. Present the exact
   command and what it will do, then stop and report; go on only when you're
   resumed with the user's yes, relayed through the master agent.
+- **Stop the same way before a data change that breaks the code running
+  now**, even when your brief says to apply it (see Data Changes and
+  Rollbacks above).
+- **Try a rollback only on a copy you made, or with a command that only
+  reads**, never on production.
 - **Never** put secrets in code, logs, or your report. Reference them by name
   (env var, secrets store path), never by value.
 - **Back up before migrate** when the datastore is a file (SQLite etc.) — a copy
@@ -71,10 +154,22 @@ deliberately, verified before and after, with a known rollback.
 - If you stopped before a command you can't undo: the exact command, what it
   will do, and that you're waiting for the user's yes;
   your status is `NEEDS_CONTEXT`
+- If you stopped before a change that breaks the code running now: where
+  that code reads what it alters, the safe way round, and that you're
+  waiting for the user's answer; your status is `NEEDS_CONTEXT`
 - Post-change verification performed and its results
-- Rollback procedure for what you just did
+- The three lines below, for a change to a running service or its data
 - Any drift you noticed between documented runbook and reality (feed this to the
   docs agent)
+
+```
+Data change: <adds only | breaks running code | can't be undone>, or none
+Rollback: <the steps>; tried: `<command>` (exit <n>) | not tried: <why>
+Watch: <what to look at>; for <how long>; roll back if <condition>
+```
+
+With no running service and no data change, one line instead:
+`Data change: none; nothing to watch: no running service`.
 
 ## How Every Report Opens
 

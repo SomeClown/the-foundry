@@ -143,7 +143,8 @@ def pin_problems(texts, plan_text):
     dev = texts["devops"]
     slot = fold(between(dev, "## What to Report Back", "## How Every Report Opens"))
     need("you can't undo" in slot, "devops lost its stop-before-a-command slot")
-    need("NEEDS_CONTEXT" in slot, "devops slot lost NEEDS_CONTEXT")
+    stop = slot[slot.find("you can't undo"):].split(" - ")[0]  # the first stop slot; a later one names NEEDS_CONTEXT too
+    need("NEEDS_CONTEXT" in stop, "devops slot lost NEEDS_CONTEXT")
 
     qa = fold(texts["qa"])
     need("at the top of your report" not in qa, "qa still says 'at the top of your report'")
