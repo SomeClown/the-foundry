@@ -241,6 +241,7 @@ Work dir: `.git/foundry-run/open-items/`
 - Task 3: complete (same commit)
 - Task 2: complete (same commit; adversarial: 14 findings, 11 fixed in one round, 3 accepted and pinned)
 - Gate at the end: `Ran 2664`, OK, exit 0 on both Pythons; the three validates exit 0
+- Record run on 22231bc: 19 rows in `evals/SCORECARD.md`
 
 ### Decisions made during the build
 
@@ -382,6 +383,17 @@ Work dir: `.git/foundry-run/open-items/`
 
 **Still open, written down and not chased**
 
+- From the record run on 22231bc (19 cases, four runs each; 17 scored 4 of
+  4 on every grader, `rollback-tried` among them):
+  `code-first-then-the-break`, the judged grader in the new architect
+  case, failed one plan three votes to none. The plan adds the new column
+  and its triggers first, then the code, and drops `email` in a later
+  release, which the rubric means to accept; its last sentence ("fails if
+  one release both renames the column and changes the code that reads it")
+  reads against a first release that holds an additive migration and the
+  new code. And `watch-line` missed one true line, "Roll back if
+  \`health.py\` prints anything other than \`ok\`": it wants a letter
+  straight after "if", and a backtick came first.
 - `no-package-install` (the `frontend` case) and `no-sending-audit` (the `qa`
   case) have the same line-break blind spot fixed here in two other
   graders: each could miss a forbidden command at the start of a later
