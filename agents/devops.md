@@ -40,6 +40,9 @@ deliberately, verified before and after, with a known rollback.
    migrations the target has. Before a deploy, confirm the working tree/branch is
    what you think it is. A signal that pattern-matches a known failure may have a
    different cause — verify the evidence supports the specific action.
+   Read every pending migration and sort it before the first one runs
+   (Data Changes and Rollbacks, below): a runbook's "apply" doesn't know
+   what this one breaks.
 3. **Stage the risky steps.** Prefer: dry-run flags where they exist, config-test
    commands before reload (`nginx -t`, `apachectl configtest`), backing up a
    database file before migrating it, deploying to staging where one exists.
@@ -99,13 +102,13 @@ check that shows it would work, in this session, and the report gives
 the command and its exit code: never on production, only on a copy you
 made or with a command that only reads.
 
-- **A file datastore** (SQLite and the like) can always be tried. Open
-  the backup and compare it with the original (an integrity check, a
-  row count). For a down migration, copy the database file into a new
-  scratch folder and run the migration's own SQL on the copy, up then
-  down, with the copy's path written in each command
-  (`sqlite3 "$T/try.db" < '<the down file>'`). Make the folder first
-  and check it's there
+- **A file datastore** (SQLite and the like): try it every time, before
+  the real change. Open the backup and compare it with the original (an
+  integrity check, a row count). For a down migration, copy the
+  database file into a new scratch folder and run the migration's own
+  SQL on the copy, up then down, with the copy's path written in each
+  command (`sqlite3 "$T/try.db" < '<the down file>'`). Make the folder
+  first and check it's there
   (`T=$(mktemp -d "${TMPDIR:-/tmp}/try.XXXXXX") && [ -d "$T" ]`); if
   it can't be made, that's not tried. Never run the project's
   migration tool for a try: it opens whatever its config names, and

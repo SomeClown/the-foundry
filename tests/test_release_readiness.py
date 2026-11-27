@@ -53,7 +53,7 @@ def problems(texts):
     found += lacks("devops's Data Changes and Rollbacks section", section,
                    KINDS + ("even when your brief says to apply it", "Treat the change as breaking running code"))
     found += lacks("devops's Data Changes and Rollbacks section", section,
-                   (OFF_PRODUCTION, NO_TOOL_FOR_A_TRY, PATH_IN_COMMAND, "unless your brief names a scratch database", WATCH_DEFAULT, ROLL_BACK_IF))
+                   (OFF_PRODUCTION, "try it every time", NO_TOOL_FOR_A_TRY, PATH_IN_COMMAND, "unless your brief names a scratch database", WATCH_DEFAULT, ROLL_BACK_IF))
     found += lacks("devops's Data Changes and Rollbacks section", between(devops, "## Data Changes and Rollbacks", "## Hard Rules"),
                    (DOWN_DIR_CHECK,))
     found += lacks("devops's Data Changes and Rollbacks section", section,
@@ -83,6 +83,8 @@ def problems(texts):
         found.append("devops's stop slot isn't followed by NEEDS_CONTEXT")
     verify = folded_between(devops, "4. **Verify after.**", "5. **Leave an audit trail.**")
     found += lacks("devops's step 4", verify, ("the thing the change touched", "only reads"))
+    state = folded_between(devops, "2. **Check state before changing it.**", "3. **Stage the risky steps.**")
+    found += lacks("devops's step 2", state, ("sort it before the first one runs",))
     work = folded_between(devops, "## How to Work", "## How Every Report Opens")
     for word in PLAIN:
         if word in work.lower():
@@ -263,7 +265,7 @@ class MutationTest(unittest.TestCase):
 
     def test_a_line_break_moved_inside_a_phrase_still_holds(self):
         def rewrap(t):
-            return t.replace("with the copy's path written in each command", "with the copy's path\n  written in each command", 1)
+            return t.replace("written in each\n  command", "written\n  in each command", 1)
         self.assertEqual(problems(self.mutated("devops", rewrap)), [])
 
     def test_a_missing_section_gives_a_message_not_a_crash(self):

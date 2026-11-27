@@ -1056,10 +1056,26 @@ class RollbackOnACopyCaseTest(MigrationCaseChecks, unittest.TestCase):
             with self.subTest(grader=name):
                 self.assertFalse(matches(self.grader(name), hand_back("Status: DONE", before=[line])))
 
-    def test_the_rubric_judges_the_trace(self):
-        meta, body = read_markdown(EVALS / self.CASE / "graders" / "tried-on-a-copy.md")
-        self.assertEqual(meta["focus"], "trace")
-        self.assertTrue(body.strip().startswith(TRACE_PREAMBLE))
+    def test_the_down_on_a_copy_grader_matches_sqlite_on_a_copy_and_misses_the_rest(self):
+        meta = self.grader("ran-the-down-on-a-copy")
+        self.assertEqual((meta["type"], meta["tool"], meta["min"], meta.get("weight")), ("tool_used", "Bash", 1, 1))
+        down = "migrations/0003_add_phone.down.sql"
+        for label, command in (("quoted var", 'sqlite3 "$T/try.db" < ' + down),
+                               ("quoted file", 'sqlite3 "$T/try.db" < \'/abs/path/' + down + "'"),
+                               ("no space", "sqlite3 /private/tmp/e-abc/tmp/try.Xy12/try.db <" + down)):
+            with self.subTest(match=label):
+                self.assertTrue(tool_input_matches(meta, "Bash", {"command": command}))
+        for label, command in (("live", "sqlite3 data/shop.db < " + down),
+                               ("live dot", "sqlite3 ./data/shop.db < " + down),
+                               ("live quoted", 'sqlite3 "data/shop.db" < ' + down),
+                               ("up file", 'sqlite3 "$T/try.db" < migrations/0003_add_phone.sql'),
+                               ("tool", "python3 migrate.py down")):
+            with self.subTest(miss=label):
+                self.assertFalse(tool_input_matches(meta, "Bash", {"command": command}))
+
+    def test_the_case_weights_total_nine(self):
+        self.assertEqual(sum(read_markdown(p)[0].get("weight", 1) for p in graders_of(EVALS / self.CASE)), 9)
+        self.assertFalse((EVALS / self.CASE / "graders" / "tried-on-a-copy.md").exists())
 
 
 if __name__ == "__main__":
