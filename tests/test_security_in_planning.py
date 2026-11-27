@@ -44,7 +44,7 @@ def problems(texts):
     """Every way the texts break a rule; an empty list means they hold."""
     found = []
     arch = folded_between(texts.get("architect", ""), "### 4. Risks and Coupling", "### 5. Testing Strategy")
-    for needle in ("`Security:`", "`Security: none`"):
+    for needle in ("`Security:`", "`Security: none`", "Don't write a line that only says a kind isn't touched."):
         if needle not in arch:
             found.append("architect's section 4 doesn't hold %s" % needle)
     if "since frontend adds none" not in fold(texts.get("architect", "")):

@@ -114,7 +114,7 @@ def pattern_of(case, name):
 
 
 def python_re(pattern, flags=""):
-    return re.compile(pattern, re.M if "m" in flags else 0)
+    return re.compile(pattern, (re.M if "m" in flags else 0) | (re.I if "i" in flags else 0))
 
 
 class Verdict(object):
@@ -839,6 +839,43 @@ class SecurityLineGraderTest(unittest.TestCase):
 
     def test_it_misses_the_design_the_case_builds(self):
         self.assertFalse(self.hit(Fixture(self, self.ARCH).read("docs/design.md")))
+
+
+class NoUntouchedSecurityLineGraderTest(unittest.TestCase):
+    """AC-7: section 4 carries no `Security:` line that only says a kind isn't touched."""
+
+    ARCH = "architect-plan-format"
+    PLAN = SecurityLineGraderTest.PLAN
+    BAD = ("Security: no new dependency", "- **Security:** auth isn't touched.",
+           "Security notes: secrets not affected", "Security: n/a for outbound calls")
+
+    def hit(self, text):
+        return matches(pattern_of(self.ARCH, "no-untouched-security-line"), text)
+
+    def test_it_passes_none_and_a_real_exposure(self):
+        for label, line in (("none", "Security: none"), ("a real line", SecurityLineGraderTest.REAL),
+                            ("an exposure", "Security: input reaches a parser in Task 1")):
+            with self.subTest(line=label):
+                self.assertFalse(self.hit(self.PLAN.replace("Security: none", line)))
+
+    def test_it_reads_a_capital_and_a_whole_word_no(self):
+        for line, want in (("Security: No new dependency", True), ("Security: no new dependency", True),
+                           ("Security: no-op for auth, but the export writes a file", False),
+                           ("Security: Node 20 is required", False)):
+            with self.subTest(line=line):
+                self.assertEqual(bool(self.hit(self.PLAN.replace("Security: none", line))), want)
+
+    def test_it_fails_a_line_that_only_says_a_kind_isnt_touched(self):
+        for line in self.BAD:
+            with self.subTest(line=line):
+                self.assertTrue(self.hit(self.PLAN.replace("Security: none", line)))
+
+    def test_it_misses_the_same_lines_under_section_5(self):
+        for line in self.BAD:
+            moved = self.PLAN.replace("Security: none\n\n## 5. Testing Strategy\n",
+                                      "## 5. Testing Strategy\n" + line + "\n")
+            with self.subTest(line=line):
+                self.assertFalse(self.hit(moved))
 
 
 STOPS = EVALS / NEW_CASES["devops"]

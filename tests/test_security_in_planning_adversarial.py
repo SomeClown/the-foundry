@@ -260,10 +260,10 @@ class SecurityLineShapeTest(unittest.TestCase):
         self.assertIsNotNone(path)
         self.assertIn(path, prompt)
 
-    def test_the_case_totals_16_and_a_coverage_miss_alone_is_under_the_threshold(self):
+    def test_the_case_totals_17_and_a_coverage_miss_alone_is_under_the_threshold(self):
         weights = {p.name: T.read_markdown(p)[0].get("weight", 1) for p in T.graders_of(T.EVALS / ARCH)}
         total = sum(weights.values())
-        self.assertEqual(total, 16)
+        self.assertEqual(total, 17)
         self.assertLess((total - weights["coverage-lines.md"]) / total, 0.8)
         for name, w in weights.items():
             if w == 1:
@@ -676,3 +676,97 @@ class JavaScriptParityTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoUntouchedLineAttackTest(Base):
+    """AC-7's grader `no-untouched-security-line` (section 4 has no `Security:` line that only says a kind isn't
+    touched), attacked from both sides."""
+
+    NAME = "no-untouched-security-line"
+    SENTENCE = "Don't write a line that only says a kind isn't touched."
+
+    def hit(self, text):
+        return T.matches(T.pattern_of(ARCH, self.NAME), text)
+
+    def line(self, line):
+        return self.hit(PLAN % line)
+
+    # right plans it must pass
+    def test_right_lines_pass(self):
+        for line in ("Security: none", "Security: None.", "Security: input reaches a parser in Task 1",
+                     "Security: the new endpoint takes user input; no new dependency is added",
+                     "Security: a new dependency, `pyyaml`; nothing else", "Security: secrets: none are read",
+                     "Security: Node 20 is required", "Security: none, nor a new call out", "Security: nonexistent risk"):
+            with self.subTest(line=line):
+                self.assertFalse(self.line(line))
+
+    def test_a_line_for_a_touched_kind_that_starts_with_no_dash_op_passes(self):
+        """A line that names a touched kind ('the export writes a file') must not fail because it begins `no-op`:
+        `\\b` sits between `no` and `-`, so the grader reads `no-op` as the word `no`. Fails today."""
+        self.assertFalse(self.line("Security: no-op for auth, but the export writes a file"))
+
+    def test_a_touched_kind_line_with_an_untouched_clause_fails_today(self):
+        """Accepted limit: a keyword anywhere on the line fails it, even beside a real exposure."""
+        self.assertTrue(self.line("Security: input reaches a parser in Task 1; auth is unaffected"))
+
+    def test_a_line_starting_no_that_goes_on_to_a_real_exposure_fails_today(self):
+        self.assertTrue(self.line("Security: no user input reaches the parser, but a file mode changes in Task 2"))
+
+    # wrong plans it catches
+    def test_wrong_lines_it_catches(self):
+        for line in ("Security: no new dependency", "Security: NO new dependency", "Security: no", "Security: No.",
+                     "- **Security:** no new dependency", "- **Security**: no new dependency", "1. Security: n/a",
+                     "Security notes: secrets not affected", "`Security: auth is untouched`", "> Security: no new call out",
+                     "Security: the parser is not affected", "Security: auth doesn't touch it"):
+            with self.subTest(line=line):
+                self.assertTrue(self.line(line))
+
+    # wrong plans it passes: limits of a keyword grader
+    def test_wrong_lines_it_passes_today(self):
+        """Pinned: each only says a kind isn't touched, in words the pattern doesn't list."""
+        for line in ("Security: dependencies: unchanged", "Security: nothing changes for secrets",
+                     "Security: auth stays as it is", "Security: (none of the five kinds apply)",
+                     "Security: not a concern", "Security: not relevant here", "Security: nil"):
+            with self.subTest(line=line):
+                self.assertFalse(self.line(line))
+
+    def test_a_dash_label_and_a_split_line_pass_today(self):
+        """Pinned: `Security - no ...` has no colon, and a word on the line after `Security:` isn't on its line."""
+        self.assertFalse(self.line("Security - no new dependency"))
+        self.assertFalse(self.line("Security:\nno new dependency"))
+        self.assertFalse(self.line("Security:\nunaffected"))
+
+    def test_a_table_cell_passes_today(self):
+        self.assertFalse(self.line("| Security: no new dependency | x |"))
+
+    # section bounds
+    def test_the_same_bad_line_under_section_5_is_not_caught(self):
+        self.assertFalse(self.hit("## 4. Risks\n\n- x\n\n## 5. Testing Strategy\nSecurity: no new dependency\n"))
+
+    def test_the_bad_line_in_a_fence_or_quote_inside_section_4_is_caught_today(self):
+        """Pinned, same as `security-line`: the pattern doesn't parse fences or quotes."""
+        self.assertTrue(self.line("```\nSecurity: no new dependency\n```"))
+        self.assertTrue(self.line("> Security: no new dependency"))
+
+    def test_a_bad_line_after_a_subheading_in_section_4_is_not_caught_today(self):
+        """Pinned: the `\\n#{1,3} ` stop that bounds `security-line` bounds this one too."""
+        text = "## 4. Risks and Coupling\n\n- x\n\n### Notes\n\nSecurity: no new dependency\n\n## 5. Testing\n"
+        self.assertFalse(self.hit(text))
+
+    def test_a_bad_line_in_a_task_section_before_section_4_is_not_caught(self):
+        text = "## 2. Tasks\n\nSecurity: no new dependency\n\n## 4. Risks and Coupling\n\n- x\n\n## 5. Testing\n"
+        self.assertFalse(self.hit(text))
+
+    # the architect's sentence
+    def test_the_sentence_removed_or_softened_fails_the_gate(self):
+        for label, new in (("removed", ""), ("softened", "You may note kinds that aren't touched.")):
+            with self.subTest(change=label):
+                texts = self.edited("architect", lambda t: re.sub(r"Don't\s+write\s+a\s+line\s+that\s+only\s+says\s+a\s+kind\s+isn't\s+touched\.",
+                                                                  new, t, count=1))
+                self.assertCaught(texts, "isn't touched")
+
+    def test_unsure_whether_it_touches_one_it_does_is_in_section_4(self):
+        """The gate (`problems`) holds no needle for this sentence, so this pins it."""
+        arch = S.folded_between(self.base["architect"], "### 4. Risks and Coupling", "### 5. Testing Strategy")
+        self.assertIn("Unsure whether the change touches one? It does.", arch)
+        self.assertIn(self.SENTENCE, arch)
