@@ -27,6 +27,7 @@ NO_SERVICE = "nothing to watch: no running service"
 COPY_CHECK = "confirm the tool will open the copy"
 ROLLBACK_SHAPE = "tried: `<command>` (exit <n>) | not tried: <why>"
 WATCH_SHAPE = "; for <how long>; roll back if <condition>"
+BOTH_FIRST = "first the code that works with both"
 PLAIN = ("expand and contract", "canary", "blast radius")
 SLO = re.compile(r"\bSLO\b")
 
@@ -51,6 +52,10 @@ def problems(texts):
                    KINDS + ("even when your brief says to apply it", "Treat the change as breaking running code"))
     found += lacks("devops's Data Changes and Rollbacks section", section,
                    (OFF_PRODUCTION, COPY_CHECK, "unless your brief names a scratch database", WATCH_DEFAULT, ROLL_BACK_IF))
+    found += lacks("devops's Data Changes and Rollbacks section", section,
+                   ("can't tell whether it reads the thing", "is no stop", "where that code reads",
+                    "not tried, unless your brief names a scratch database", "Never create one on the production host",
+                    BOTH_FIRST, "no running service on this data"))
     rules = folded_between(devops, "## Hard Rules", "## What to Report Back")
     found += lacks("devops's Hard Rules", rules, ("breaks the code running now", OFF_PRODUCTION))
     report = between(devops, "## What to Report Back", "## How Every Report Opens")
@@ -83,10 +88,17 @@ def problems(texts):
     ship = texts.get("ship", "")
     preflight = folded_between(ship, "## 2. Preflight", "## 3. One ask")
     found += lacks("ship's preflight", preflight, KINDS + ("no data change", NO_SERVICE, "send it back to be split"))
+    found += lacks("ship's preflight", preflight, ("isn't ready for one release", "both work on the changed data", BOTH_FIRST))
     handover = folded_between(ship, "## 8. Hand over the deploy", "## 9. Close the loop")
     found += lacks("ship's hand-over", handover,
                    (NOT_TRIED, OFF_PRODUCTION, ROLL_BACK_IF, WATCH_DEFAULT, "what to look at", "for how long"))
     found += lacks("ship's hand-over", handover, ("never the value", "Run nothing on the server yourself"))
+    found += lacks("ship's hand-over", handover,
+                   ("grep -c", "nothing else goes out until it does", "give the rollback command again", "for them to run",
+                    "whether the previous version runs on the changed data"))
+    count_check = handover.find("prints a count and never the value")
+    if not 0 <= count_check < handover.find("2. **The deploy command**"):
+        found.append("ship's hand-over doesn't put the count check in item 1, before the deploy command")
     flags = ship[ship.find("## Red flags"):] if "## Red flags" in ship else ""
     rows = {
         '| "The rollback is just the previous tag"': "tried or not tried",
@@ -106,7 +118,7 @@ def problems(texts):
     if SLO.search(ship_all):
         found.append("ship uses SLO, not a plain word")
     section = folded_between(texts.get("architect", ""), "### 3. Data / Schema Changes", "### 4. Risks and Coupling")
-    found += lacks("architect's section 3", section, ("breaks the code running now", "two releases"))
+    found += lacks("architect's section 3", section, ("breaks the code running now", "two releases", BOTH_FIRST))
     return found
 
 

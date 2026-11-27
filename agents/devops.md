@@ -78,7 +78,10 @@ deployed folder, `git grep -n -e '<name>' '<ref>' --` for a tag. A
 search that finds nothing covers that code only; another program on the
 same database isn't in it. Can't find the version running now, or can't
 tell whether it reads the thing? Treat the change as breaking running
-code. Can't find the one before? Say so on the `Rollback:` line.
+code. Can't find the one before? Say so on the `Rollback:` line. Where the
+project's docs or your brief say there's no running service on this data
+(a development database, a tool's own file), no running code can break:
+say so and go on.
 
 **A change that breaks the code running now is a stop**, even when your
 brief says to apply it: whoever wrote the brief may not have known. Give

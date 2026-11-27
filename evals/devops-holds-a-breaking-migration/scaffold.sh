@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds this case's fixture in the eval's throwaway workspace.
 set -euo pipefail
-mkdir -p app config data docs migrations
+mkdir -p app config data docs logs migrations
+: > logs/migrate.log
 cat > CLAUDE.md <<'EOF'
 # shop
 
@@ -23,6 +24,7 @@ The service keeps running while migrations are applied.
 
 `python3 migrate.py down` reverts the last applied migration with its
 `.down.sql` file. `migrate.py` reads the database's path from `config/shop.ini`.
+Each run is also logged, one line, in `logs/migrate.log`.
 EOF
 cat > config/shop.ini <<'EOF'
 [database]
@@ -97,6 +99,8 @@ def connect():
 def record(db, name, direction):
     db.execute("INSERT INTO migration_runs (name, direction) VALUES (?, ?)", (name, direction))
     db.commit()
+    with open(str(HERE / "logs" / "migrate.log"), "a", encoding="utf-8") as log:
+        log.write("%s %s\n" % (direction, name))
     print(("applied   " if direction == "up" else "reverted  ") + name)
 
 
