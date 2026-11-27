@@ -3230,6 +3230,65 @@ class TranscriptReadersTest(TranscriptBase):
             events.extend(t.reader("api/billing/toll.py", "tX"))
         self.assertTranscriptFails(self.run_t(events), r"toll\.py \(3 times\)")
 
+    # AC-4: a restarted lead's second readers are allowed, only when the two prompts are the same bytes
+    def restarted(self, files=("api/billing/toll.py", "api/billing/tow.py"), second_prompt=None, listing=None):
+        """Events where the lead of api-billing is started twice with a brief that has a Files: list, and the listed files get a second reader."""
+        events = self.events()
+        lead = next(e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE
+                    and e.get("spawn_depth") == 2 and "Area: api-billing\n" in e["prompt"])
+        body = "\n".join("`%s/%s`" % (Fixture.repo, f) for f in files) if listing is None else listing
+        lead["prompt"] += "\nReader agent: the-foundry:file-reader\nFiles:\n" + body
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        second = t.started("l90000", INVESTIGATE, lead["prompt"] if second_prompt is None else second_prompt, 2, lead.get("parent_task_id"), "again")
+        events.append(second)
+        events.append(t.notified("l90000", "Area: api-billing\n..."))
+        for f in files:
+            events.extend(t.reader(f, "l90000"))
+        return events
+
+    def test_a_restarted_lead_with_the_same_prompt_allows_its_files_second_readers_and_notes_it(self):
+        # AC-4
+        files = ("api/billing/toll.py", "api/billing/tow.py")
+        for f in files:
+            self.assertIn(f, readable_paths())
+        out = self.assertTranscriptProved(self.run_t(self.restarted(files)))
+        self.assertIn("NOTE: transcript: area api-billing's lead was started twice; its 2 files had a second set of readers", out.splitlines())
+
+    def test_a_second_lead_prompt_changed_by_one_byte_gives_no_allowance(self):
+        # AC-4
+        events = self.restarted()
+        lead = next(e for e in events if e.get("task_id") == "l90000")
+        lead["prompt"] += " "
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 2 readable files had a reader dispatched more than once: ")
+
+    def test_a_file_read_three_times_fails_even_with_a_restarted_lead(self):
+        # AC-4
+        events = self.restarted()
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 91000, str(Fixture.repo)
+        events.extend(t.reader("api/billing/toll.py", "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 readable files had a reader dispatched more than once: api/billing/toll\.py \(3 times\)$")
+
+    def test_a_file_the_restarted_leads_do_not_list_still_fails(self):
+        # AC-4
+        events = self.restarted(files=("api/billing/toll.py",))
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 91000, str(Fixture.repo)
+        events.extend(t.reader("api/billing/tow.py", "tX"))
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 readable files had a reader dispatched more than once: api/billing/tow\.py \(2 times\)$")
+
+    def test_a_lead_prompt_with_no_files_line_gives_no_allowance_and_no_exception(self):
+        # AC-4
+        events = self.restarted()
+        for e in events:
+            if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and "Area: api-billing\n" in e.get("prompt", ""):
+                e["prompt"] = e["prompt"].split("\nReader agent:")[0]
+        code, out = self.run_t(events)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+        self.assertRegex(out, r"readable files had a reader dispatched more than once")
+
     def test_a_reader_for_a_skipped_lock_file_fails(self):
         events = self.events()
         t = Transcript.__new__(Transcript)

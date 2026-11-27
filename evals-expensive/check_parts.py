@@ -353,6 +353,25 @@ def report_lines(text):
     return [(line[2:] if line.startswith("  ") else line).rstrip() for line in lines[start:] if line.strip()]
 
 
+def restarted_files(leads, relative):
+    """Maps each file named by two or more lead tasks with byte-identical prompts (a restart sends the same brief) to the area's name.
+    A prompt with no `Area:` line or no `Files:` list gives nothing."""
+    by_prompt = {}
+    for _number, _task_id, prompt in leads:
+        by_prompt.setdefault(prompt, []).append(prompt)
+    found = {}
+    for prompt, same in by_prompt.items():
+        area = re.search(r"^Area: (\S+)", prompt, re.M)
+        listing = re.search(r"^Files:[ \t]*\r?\n(.*)", prompt, re.M | re.S)
+        if len(same) < 2 or not area or not listing:
+            continue
+        for line in listing.group(1).replace("\r\n", "\n").split("\n"):
+            if not line.strip():
+                break
+            found[relative(line.strip().strip("`"))] = area.group(1)
+    return found
+
+
 def check_transcript(events, repo, tracked, layout, infos, fails, notes):
     """Checks the transcript against the key and the parts; returns (readers completed, readers expected) when it all holds."""
     if "file_skips" not in layout:
@@ -417,6 +436,14 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
     if incomplete:
         fails.append("transcript: %d readable files had a reader dispatched that never completed: %s" % (len(incomplete), short(incomplete)))
     twice = sorted(path for path, ids in dispatched.items() if path in readable and len(ids) > 1)
+    restarted = restarted_files(leads, relative)
+    allowed = {}   # area name -> files whose second readers a restarted lead explains
+    for path in list(twice):
+        if len(dispatched[path]) == 2 and path in restarted:
+            twice.remove(path)
+            allowed[restarted[path]] = allowed.get(restarted[path], 0) + 1
+    for area in sorted(allowed):
+        notes.append("NOTE: transcript: area %s's lead was started twice; its %d files had a second set of readers" % (area, allowed[area]))
     if twice:
         fails.append("transcript: %d readable files had a reader dispatched more than once: %s" % (len(twice), short(["%s (%d times)" % (p, len(dispatched[p])) for p in twice])))
     outside = sorted(set(dispatched) - readable)

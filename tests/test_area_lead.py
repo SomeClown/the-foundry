@@ -270,6 +270,15 @@ class TopLevelHoldsNoLeadTextTest(unittest.TestCase):
                 self.assertIn(mark, sentence)
                 self.assertIn(mark, defined)
 
+    def test_a_checklist_that_is_not_one_line_a_path_counts_as_no_checklist_and_the_lead_is_asked_for_one_line_a_path(self):
+        # AC-4
+        body = fold(section_of(self.text, "Check Before You Compile"))
+        self.assertIn("A lead that fails, returns no checklist, or comes back cut off: start it once more with the same brief. "
+                      "A checklist that isn't one line a path counts as no checklist.", body)
+        lead = fold((AGENTS / (LEAD + ".md")).read_text(encoding="utf-8"))
+        self.assertIn("The checklist is one line for each path in your brief, with no ranges and no groups: "
+                      "never a folder or a count in place of its paths.", lead)
+
     def test_a_lead_that_returns_not_a_per_file_read_is_not_restarted(self):
         # AC-1
         body = fold(section_of(self.text, "Check Before You Compile"))

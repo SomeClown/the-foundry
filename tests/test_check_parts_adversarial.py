@@ -331,3 +331,177 @@ class LookAlikeTypesTest(Shapes):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---- Task 4 (AC-4): the restarted-lead allowance in the twice-read check --------------------------------------
+
+import test_check_parts as tcp  # noqa: E402
+
+
+def area_files(name):
+    return [f for f in next(a for a in tcp.base_areas() if a.name == name).files if tcp.is_readable(f)]
+
+
+class RestartBase(TranscriptBase):
+    """Builds transcripts where a lead is started twice with one brief and second readers follow."""
+
+    def restart(self, area="api-billing", listed=None, second=None, readers_parent="restart", prompt_edit=None,
+                second_kind=INVESTIGATE, first_kind=None, extra_leads=0, events=None, base=90000):
+        events = events if events is not None else self.events()
+        first = next(e for e in events if e.get("subtype") == "task_started" and e.get("spawn_depth") == 2
+                     and e.get("subagent_type") in LEAD_KINDS and ("Area: %s\n" % area) in e["prompt"])
+        files = area_files(area)
+        listed = files if listed is None else listed
+        body = "\n".join("`%s/%s`" % (Fixture.repo, f) if f.startswith("api") else f for f in listed)
+        first["prompt"] += "\nReader agent: the-foundry:file-reader\nFiles:\n" + body
+        if first_kind:
+            first["subagent_type"] = first_kind
+        if prompt_edit is not None:
+            first["prompt"] = prompt_edit(first["prompt"])   # both leads carry the edited text, so the prompts stay byte-identical
+        prompt = first["prompt"]
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = base, str(Fixture.repo)
+        ids = []
+        for k in range(1 + extra_leads):
+            lid = "l%d_%d" % (base, k)
+            ids.append(lid)
+            events.append(t.started(lid, second_kind, prompt, 2, first.get("parent_task_id"), "again"))
+            events.append(t.notified(lid, "Area: %s\n..." % area))
+        parent = {"restart": ids[0], "top": first.get("parent_task_id"), "first": first["task_id"]}.get(readers_parent, readers_parent)
+        for f in (files if second is None else second):
+            events.extend(t.reader(f, parent))
+        return events
+
+
+class AllowanceHoleTest(RestartBase):
+    def test_a_second_reader_with_no_restarted_lead_still_fails(self):
+        """AC-4: one lead lists the file, nobody restarted it, a stray second reader reads it."""
+        events = self.restart(extra_leads=0)
+        restart_lead = next(e for e in events if e.get("task_id") == "l90000_0")
+        events = [e for e in events if e.get("task_id") != restart_lead["task_id"]]
+        self.assertTranscriptFails(self.run_t(events), r"readable files had a reader dispatched more than once")
+
+    def test_a_restart_of_a_restart_with_two_readers_each_still_fails(self):
+        """AC-4: three leads with one brief; every file then has three readers."""
+        events = self.restart(extra_leads=1)
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 95000, str(Fixture.repo)
+        for f in area_files("api-billing"):
+            events.extend(t.reader(f, "l90000_1"))
+        out = self.assertTranscriptFails(self.run_t(events), r"\(3 times\)")
+        self.assertNotIn("NOTE: transcript: area api-billing", out)
+
+    def test_a_path_that_is_a_substring_of_a_listed_path_gets_no_allowance(self):
+        """AC-4: the list holds api/billing/toll.py.bak and x/api/billing/toll.py, never toll.py itself."""
+        files = area_files("api-billing")
+        listed = [f for f in files if f != "api/billing/toll.py"] + ["api/billing/toll.py.bak", "x/api/billing/toll.py"]
+        out = self.assertTranscriptFails(self.run_t(self.restart(listed=listed, second=["api/billing/toll.py"])),
+                                         r"^transcript: 1 readable files had a reader dispatched more than once: api/billing/toll\.py \(2 times\)$")
+        self.assertNotIn("was started twice", out)
+
+    def test_a_path_named_after_the_blank_line_that_ends_the_list_gets_no_allowance(self):
+        """AC-4: text after the list, even a line that is exactly the path, is not part of it."""
+        files = area_files("api-billing")
+        listed = [f for f in files if f != "api/billing/toll.py"]
+        events = self.restart(listed=listed, second=["api/billing/toll.py"],
+                              prompt_edit=lambda p: p)  # the listing is edited below, before the restart copies it
+        for e in events:
+            if e.get("subagent_type") in LEAD_KINDS and "Files:\n" in e.get("prompt", ""):
+                e["prompt"] += "\n\napi/billing/toll.py\nSee api/billing/toll.py"
+        self.assertTranscriptFails(self.run_t(events), r"api/billing/toll\.py \(2 times\)")
+
+    def test_a_second_reader_started_by_the_top_level_is_allowed_today(self):
+        """AC-4 finding: the allowance never looks at who started the second reader. This pins what the scorer does now:
+        a restarted lead exists, yet the second readers have the top level as parent, and the run still proves."""
+        out = self.assertTranscriptProved(self.run_t(self.restart(readers_parent="top")))
+        self.assertIn("NOTE: transcript: area api-billing's lead was started twice; its %d files had a second set of readers"
+                      % len(area_files("api-billing")), out.splitlines())
+
+
+class ParserNeverRaisesTest(RestartBase):
+    def check(self, prompt_edit, allowed, second=("api/billing/toll.py",)):
+        events = self.restart(second=list(second), prompt_edit=prompt_edit, listed=["api/billing/toll.py"])
+        code, out = self.run_t(events)
+        self.assertNotIn("Traceback", out)
+        self.assertIn(code, (0, 1), out)
+        self.assertEqual("was started twice" in out, allowed, out)
+        if not allowed:
+            self.assertEqual(code, 1, out)
+        return out
+
+    def test_a_prompt_with_no_files_line_gets_no_allowance(self):
+        self.check(lambda p: p.split("\nReader agent:")[0], False)
+
+    def test_an_empty_files_list_gets_no_allowance(self):
+        self.check(lambda p: p.split("Files:\n")[0] + "Files:\n\n", False)
+
+    def test_files_given_inline_on_the_header_line_gets_no_allowance(self):
+        self.check(lambda p: p.split("Files:\n")[0] + "Files: api/billing/toll.py\n", False)
+
+    def test_a_prompt_with_no_area_line_gets_no_allowance(self):
+        self.check(lambda p: p.replace("Area: api-billing\n", ""), False)
+
+    def test_an_area_line_with_no_name_gets_no_allowance(self):
+        self.check(lambda p: p.replace("Area: api-billing\n", "Area: \n"), False)
+
+    def test_control_characters_and_a_huge_line_do_not_raise(self):
+        self.check(lambda p: p + "\n\x00\x1b[31m\x07\x08﻿ " + "z" * 2000000, True)
+
+    def test_a_non_string_prompt_does_not_raise_and_gets_no_allowance(self):
+        events = self.restart(listed=["api/billing/toll.py"], second=["api/billing/toll.py"])
+        for e in events:
+            if e.get("subagent_type") in LEAD_KINDS and "Files:\n" in e.get("prompt", ""):
+                e["prompt"] = 12345
+        code, out = self.run_t(events)
+        self.assertNotIn("Traceback", out)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("was started twice", out)
+
+    def test_windows_line_endings_get_the_same_allowance(self):
+        self.check(lambda p: p, True)  # baseline
+        events = self.restart(listed=["api/billing/toll.py"], second=["api/billing/toll.py"])
+        for e in events:
+            if e.get("subagent_type") in LEAD_KINDS and "Files:\n" in e.get("prompt", ""):
+                e["prompt"] = e["prompt"].replace("\n", "\r\n")
+        code, out = self.run_t(events)
+        self.assertNotIn("Traceback", out)
+        self.assertEqual(code, 0, out)
+        self.assertIn("NOTE: transcript: area api-billing's lead was started twice; its 1 files had a second set of readers", out.splitlines())
+
+    def test_a_repeated_area_line_uses_one_name_and_a_repeated_files_line_does_not_raise(self):
+        out = self.check(lambda p: p.replace("Area: api-billing\n", "Area: api-billing\nArea: other\n") + "\nFiles:\napi/billing/tow.py", True)
+        self.assertIn("area api-billing's lead", out)
+
+
+class LeadShapesAndNoteTest(RestartBase):
+    def test_every_pair_of_lead_shapes_with_one_brief_gets_the_same_verdict_and_note(self):
+        seen = {}
+        for first in LEAD_KINDS:
+            for second in LEAD_KINDS:
+                events = self.restart(first_kind=first, second_kind=second)
+                code, out = self.run_t(events)
+                lines = [l for l in out.splitlines() if "ran as the-foundry:investigate" not in l]
+                seen[(first, second)] = (code, lines)
+        self.assertEqual(len(set(str(v) for v in seen.values())), 1, seen)
+        code, lines = seen[(INVESTIGATE, AREA_LEAD_AGENT)]
+        self.assertEqual(code, 0, lines)
+
+    def test_the_old_shape_prompt_with_the_area_lead_prefix_is_found_at_depth_two_for_a_restart(self):
+        events = self.restart(first_kind=INVESTIGATE, second_kind=AREA_LEAD_AGENT)
+        self.assertEqual(self.run_t(events)[0], 0)
+
+    def test_one_note_per_restarted_area_with_its_own_count_and_nothing_else_changes(self):
+        base_code, base_out = self.run_t(self.events())
+        events = self.restart("api-billing", events=self.events())
+        events = self.restart("cli", events=events, base=96000)
+        code, out = self.run_t(events)
+        lines = out.splitlines()
+        notes = [l for l in lines if "was started twice" in l]
+        self.assertEqual(sorted(notes), sorted([
+            "NOTE: transcript: area api-billing's lead was started twice; its %d files had a second set of readers" % len(area_files("api-billing")),
+            "NOTE: transcript: area cli's lead was started twice; its %d files had a second set of readers" % len(area_files("cli")),
+        ]))
+        self.assertEqual((code, lines[0]), (base_code, "LOOP PROVED"))
+        self.assertFalse([l for l in lines if l.startswith("transcript:")], out)
+        rest = [l for l in lines if "was started twice" not in l and "area leads ran as" not in l]  # two more leads ran, so that count moves
+        self.assertEqual(rest, [l for l in base_out.splitlines() if "area leads ran as" not in l])

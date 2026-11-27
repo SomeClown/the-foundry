@@ -467,7 +467,7 @@ Coverage by path. This is a list comparison, not a re-read, so it doesn't rebuil
 the long context.
 
 A lead that fails, returns no checklist, or comes back cut off: start it once more
-with the same brief. Cut off means its return lacks `AREA REPORT ENDS`. A return that
+with the same brief. A checklist that isn't one line a path counts as no checklist. Cut off means its return lacks `AREA REPORT ENDS`. A return that
 arrives as a preview, with its full text saved to a file, isn't cut off: read the saved
 file for the whole return before judging it. A lead whose return starts `NOT A PER-FILE READ` hasn't failed: it read its files itself and still returns its checklist, so don't start it again. If that fails
 too, list every file in its area by path as unread in Coverage, and name the area in a

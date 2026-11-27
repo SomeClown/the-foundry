@@ -334,3 +334,57 @@ class FlagHandOffTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---- Task 4 (AC-4): the two checklist sentences -------------------------------------------------------------
+
+from unittest import mock  # noqa: E402
+
+PAIR_TEST = "test_a_checklist_that_is_not_one_line_a_path_counts_as_no_checklist_and_the_lead_is_asked_for_one_line_a_path"
+
+
+class ChecklistSentenceMutationTest(unittest.TestCase):
+    """The builder's pair test must go red when either sentence is dropped or softened, or when the restart rule it leans on changes."""
+
+    MUTATIONS = [
+        (LEAD, "with no ranges and no groups", "with no ranges"),
+        (LEAD, "with no ranges and no groups: never a folder or a count in place of its paths", "with no ranges and no groups"),
+        (LEAD, "The checklist is one line for each path in your brief", "The checklist is one line for each folder in your brief"),
+        (TOP, "counts as no checklist", "is accepted"),
+        (TOP, "A checklist that isn't one line a path counts as no checklist.", ""),
+        (TOP, "A lead that fails, returns no checklist, or comes back cut off: start it once more",
+         "A lead that fails or comes back cut off: start it once more"),
+        (TOP, "start it once more with the same brief", "start it once more with a shorter brief"),
+    ]
+
+    def run_pair_test(self, name, old, new):
+        real = Path.read_text
+        target = str(al.AGENTS / (name + ".md"))
+
+        def read_text(path, *a, **k):
+            text = real(path, *a, **k)
+            if str(path) == target:
+                pattern = r"\s+".join(re.escape(w) for w in old.split())
+                mutated, count = re.subn(pattern, new, text, count=1)
+                self.assertEqual(count, 1, "the mutation does not apply")
+                return mutated
+            return text
+
+        suite = unittest.TestSuite([al.TopLevelHoldsNoLeadTextTest(PAIR_TEST)])
+        result = unittest.TestResult()
+        with mock.patch.object(Path, "read_text", read_text):
+            suite.run(result)
+        return result
+
+    def test_the_pair_test_passes_unmutated(self):
+        suite = unittest.TestSuite([al.TopLevelHoldsNoLeadTextTest(PAIR_TEST)])
+        result = unittest.TestResult()
+        suite.run(result)
+        self.assertTrue(result.wasSuccessful(), result.failures + result.errors)
+
+    def test_each_dropped_or_softened_sentence_makes_a_test_fail(self):
+        for name, old, new in self.MUTATIONS:
+            with self.subTest(old=old[:50], new=new[:30]):
+                result = self.run_pair_test(name, old, new)
+                self.assertFalse(result.wasSuccessful())
+                self.assertEqual(result.errors, [])  # red because of the text, not a crash of the mutation

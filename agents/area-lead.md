@@ -156,7 +156,8 @@ unread. A file your checks leave unread is marked `unread: <why>` in the checkli
 and counted as unread. Add counts with a command, never in your head: `echo $((122 + 36 + 30 + 20))`.
 
 Also return a **file checklist**: every path from your brief, one per line, each
-marked `read`, `read in sections` (with the sections), or `unread: <why>`. It
+marked `read`, `read in sections` (with the sections), or `unread: <why>`. The checklist is one line for each path in your brief, with no ranges
+and no groups: never a folder or a count in place of its paths. It
 replaces nothing else you return.
 
 Your findings come first, under your area's name; the checklist comes after them;
