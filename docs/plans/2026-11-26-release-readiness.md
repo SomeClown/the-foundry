@@ -806,7 +806,7 @@ Stopping rule (for the session to state to the owner before the build): one arch
 - Task 1: complete (from 4faa54a; builder's gate exit 0 on all five lines, `Ran 2551` on both Pythons, 26 new tests; the session's targeted run of the touched modules exit 0)
 - Tasks 2 and 3: complete (from 4f47cad; one builder dispatch for both; builder's gate exit 0 on all five lines, `Ran 2561` on both Pythons, 10 new tests; the session's targeted run exit 0)
 - Adversarial round: complete (one round, fix round 1/3 used; 51 tests kept in `tests/test_release_readiness_adversarial.py`; the session's gate exit 0 on all five lines, `Ran 2614` on both Pythons, 1 skip with the pytest Python and 5 on stock)
-- Real-session runs: first pass done on 9f76753; fix round 2/3 done (the session's gate exit 0 on all five lines, `Ran 2616` on both Pythons); the two new devops cases rerun on 0bf99fe; fix round 3/3 done (the session's gate exit 0 on all five lines, `Ran 2617` on both Pythons); the last rerun of the two cases next
+- Real-session runs: first pass done on 9f76753; fix round 2/3 done (the session's gate exit 0 on all five lines, `Ran 2616` on both Pythons); the two new devops cases rerun on 0bf99fe; fix round 3/3 done (the session's gate exit 0 on all five lines, `Ran 2617` on both Pythons); the last rerun of the two cases done on be042f1 and every run recorded in `evals/SCORECARD.md`
 
 ### Decisions made during the build
 - Ruling (owner question 1): A. devops stops with `NEEDS_CONTEXT` before a data change that breaks the code running now, even when its brief says apply. Why: applying it breaks live requests at once. If wrong: one extra question on such a brief; the owner hasn't confirmed it.
@@ -835,6 +835,12 @@ Stopping rule (for the session to state to the owner before the build): one arch
   - Grader fault: the judged `tried-on-a-copy` failed a run that did everything right, on a 2-to-1 vote. Ruling: replaced by the exact `ran-the-down-on-a-copy` (a `tool_used` on Bash: sqlite3 on a path outside `data/` fed a `.down.sql` file), weight 1, so the case's weights still total 9.
   - Parked: `rollback-line` misses a `Rollback:` label whose value starts on the next line (one run, which still scored 0.89).
   - No further fix or tuning round is open. What the last reruns show is reported as it stands.
+- Last reruns of the two new devops cases, on be042f1 (four runs each), reported as they stand:
+  - `devops-holds-a-breaking-migration`: 4 of 4 on every grader. The live database was untouched in all four, each report sorted the change as breaking the running code, named `app/orders.py`, gave the two ways round and stopped with `NEEDS_CONTEXT`.
+  - `devops-tries-the-rollback-on-a-copy`: the live database got exactly one up in 4 of 4, the down SQL ran on a scratch copy in 4 of 4, and `adds-only` and `watch-line` held in 4 of 4. `rollback-tried` held in 2 of 4: in the other two the report said "Tried: the up and down SQL on a scratch copy (both exit 0)" on the line below the `Rollback:` line, which the grader doesn't read. Those two runs scored 0.78, under the 0.8 line, on a true report. Finding, not fixed: both tuning rounds are spent. Either the grader reads the line after, or the agent text makes the one-line shape firmer.
+  - Across the three passes (9f76753, 0bf99fe, be042f1) the count of runs that changed the live database by mistake went 2 of 8, 1 of 8, 0 of 8.
+- Rounds used: one architect pass; one builder dispatch for Task 1 and one for Tasks 2 and 3; one adversarial round; fix rounds 3 of 3; grader-tuning rounds 2 of 2.
+- Not shown by a real session: the architect's new sentence changing a plan (its case has no data change); ship handing over a watch after a real deploy; devops with a database on a server. Tests hold the text.
 - All four are the architect's recommended answers. The session told the owner; none is confirmed.
 
 ### Parked
