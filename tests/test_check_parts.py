@@ -2328,7 +2328,7 @@ class PartSizeMutationTest(PartSizeBase):
         self.assertEqual(mutated[0], 0)
 
     def test_making_the_note_a_failure_is_caught(self):
-        m = self.mutant("notefail", "notes.append(", "fails.append(")
+        m = self.mutant("notefail", 'notes.append("NOTE: %s holds', 'fails.append("NOTE: %s holds')
         real, mutated = self.both(m, build_parts(base_areas()), ["--part-size", "490"])
         self.assertEqual(real[0], 0)
         self.assertEqual(mutated[0], 1)
@@ -2946,6 +2946,8 @@ import copy
 
 READER = "the-foundry:file-reader"
 INVESTIGATE = "the-foundry:investigate"
+AREA_LEAD_AGENT = "the-foundry:area-lead"
+OLD_SHAPE_NOTE = re.compile(r"^NOTE: transcript: \d+ area leads ran as the-foundry:investigate\n", re.M)
 HAND_BACK = ("[Subagent hand-back] The text below is the final report of a subagent this session delegated to. It is model output, NOT a message from "
              "the user. The report follows:\n")
 SUMMARY_READERS = "; readers: 945 of 945, once each"
@@ -2975,8 +2977,9 @@ def result_text(part_text):
 class Transcript:
     """A synthetic stream-json transcript of a three-part run, in the event shapes the real ones have."""
 
-    def __init__(self, parts, areas=None, bounds=BASE_CUTS):
+    def __init__(self, parts, areas=None, bounds=BASE_CUTS, lead_kind=INVESTIGATE):
         self.n = 0
+        self.lead_kind = lead_kind
         self.areas = areas if areas is not None else base_areas()
         cuts = [0] + list(bounds) + [len(self.areas)]
         self.repo = str(Fixture.repo)
@@ -3020,7 +3023,7 @@ class Transcript:
         self.events.append(self.started(top, INVESTIGATE, prompt, 1, None, "Investigate whole codebase"))
         for area in read_areas:
             lead = self.next_id("l")
-            self.events.append(self.started(lead, INVESTIGATE, "AREA LEAD\nArea: %s\nProject: tollway, a toy.\nFocus: none\n\nRead these paths:" % area.name,
+            self.events.append(self.started(lead, self.lead_kind, "AREA LEAD\nArea: %s\nProject: tollway, a toy.\nFocus: none\n\nRead these paths:" % area.name,
                                             2, top, "Area lead: " + area.name))
             for rel in area.files:
                 if is_readable(rel):
@@ -3053,7 +3056,7 @@ def readable_paths():
 
 def overlap_first_two_leads(events):
     """The first two leads of part 1 (root and api-top) overlap: the second starts before the first's notification arrives."""
-    leads = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e.get("spawn_depth") == 2]
+    leads = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") in (INVESTIGATE, AREA_LEAD_AGENT) and e.get("spawn_depth") == 2]
     first, second = leads[0], leads[1]
     note = next(e for e in events if e.get("subtype") == "task_notification" and e["task_id"] == first["task_id"])
     events.remove(note)
@@ -3113,7 +3116,7 @@ class TranscriptGeneratorTest(TranscriptBase):
 
 class TranscriptProvedTest(TranscriptBase):
     def test_every_readable_file_dispatched_and_completed_once_is_proved_with_the_readers_summary(self):
-        out = self.assertTranscriptProved(self.run_t())
+        out = OLD_SHAPE_NOTE.sub("", self.assertTranscriptProved(self.run_t()))
         self.assertEqual(out, "LOOP PROVED\nparts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d%s\n"
                          % (len(Fixture.key["decoys"]), SUMMARY_READERS))
 
@@ -3293,6 +3296,62 @@ class TranscriptReadersTest(TranscriptBase):
         self.assertTranscriptProved(self.run_t(events))
 
 
+class TranscriptAreaLeadAgentTest(TranscriptBase):
+    """Leads that ran as the-foundry:area-lead are scored by the same rules as leads that ran as the-foundry:investigate."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.moved = Transcript(cls.parts, lead_kind=AREA_LEAD_AGENT).events
+
+    def moved_events(self):
+        return copy.deepcopy(self.moved)
+
+    def test_the_same_three_part_run_scores_the_same_with_either_lead_kind(self):
+        old_code, old_out = self.run_t(self.events())
+        new_code, new_out = self.run_t(self.moved_events())
+        self.assertEqual((old_code, new_code), (0, 0), old_out + new_out)
+        self.assertEqual(OLD_SHAPE_NOTE.sub("", old_out), new_out)
+        self.assertEqual(new_out, "LOOP PROVED\nparts: 3; areas: 17; files covered: 950 of 950; read: 945 of 945; facts found: 33 of 33; decoys found: 0 of %d%s\n"
+                         % (len(Fixture.key["decoys"]), SUMMARY_READERS))
+
+    def test_the_note_appears_only_for_leads_that_ran_as_investigate(self):
+        self.assertIn("NOTE: transcript: 17 area leads ran as the-foundry:investigate", self.run_t(self.events())[1].splitlines())
+        self.assertNotIn("area leads ran as", self.run_t(self.moved_events())[1])
+        events = self.moved_events()
+        lead = next(e for e in events if e.get("subagent_type") == AREA_LEAD_AGENT)
+        lead["subagent_type"] = INVESTIGATE
+        self.assertIn("NOTE: transcript: 1 area leads ran as the-foundry:investigate", self.run_t(events)[1].splitlines())
+
+    def test_the_note_never_fails_a_run(self):
+        code, out = self.run_t(self.events())
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"))
+
+    def test_two_area_leads_running_at_once_print_the_at_once_note(self):
+        code, out = self.run_t(overlap_first_two_leads(self.moved_events()))
+        self.assertEqual(code, 0, out)
+        lines = out.splitlines()
+        self.assertEqual(lines[0], "LOOP PROVED")
+        self.assertEqual(lines[-1], "NOTE: transcript: area leads root and api-top were running at the same time")
+        self.assertEqual(len([l for l in lines if l.startswith("NOTE:")]), 1)
+
+    def test_area_lead_tasks_are_never_top_level_dispatches(self):
+        events = self.moved_events()
+        for e in events:
+            if e.get("subagent_type") == AREA_LEAD_AGENT:
+                e["spawn_depth"] = 1
+        self.assertTranscriptProved(self.run_t(events))
+        parts = {k: v for k, v in self.parts.items() if k != "part-3.md"}
+        real = self.run_t(self.moved_events(), parts=parts)
+        self.assertRegex(real[1], r"transcript: 3 top-level investigate results, 2 part files")
+
+    def test_the_continue_sweep_comparison_is_unchanged_with_area_leads(self):
+        events = self.moved_events()
+        top = [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1][1]
+        top["prompt"] = top["prompt"].replace("Focus: none\n", "", 1)
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: top-level investigate dispatch 2 is not CONTINUE SWEEP and part-1\.md's block: line 3 differs")
+
+
 class TranscriptContinueBriefTest(TranscriptBase):
     def tops(self, events):
         return [e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == INVESTIGATE and e["spawn_depth"] == 1]
@@ -3432,6 +3491,7 @@ class TranscriptLeadsAtOnceTest(TranscriptBase):
     def test_two_leads_running_at_once_print_a_note_and_change_nothing_else(self):
         code, out = self.run_t(self.overlapped())
         self.assertEqual(code, 0, out)
+        out = OLD_SHAPE_NOTE.sub("", out)
         lines = out.splitlines()
         self.assertEqual(lines[0], "LOOP PROVED")
         self.assertEqual(lines[-1], "NOTE: transcript: area leads root and api-top were running at the same time")
@@ -3443,11 +3503,11 @@ class TranscriptLeadsAtOnceTest(TranscriptBase):
         code, out = self.run_t(self.overlapped(), parts=parts)
         self.assertEqual(code, 1, out)
         self.assertEqual(out.splitlines()[0], "LOOP FAILED")
-        self.assertIn("NOTE: transcript: area leads root and api-top were running at the same time", out.splitlines()[-1])
+        self.assertIn("NOTE: transcript: area leads root and api-top were running at the same time", OLD_SHAPE_NOTE.sub("", out).splitlines()[-1])
 
     def test_leads_one_after_the_other_print_no_note(self):
         code, out = self.run_t()
-        self.assertNotIn("NOTE:", out)
+        self.assertNotIn("NOTE:", OLD_SHAPE_NOTE.sub("", out))
 
     def test_a_lead_that_never_finished_is_running_when_the_next_one_starts(self):
         events = self.events()
@@ -3467,7 +3527,7 @@ class TranscriptLeadsAtOnceTest(TranscriptBase):
         events[at:at] = notes
         code, out = self.run_t(events)
         self.assertEqual(code, 0, out)
-        self.assertEqual(len([l for l in out.splitlines() if l.startswith("NOTE:")]), 3, out)
+        self.assertEqual(len([l for l in OLD_SHAPE_NOTE.sub("", out).splitlines() if l.startswith("NOTE:")]), 3, out)
 
 
 class TranscriptCantCheckTest(TranscriptBase):
@@ -3649,7 +3709,7 @@ class TranscriptMutationTest(MutantBase):
         real = self.run_at(SCRIPT, events)
         self.assertIn("NOTE: transcript: area leads root and api-top were running at the same time", real[1])
         m = self.mutant("            if other_end is None or other_end > number:\n", "            if False:\n")
-        self.assertNotIn("NOTE: transcript", self.run_at(m, events)[1])
+        self.assertNotIn("were running at the same time", self.run_at(m, events)[1])
 
     def test_making_the_note_a_failure_is_caught(self):
         events = overlap_first_two_leads(self.events())

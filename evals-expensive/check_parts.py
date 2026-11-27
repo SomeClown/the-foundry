@@ -73,6 +73,7 @@ COVERAGE_HEADING = "8. Coverage"
 AREA_MAX = 165
 READER = "the-foundry:file-reader"
 INVESTIGATE = "the-foundry:investigate"
+AREA_LEAD_AGENT = "the-foundry:area-lead"
 AREA_LEAD = "AREA LEAD"
 CONTINUE = "CONTINUE SWEEP"
 FILE_SKIP_SUFFIXES = {"lock": ".lock", "binary": ".bin"}
@@ -369,6 +370,7 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
         return path
 
     started, done, tops, leads, results = {}, {}, [], [], {}
+    old_leads = 0
     for number, e in events:
         if e.get("type") == "user" and e.get("parent_tool_use_id") is None:
             content = (e.get("message") or {}).get("content") if isinstance(e.get("message"), dict) else None
@@ -383,10 +385,13 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
         if e.get("subtype") == "task_started":
             kind, prompt = e.get("subagent_type"), e.get("prompt") if isinstance(e.get("prompt"), str) else ""
             started[e.get("task_id")] = (number, e)
-            if kind == INVESTIGATE:
+            if kind == AREA_LEAD_AGENT:
+                leads.append((number, e.get("task_id"), prompt))
+            elif kind == INVESTIGATE:
                 depth = e.get("spawn_depth")
                 if prompt.startswith(AREA_LEAD) or (isinstance(depth, int) and depth > 1):
                     leads.append((number, e.get("task_id"), prompt))
+                    old_leads += 1
                 else:
                     tops.append((prompt, e.get("tool_use_id")))
         elif e.get("subtype") == "task_notification":
@@ -463,6 +468,8 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
             if other_end is None or other_end > number:
                 notes.extend(["NOTE: transcript: area leads %s and %s were running at the same time" % (other, area)])
         running.append((done[task_id][0] if task_id in done else None, area))
+    if old_leads:
+        notes.append("NOTE: transcript: %d area leads ran as %s" % (old_leads, INVESTIGATE))
 
     if fails:
         return None

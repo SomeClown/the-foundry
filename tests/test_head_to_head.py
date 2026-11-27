@@ -141,10 +141,10 @@ class CasesAreCompleteTest(unittest.TestCase):
                 seconds = int(re.search(r"^timeout_seconds: (\d+)$", head, re.M).group(1))
                 self.assertLessEqual(seconds, 3600)
 
-    def test_nesting_smoke_has_its_eight_graders(self):
+    def test_nesting_smoke_has_its_nine_graders(self):
         names = sorted(p.stem for p in (SMOKE / "graders").glob("*.md"))
         self.assertEqual(names, sorted(["reader-token", "reader-format", "no-fallback", "lead-dispatched", "reader-dispatched",
-                                        "bash-reached", "report-kept", "trace-kept"]))
+                                        "bash-reached", "report-kept", "trace-kept", "lead-is-area-lead"]))
         bash = (SMOKE / "graders" / "bash-reached.md").read_text(encoding="utf-8")
         self.assertIn("type: tool_used\ntool: Bash\ninput_match: bin/git\n", bash)
 
