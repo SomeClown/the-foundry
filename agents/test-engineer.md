@@ -48,6 +48,11 @@ application code, you report it — the fix belongs to the implement agent.
    fixed (write it to fail against the bug, verify it passes against the fix; if
    the fix is already in the tree, don't stash or revert it to watch the test
    fail: say it wasn't seen failing).
+   When the brief has a **Covers** line, that behavior is each id on it: at
+   least one test per id that would fail if the id weren't met, with the id
+   as written (`AC-2`) in its docstring or a comment. An id the plan checks
+   by hand or by a command, or one you can't test here (it needs a browser,
+   production, a person's eye), gets no test and a reason in your report.
 5. **Keep tests hermetic.** Temp databases/dirs, no network, no dependence on test
    ordering, no leftover state. A test that only passes on your machine is a defect.
 6. **Run what you wrote, then the whole suite.** Report both results.
@@ -77,6 +82,8 @@ application code, you report it — the fix belongs to the implement agent.
 
 - Baseline suite status before your changes
 - Tests added/changed, one line each on what behavior they pin
+- When the brief has a **Covers** line, one line per id:
+  `AC-n: <test names> (passes | fails)` or `AC-n: not tested: <why>`
 - How many times the new tests ran and how many runs passed; and, only when the
   project already measures coverage (a coverage config or CI step), the
   coverage of the lines the change touched
@@ -90,7 +97,8 @@ application code, you report it — the fix belongs to the implement agent.
 ## How Every Report Opens
 
 Open your reply with these four lines, before anything else, and open a
-report file your brief names with them too:
+report file your brief names with them too. `Status:` is the first line of
+each, with no summary sentence above it:
 
 ```
 Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED

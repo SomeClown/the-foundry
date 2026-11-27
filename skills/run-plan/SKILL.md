@@ -51,6 +51,8 @@ The brief command in step 2 of the loop copies Task N out of the plan into
 7. **Check task sizes once.** Every task should be one implement or frontend
    dispatch that leaves the gate green. Split a task that isn't; merge a run
    of tiny same-shape tasks (section 3). Record either as a ruling.
+   A split task's ruling says which ids each part covers; a merged one
+   covers all of theirs.
 8. **Start or resume the build log** (section 6).
 
 ## 2. The loop, per task
@@ -179,6 +181,8 @@ package. A small task's
 spec check can run on `model: "sonnet"`. Gaps go back to the
 builder (step 6) before the adversarial round. For other tasks, the spec
 check happens in the final qa review of the whole branch.
+When the brief has a **Covers** line, tell qa the tests come in step 5,
+so it judges each id met or not and leaves tests to the final pass.
 
 ### Step 5: Adversarial round
 
@@ -189,6 +193,10 @@ not to admire it: the brief's edge cases, error paths, boundary values, and
 every exact value the brief specifies. It writes tests only, reports failing
 tests as bugs with the test name and what the code did, writes its report to
 `<work dir>/task-N-tests.md`, and replies with a short status.
+When the brief has a **Covers** line, its report has a line per id.
+Before step 7, check that each id has a test or a reason it has none: an
+id with neither goes back to test-engineer, and a reason you accept is a
+ruling in the build log.
 
 A failing test is either a bug in the code or a test that misread the brief.
 You decide which, against the brief, and record each call as a ruling in the
@@ -238,7 +246,9 @@ is green.
 Check `git status` for anything the task shouldn't have touched. Replace the
 task's progress line with its `complete` line (section 6), stage the task's
 files and the plan, and commit them together with a subject that starts
-`Task N:`. The log line names the base, not the new commit (a commit can't
+`Task N:`. When the brief has a **Covers** line, the `complete` line ends
+with its ids (`; AC-1, AC-3`).
+The log line names the base, not the new commit (a commit can't
 contain its own SHA); the subject is how to find the commit later. Local
 commits only: pushing waits for the user.
 
@@ -280,6 +290,8 @@ Then dispatch `the-foundry:qa` with the
 package, the design section, the plan, and the build log's parked items to
 triage. qa runs in spec-check mode first (does the branch build what the
 design describes?), then its usual review.
+When the design or the plan lists ids, its spec section has a line for
+every one.
 
 For a big change (roughly ten or more tasks, or anything touching auth,
 money, user data, or scheduling), dispatch two or three qa reviewers **in one
@@ -314,6 +326,8 @@ test-engineer owns tests. When the original builder of the affected code is
 still reachable, resume it for the fix (it knows the code). Record "From the
 qa pass (fix batch K)" in the build log. Anything qa says only the user can
 decide goes into the final report as a question, not into a fix batch.
+A finding on an id (`AC-2 NOT MET`, `AC-2 UNTESTED`) keeps the id in its
+batch's brief and its log line.
 
 ### Retro
 
@@ -416,7 +430,9 @@ folder: a fix goes through the user and the repo's own review.
 Dispatch `the-foundry:docs` with the design section, the plan, and the build
 log. It updates the project's CLAUDE.md, README, and runbooks, and adds an
 `### As built (YYYY-MM-DD)` subsection to the design section recording what
-changed during the build, drawn from the build log's decisions. A plan rule
+changed during the build, drawn from the build log's decisions.
+It names by id any **Done when** item that changed or was dropped.
+A plan rule
 like "don't edit docs/design.md" is meant for the builders; tell the docs agent
 it may add the "As built" subsection and nothing else. Commit, then
 run the gate one last time, so the exit code you report is for `HEAD`.
@@ -427,6 +443,9 @@ One message:
 - what was built, in two or three sentences
 - tasks and fix batches completed, with the commit range
 - the final gate's command and exit code, quoted
+- when the plan has ids, each one with its state at `HEAD`: met (and how
+  it's checked), not met, or dropped, from the qa pass and the fix batches
+  after it
 - **Decisions I made**: every ruling from the build log, each with what it
   costs if it's wrong, so the user can check them
 - parked findings and declined qa findings, with reasons
@@ -448,6 +467,11 @@ Only these stop the run:
   made"), and give them `brainstorm`'s builder check (a cold read by a fresh
   read-only agent) before any builder is briefed on them. The user's own
   answers don't need it.
+  Changing or dropping an item of the design's **Done when** list is a stop
+  of this kind. Once the user answers, the design marks the old id dropped
+  (date and why), a changed item takes the next number, and the plan's
+  **Covers** lines follow, in one commit. A list the architect wrote
+  itself changes by ruling.
 - **Anything irreversible or outside the branch**: production, a migration on
   real data, deleting anything that isn't the run's scratch, a push, a merge,
   a tag, a release. The one write outside the branch that doesn't stop the run

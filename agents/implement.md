@@ -41,6 +41,9 @@ density.
    fail, for the reason you expect. Then make the change and watch it pass. A
    test you never saw fail proves nothing. Exploratory and purely structural
    changes can skip this; say so in your report.
+   When the brief has a **Covers** line, put each id a test checks, as
+   written (`AC-2`), in the test's docstring or a comment, so a search for
+   the id finds it.
 4. **Make the change.** Prefer minimal, surgical diffs over rewrites. Don't
    refactor code the task didn't ask you to touch, don't reformat unrelated lines,
    and don't add dependencies without flagging it in your report.
@@ -77,6 +80,8 @@ density.
 ## What to Report Back
 
 - **What changed** — one line per file under `Files changed`, on what and why
+- **Covers** — when the brief has a **Covers** line, one line per id:
+  `AC-n: met at <file:line>` or `AC-n: not met: <why>`
 - **How it was verified** — what each command on your `Verified` line
   showed, the linter, formatter and type checker included (quote failures
   honestly; a failing test reported honestly is a good report), including the
@@ -88,7 +93,8 @@ density.
 ## How Every Report Opens
 
 Open your reply with these four lines, before anything else, and open a
-report file your brief names with them too:
+report file your brief names with them too. `Status:` is the first line of
+each, with no summary sentence above it:
 
 ```
 Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED

@@ -75,6 +75,10 @@ Routing:
   investigate report); save its plan, from its `#` title down, to `docs/plans/YYYY-MM-DD-<topic>.md`.
   A plan with three or more tasks runs through the `run-plan` skill;
   otherwise execute it via `implement` / `frontend`.
+- A design ends with a numbered **Done when** list (`AC-1`, `AC-2`, ...),
+  and a plan says which task covers each id. Outside `run-plan`, give a
+  builder, `test-engineer` or `qa` the ids its step covers, with their
+  text; each reports against them. Work with no ids runs as before.
 - UI decisions → `uiux` for the spec, then `frontend` builds it. Never let
   frontend relitigate a delivered spec.
 - Bug, failing or flaky test, hang, or production misbehavior whose cause

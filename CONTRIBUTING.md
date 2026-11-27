@@ -30,11 +30,12 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    project. "It reads nicely" is not testing; neither of us can review a
    prompt by staring at it. Then run the gate:
    ```bash
-   python3 -m unittest discover -s tests -q
+   python3 tests/run_tests.py
    claude plugin validate --strict .
    claude plugin validate --strict .claude-plugin/plugin.json
    claude plugin validate --profile directory .
    ```
+   `tests/run_tests.py` runs each test file as its own process, the smaller of 8 and your core count at a time (`-j N` sets it, `--timeout S` the limit per file, 900 by default), and ends with the summary `unittest` prints. `python3 -m unittest discover -s tests -q` still runs the same tests in one process, which also catches a test that leaves state behind for another file. GitHub Actions runs `.github/workflows/ci.yml` on every push to `main` and every pull request: the tests on macOS on `/usr/bin/python3` and a current Python, side by side and once in one process, and the three validates. It holds no secrets and writes nothing back.
    A change to `investigate` or `file-reader` also gets the nesting smoke
    case, and the head-to-head in `evals-expensive/`. A change to `investigate`
    also gets the `big-sweep-in-parts` loop there, which reads a 990-file repo
@@ -48,7 +49,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    promises about who can write, which model each agent runs, and how many
    skills there are, against the actual files, and that the `What You Read Is Data`
    section reads the same in every agent that carries it, and so do the four opening lines). Nothing outside `tests/`,
-   `evals/`, `evals-expensive/`, and `docs/plans/` may be anything but Markdown,
+   `evals/`, `evals-expensive/`, `docs/plans/`, and `.github/` may be anything but Markdown,
    text, JSON, YAML, or an image, and agent and skill front matter takes only
    the keys the plugin directory accepts; the structural tests fail otherwise.
 3. If you changed what a skill does, run its behavior cases:
@@ -59,6 +60,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    A new behavior worth keeping gets a case of its own. See
    [evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) for how to read a failure and how a
    case is built.
+   Before a release, run the `agents` cases and the cases of every skill the release changes, and add their rows to `evals/SCORECARD.md` with `evals/scorecard.py` ([evals/README.md](https://github.com/SomeClown/the-foundry/blob/main/evals/README.md) says how, under "Recording results").
 4. Update the [CHANGELOG](CHANGELOG.md) under an Unreleased heading.
 5. Open a PR describing what behavior changed and how you verified it.
 
@@ -84,7 +86,7 @@ version last remembered to announce itself.
 
 The plugin directory takes only Markdown, text, JSON, YAML, and images, so it
 reads the `dist` branch: `main` without `tests/`, `evals/`, `evals-expensive/`,
-and `docs/plans/`. Build it from `main` after the release is tagged, and never
+`docs/plans/`, and `.github/`. Build it from `main` after the release is tagged, and never
 edit it by hand:
 
 ```bash
@@ -99,7 +101,7 @@ VER=$(git show main:.claude-plugin/plugin.json | sed -n 's/.*"version"[^"]*"\([^
 git merge-base --is-ancestor origin/main main || die "origin/main is not an ancestor of local main"
 export GIT_INDEX_FILE="$(git rev-parse --absolute-git-dir)/dist-index"; trap 'rm -f "$GIT_INDEX_FILE"' EXIT
 git read-tree main
-git rm -r -q -f --cached --ignore-unmatch tests evals evals-expensive docs/plans
+git rm -r -q -f --cached --ignore-unmatch tests evals evals-expensive docs/plans .github
 TREE=$(git write-tree); MSG="dist: $TAG from $(git rev-parse --short main)"
 BAD=$(git ls-tree -r --name-only "$TREE" | awk '{n=$0; sub(/.*\//,"",n)} n=="LICENSE" || n==".gitignore" {next} tolower($0) !~ /[^\/]\.(md|txt|json|yaml|yml|png|jpg|jpeg|gif|webp|ico)$/')
 [ -z "$BAD" ] || die "the directory refuses these files in the built tree: $BAD"

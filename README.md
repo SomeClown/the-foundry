@@ -352,7 +352,9 @@ version, so you don't have to take my word for it:
   the suite. Both run through your session's Bash, under your permissions, and
   neither touches the network.
 - **The tests and evals.** They live on the repository's `main` branch, not in
-  the copy the plugin directory installs. `tests/` holds the repo to its own
+  the copy the plugin directory installs. So does `.github/workflows/ci.yml`,
+  which runs `tests/` on GitHub's machines for every push to `main` and every
+  pull request; it never runs on yours. `tests/` holds the repo to its own
   README. The `evals/` cases run only when you invoke `claude plugin eval .`
   yourself; their `scaffold.sh` scripts, which build small fixture repos in the
   harness's temporary workspace, run only if you also pass `--scaffold`, and
@@ -369,6 +371,7 @@ version, so you don't have to take my word for it:
   starts a model session. Installing from this GitHub
   repository's own marketplace brings them along; they still run only when you
   run them.
+  `evals/scorecard.py` (Python) is run by hand too: it reads result JSON and adds rows to `evals/SCORECARD.md`, uses no network, and starts no model session.
 
 None of it sends your code or data anywhere beyond what any Claude Code
 session already does with the files it reads. The
@@ -394,7 +397,7 @@ If you improve an agent in a way that isn't specific to your setup, send it
 back — see [CONTRIBUTING.md](CONTRIBUTING.md). Changes are tracked in the
 [CHANGELOG](CHANGELOG.md).
 
-The Foundry tests itself, too, in two layers. `tests/` checks run-plan's brief command and debug's polluter procedure, and holds the repo to its own README (a read-only agent that grows a
+The Foundry tests itself, too, in two layers. GitHub Actions runs them on every push and pull request. `tests/` checks run-plan's brief command and debug's polluter procedure, and holds the repo to its own README (a read-only agent that grows a
 Write tool, or a skill count that goes stale, fails the suite). `evals/` is a
 library of behavior cases for `claude plugin eval .`, each one a situation that
 once caught a skill doing the wrong thing; the second run of it caught the

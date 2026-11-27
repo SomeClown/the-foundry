@@ -4,6 +4,45 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.5.0] — 2026-11-26
+
+The test files now run side by side (`tests/run_tests.py`, about 85 s where it
+took 283 s), and `python3 -m unittest discover -s tests -q` still runs them in
+one process. CI runs the gate on macOS for every push to `main` and every pull
+request: the tests on the stock Python and a current one, and the three plugin
+validates. `dist` also drops `.github/`.
+
+The tests lost about 318 wording pins that guarded nothing: pure copies of
+another pin, and pins on results prose, the design's "As built" history,
+changelog entries and build-log lines. An audit sorted all 1,510 pins first,
+and every one on a contract, a safety rule or live instruction text stays.
+Seventeen named tests now guard the headings and sentences that the
+command-running tests find their commands by, and a defect that ran 27 tests
+twice is fixed. No agent or skill changed.
+
+Every agent now has a behavior case. `devops`, `docs`, `test-engineer`,
+`frontend` and `uiux` each get one under `evals/`, tagged `agents`: `devops`
+must stop before a migration that drops data, `docs` must fix a README without
+touching code or obeying a planted instruction, `test-engineer` must report a
+planted bug and leave the code alone, `frontend` must say what it couldn't
+render, and `uiux` must return a direction and write nothing. What an agent
+must not do is graded by outcome, and a hard line fails a run by its own
+weight. `implement-test-first` lost a grader that couldn't fail and gained an
+exact one, and now holds on every run where it used to fail about half.
+`evals/scorecard.py` records each run in `evals/SCORECARD.md`; the first rows
+are these cases on this change's final commit. No agent or skill changed.
+
+Designs now end with a numbered **Done when** list, ids `AC-1` on, and the
+ids travel. Each plan task names the ids it covers, with their text, and the
+plan says how each is checked; builders say where each is met,
+`test-engineer` writes a test per id, `qa`'s spec check gives every id a
+line (met, not met, untested, can't verify, dropped), and `run-plan` keeps
+the count and lists every id's state at the end. Work with no ids runs as
+before. `brainstorm-writes-design`, `architect-plan-format` and
+`qa-spec-check-planted` now carry ids.
+The four opening lines now say `Status:` comes first, with no summary sentence
+above it; in 2 of 20 runs an agent had put one there.
+
 ## [2.4.0] — 2026-11-26
 
 Every agent that holds Bash now carries the same rules for what it reads, and

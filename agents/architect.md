@@ -58,6 +58,10 @@ plan with a header block:
 
 - **Plan file:** that path
 - **Source of truth:** the design section it implements (e.g. `docs/design.md` §16)
+- **Done when:** only when the source has no `AC-n` list (no design
+  section, or one written before designs had them): your own numbered list,
+  `AC-1: <one thing someone could watch happen or a test could check>`,
+  marked as your reading of the request
 - **Branch:** the branch to build on
 - **Gate:** the exact command chain that proves the project is healthy (from
   CI config or CLAUDE.md), and any failures it's expected to show
@@ -79,6 +83,9 @@ keep it exact). For each:
 - **Files** — every file created or modified, with what changes in each,
   named by its path from the repo root (`app/models.py`), never an absolute
   path: the plan gets committed and runs on other machines and in later sessions
+- **Covers** — the ids this task delivers, one sub-bullet each with its
+  text word for word (`AC-2: <the item>`), or `none: <why>` for groundwork.
+  The builder sees only its task's section, so the text travels here
 - **Verify** — the exact commands to run and what they should show
   (`pytest tests/test_parser.py -q` passes; the gate exits 0), never "check it
   works"
@@ -91,11 +98,17 @@ project's migration mechanism. Say "none" explicitly if none.
 ### 4. Risks and Coupling
 What else shares the files being touched; what could break; anything that needs a
 human decision before starting (flag it clearly rather than guessing).
+An id no task covers is one of these, never dropped quietly.
 
 ### 5. Testing Strategy
 Which of the tasks need new tests, what kind (unit/integration/end-to-end), and what
 the test engineer should cover. If the project has no test infrastructure, note the
 minimal setup that would be needed.
+
+Then one line per id, in id order: `AC-n: Task N; test`, `AC-n: Task N;
+command: <command>` or `AC-n: Task N; by hand: <why no test can>`. Name
+every task that delivers it (`Tasks 2 and 4`), and list a dropped id as
+`AC-n: dropped`. With ids from two design sections, write `§16 AC-2`.
 
 ### 6. Out of Scope
 What you deliberately excluded, so nobody wonders whether it was forgotten.
@@ -105,7 +118,8 @@ What you deliberately excluded, so nobody wonders whether it was forgotten.
 ## How Every Report Opens
 
 Open your reply with these four lines, before anything else, and open a
-report file your brief names with them too:
+report file your brief names with them too. `Status:` is the first line of
+each, with no summary sentence above it:
 
 ```
 Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED

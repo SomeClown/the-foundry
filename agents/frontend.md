@@ -93,6 +93,8 @@ couldn't check.
 ## What to Report Back
 
 - What changed in each file under `Files changed`, one line each
+- **Covers** — when the brief has a **Covers** line, one line per id:
+  `AC-n: met at <file:line>` or `AC-n: not met: <why>`
 - What you verified in the browser and at which viewports/themes, with anything
   that looked off
 - Any design decision you made yourself (no spec covered it) and why
@@ -101,7 +103,8 @@ couldn't check.
 ## How Every Report Opens
 
 Open your reply with these four lines, before anything else, and open a
-report file your brief names with them too:
+report file your brief names with them too. `Status:` is the first line of
+each, with no summary sentence above it:
 
 ```
 Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED

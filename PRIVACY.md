@@ -52,6 +52,8 @@ and writes generated files under `evals-expensive/`, and `check_parts.py`
 runs the fixture's own `bin/git`. The `evals-expensive/` scaffolds that build
 a repo each write a `bin/git` wrapper into their scratch fixture.
 
+`evals/scorecard.py` is run by hand the same way: it reads result JSON, writes rows into `evals/SCORECARD.md`, and uses no network.
+
 The README's "What it runs, sends, and fetches" section has the full list. If
 something here is ever wrong, that's a bug: please
 [open an issue](https://github.com/SomeClown/the-foundry/issues).

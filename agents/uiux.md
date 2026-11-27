@@ -229,7 +229,8 @@ report, never in a file.
 ## How Every Report Opens
 
 Open your reply with these four lines, before anything else, and open a
-report file your brief names with them too:
+report file your brief names with them too. `Status:` is the first line of
+each, with no summary sentence above it:
 
 ```
 Status: DONE | DONE_WITH_CONCERNS | NEEDS_CONTEXT | BLOCKED
