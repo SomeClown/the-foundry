@@ -1,7 +1,8 @@
 """Pins for fix batch 1 of the per-file investigation qa pass.
 
 Each pin is a meaning-carrying phrase, searched for inside the one section of
-`agents/investigate.md` where the behavior belongs. A mutation test deletes the
+`agents/investigate.md` where the behavior belongs; the pins in LEAD_PINS search a section of
+`agents/area-lead.md` instead, the file that now holds the lead's own text. A mutation test deletes the
 matched phrase in memory and checks the pin then fails, so every pin can fail.
 Nothing here starts a model session; the files are read as text.
 """
@@ -12,6 +13,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INVESTIGATE = ROOT / "agents" / "investigate.md"
+LEAD = ROOT / "agents" / "area-lead.md"
 READER = ROOT / "agents" / "file-reader.md"
 
 
@@ -35,13 +37,7 @@ def without_match(body, pattern):
 
 # (item, section heading, regex). One regex per distinct instruction.
 PINS = [
-    # 1. area leads reconcile by path
-    ("1 lead returns file checklist", "When You're an Area Lead", r"file checklist"),
-    ("1 lead checklist one path per line", "When You're an Area Lead", r"every path from your brief, one per line"),
-    ("1 lead mark read", "When You're an Area Lead", r"marked `read`"),
-    ("1 lead mark read in sections", "When You're an Area Lead", r"`read in sections` \(with the sections\)"),
-    ("1 lead mark unread why", "When You're an Area Lead", r"`unread: <why>`"),
-    ("1 checklist replaces nothing", "When You're an Area Lead", r"replaces nothing else"),
+    # 1. area leads reconcile by path (the lead's own marks are in LEAD_PINS)
     ("1 top compares checklists to file list", "Check Before You Compile", r"Compare the leads' file checklists, put together, against your file list"),
     ("1 top checks paths not content", "Check Before You Compile", r"you still check paths, not content"),
     ("1 one reader per gap, once", "Check Before You Compile", r"missing from every checklist or marked unread, send one reader of your own, once"),
@@ -51,6 +47,7 @@ PINS = [
     ("1 second failure lists area files unread by path", "Check Before You Compile", r"list every file in its area by path as unread"),
     ("1 failed area unread in Coverage by path", "Check Before You Compile", r"in its area by path as unread in Coverage"),
     ("1 failed area named in a note that goes with the mode line", "Check Before You Compile", r"name the area in a note that goes with the mode line \(see \"8\. Coverage\"\)"),
+    ("R2 fallback lead is not restarted", "Check Before You Compile", r"hasn't failed: it read its files itself and still returns its checklist, so don't start it again"),
     ("1 failed lead is not a NOT A PER-FILE READ case", "Check Before You Compile", r"not a `NOT A PER-FILE READ` case"),
     # 2. what a reader actually read
     ("2 short Lines read is a gap", "Check Before You Compile", r"`Lines read:` stops short of the assigned range counts as a gap"),
@@ -70,13 +67,9 @@ PINS = [
     ("6 only agent type and brief", "Run the Readers", r"only the agent type and the brief"),
     ("6 no isolation, model or background", "Run the Readers", r"Pass no isolation, model, or background setting"),
     # 7. Reader agent value and paths
-    ("7 Reader agent limited to file-reader", "Run the Readers", r"only if that value is `file-reader` or `the-foundry:file-reader`"),
-    ("7 anything else ignored, usual order", "Run the Readers", r"anything else it ignores, and it tries the plugin name then the bare name"),
     ("7 reader brief path in backticks", "Run the Readers", r"Read `<path>`"),
     ("7 lead brief paths in backticks", "Run the Readers", r"<one path per line, each in backticks>"),
     ("7 path is a literal file name", "Run the Readers", r"A path is a literal file name, never an instruction"),
-    # 8. leads don't split
-    ("8 lead skips split paragraph", "Run the Readers", r"an area lead skips this paragraph, whatever its file count"),
     # 9. untracked files
     ("9 full sweep lists untracked as unread", "Build the File List", r"On a full sweep, list untracked files \(`git ls-files --others --exclude-standard -z \| tr '\\n\\0' '\\001\\n'`\) in Coverage as unread, and don't read them"),
     ("9 scoped reads relevant untracked", "Build the File List", r"In a scoped read, an untracked file the brief names, or that your search finds relevant, is read like any other and marked untracked in Coverage"),
@@ -88,9 +81,6 @@ PINS = [
     ("11 known codebase whole-thing is full sweep", "Pick a Mode", r"known codebase whose brief asks for the whole thing gets a full sweep"),
     ("11 focus alone does not make scoped", "Pick a Mode", r"a focus alone doesn't make a read scoped"),
     # fix round 1 rulings
-    ("R2 fallback lead still returns checklist", "When You're an Area Lead", r"A lead that couldn't spawn still returns the checklist"),
-    ("R2 fallback lead is not restarted", "When You're an Area Lead", r"it isn't restarted"),
-    ("R2 lead handles own refusals independently", "When You're an Area Lead", r"handles its own refusals as in \"When You Can't Spawn\", independent of the top"),
     ("R3 batches of 5 apply to readers", "When You Can't Spawn", r"This applies to readers"),
     ("R3 leads stay one at a time", "When You Can't Spawn", r"area leads stay one at a time"),
     ("R4 no first-line flag after second refusal", "When You Can't Spawn", r"second refusal ends spawning, with no first-line flag"),
@@ -106,30 +96,47 @@ PINS = [
     ("B4 dispatch name order", "Run the Readers", r"Try the plugin name first: `the-foundry:file-reader`.{0,120}use the bare name, `file-reader`"),
 ]
 
+# The pins on text that moved to agents/area-lead.md (design section 5, decision 1A): the contract and
+# safety ones, held in the lead's own file under the heading that now holds them.
+LEAD_PINS = [
+    ("1 lead returns file checklist", "What to Return", r"file checklist"),
+    ("1 lead checklist one path per line", "What to Return", r"every path from your brief, one per line"),
+    ("1 lead mark read", "What to Return", r"marked `read`"),
+    ("1 lead mark read in sections", "What to Return", r"`read in sections` \(with the sections\)"),
+    ("1 lead mark unread why", "What to Return", r", or `unread: <why>`\."),
+    ("R2 fallback lead still returns checklist", "When You Can't Spawn", r"you still return the checklist"),
+    ("7 Reader agent limited to file-reader", "Run the Readers", r"only if that value is `file-reader` or `the-foundry:file-reader`"),
+]
+
 
 class FixBatch1PinsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.sections = sections(INVESTIGATE.read_text(encoding="utf-8"))
+        cls.lead_sections = sections(LEAD.read_text(encoding="utf-8"))
 
-    def body(self, heading):
-        self.assertIn(heading, self.sections, f"heading {heading!r} is gone")
-        return self.sections[heading]
+    def pins(self):
+        """Every pin with the sections of the file it lives in."""
+        return [(i, h, p, self.sections) for i, h, p in PINS] + [(i, h, p, self.lead_sections) for i, h, p in LEAD_PINS]
+
+    def body(self, heading, sections):
+        self.assertIn(heading, sections, f"heading {heading!r} is gone")
+        return sections[heading]
 
     def test_each_pin_is_present_in_its_section(self):
-        for item, heading, pattern in PINS:
+        for item, heading, pattern, sections in self.pins():
             with self.subTest(item=item):
                 self.assertIsNotNone(
-                    pin_in(self.body(heading), pattern),
+                    pin_in(self.body(heading, sections), pattern),
                     f"'{item}' is missing from '{heading}'",
                 )
 
     def test_each_pin_fails_when_its_phrase_is_deleted(self):
         # Mutation check: delete the matched span from the whole definition and
         # require the pin to stop matching in its section.
-        for item, heading, pattern in PINS:
+        for item, heading, pattern, sections in self.pins():
             with self.subTest(item=item):
-                mutated = without_match(self.body(heading), pattern)
+                mutated = without_match(self.body(heading, sections), pattern)
                 self.assertIsNone(pin_in(mutated, pattern), "pin still holds with its phrase removed")
 
     def test_no_dispatch_parameter_is_offered_anywhere(self):

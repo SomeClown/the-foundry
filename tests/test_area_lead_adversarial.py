@@ -170,6 +170,167 @@ class EvalExemptionTest(unittest.TestCase):
         """A third name in the exemption set would let that agent ship with no eval case, unnoticed."""
         self.assertEqual(ec.CoverageTest.NOT_DISPATCHED_BY_THE_SESSION, {"file-reader", "area-lead"})
 
+# ---- Task 3: the switch in investigate.md and the contract between the two agents ----
+
+HEAD = "If Your Brief Is an Area Lead's"
+ALLOWED_LEAD_HEADING = "## " + HEAD
+
+
+def stray_brief_problems(top):
+    """The instruction part of the answer to a stray AREA LEAD brief: the trigger, 'read nothing', 'nothing else'."""
+    body = al.section_of(top, HEAD)
+    if body is None:
+        return ["no section " + HEAD]
+    prose = al.fold(re.sub(r"^```\n.*?^```$", "", body, flags=re.S | re.M))
+    need = ["If the first line of your brief is `AREA LEAD`, it was meant for the `area-lead` agent.",
+            "Read nothing, and reply with these two lines and nothing else:"]
+    return [n for n in need if n not in prose]
+
+
+def lead_creep_problems(top):
+    """Lead-only text coming back in other words: a heading about leading, or a rule addressed to a lead."""
+    found = []
+    for h in re.findall(r"^#{2,3} (.*)$", top, flags=re.M):
+        if re.search(r"\blead(s|ing)?\b", h, re.I) and "## " + h != ALLOWED_LEAD_HEADING:
+            found.append("heading: " + h)
+    folded = al.fold(top)
+    for pat in [r"if you(?:'re| are) (?:leading|an? (?:area )?lead)", r"as an? (?:area )?lead,? you",
+                r"\ban? (?:area )?lead (?:skips|reads only|returns only|ignores|doesn't (?:use|build|apply))",
+                r"\byou are (?:an? )?(?:area )?lead\b", r"\bleading an area\b"]:
+        for m in re.finditer(pat, folded, re.I):
+            found.append("text: " + m.group(0))
+    return found
+
+
+def brief_field_problems(texts):
+    """The fields the lead's opening lists, in order, equal the fields of the template investigate sends."""
+    opening = al.fold(texts[LEAD].split("\n## ", 1)[0])
+    sentence = re.search(r"Its first line is (.*?)\. The path lines", opening)
+    if sentence is None:
+        return ["the lead's opening no longer lists the brief's fields"]
+    listed = re.findall(r"`([^`]+)`", sentence.group(1))
+    body = al.section_of(texts[TOP], "Run the Readers")
+    fence = [f for f in fences(body) if f.startswith("AREA LEAD\n")]
+    if len(fence) != 1:
+        return ["investigate holds %d AREA LEAD templates" % len(fence)]
+    sent = ["AREA LEAD"] + [ln.split(":", 1)[0] + ":" for ln in fence[0].splitlines()[1:] if re.match(r"[A-Z][A-Za-z ]*:", ln)]
+    return [] if listed == sent else ["lead lists %r, investigate sends %r" % (listed, sent)]
+
+
+def flag_carry_problems(texts):
+    """Both sides of the NOT A PER-FILE READ hand-off: the lead flags its first line, investigate carries it up."""
+    top = al.fold(al.section_of(texts[TOP], "When You Can't Spawn"))
+    lead = al.fold(al.section_of(texts[LEAD], "When You Can't Spawn"))
+    found = []
+    if "make the first line of your return `NOT A PER-FILE READ: <why>`" not in lead:
+        found.append("the lead no longer puts the flag on the first line of its return")
+    if ("A lead that couldn't start agents puts the flag on the first line of its return, and you carry it "
+            "to the first line of your report.") not in top:
+        found.append("investigate no longer carries a lead's flag to the first line of its report")
+    return found
+
+
+class StrayAreaLeadBriefTest(unittest.TestCase):
+    """AC-1: this answer is what keeps an old copy of investigate from sweeping inside a lead's slot."""
+
+    def setUp(self):
+        self.top = al.texts_of()[TOP]
+
+    def test_the_real_file_tells_investigate_to_read_nothing_and_send_only_the_reply(self):
+        self.assertEqual(stray_brief_problems(self.top), [])
+
+    def test_softening_read_nothing_or_nothing_else_is_found(self):
+        """AC-1: 'Read only what you need' or a dropped 'and nothing else' lets investigate work the brief."""
+        cuts = [
+            ("Read nothing, and reply with these two lines and nothing else:", "Read nothing, and reply with these two lines:"),
+            ("Read nothing, and reply with these two lines and nothing else:",
+             "Read only what you need, and reply with these two lines and nothing else:"),
+            ("Read nothing, and reply", "Skim the brief, and reply"),
+            ("If the first line of your brief is `AREA LEAD`, it was meant for the `area-lead`\nagent.",
+             "If the first line of your brief is `AREA LEAD`, work it."),
+            ("If the first line of your brief is `AREA LEAD`", "If your brief mentions `AREA LEAD`"),
+        ]
+        for old, new in cuts:
+            with self.subTest(cut=old[:50]):
+                self.assertIn(old, self.top)
+                self.assertTrue(stray_brief_problems(self.top.replace(old, new, 1)))
+
+
+class LeadTextCreepTest(unittest.TestCase):
+    """AC-1: the phrase list in test_area_lead holds the 2.7.0 wording; these hold the class in other words."""
+
+    def setUp(self):
+        self.top = al.texts_of()[TOP]
+
+    def test_the_real_file_has_no_lead_heading_but_the_one_and_no_rule_addressed_to_a_lead(self):
+        self.assertEqual(lead_creep_problems(self.top), [])
+
+    def test_a_new_lead_heading_or_a_rule_for_a_lead_in_other_words_is_found(self):
+        adds = [
+            ("## If Your Brief Continues a Sweep", "## If You Are Leading an Area\n\nRead your files.\n\n## If Your Brief Continues a Sweep"),
+            ("## What to Produce", "## What to Produce\n\nA lead returns only its checklist and skips the sections below.\n"),
+            ("## What to Produce", "## What to Produce\n\nIf you are leading an area, stop here.\n"),
+            ("## What to Produce", "## What to Produce\n\nAs a lead you skip the sections below.\n"),
+            ("## How to Orient Yourself", "### Leads\n\n## How to Orient Yourself"),
+        ]
+        for old, new in adds:
+            with self.subTest(add=new[:60]):
+                self.assertIn(old, self.top)
+                self.assertTrue(lead_creep_problems(self.top.replace(old, new, 1)))
+
+
+class BriefFieldsMatchTest(unittest.TestCase):
+    """AC-1/AC-3: the template investigate sends and the fields the lead expects can't change one at a time."""
+
+    def setUp(self):
+        self.base = al.texts_of()
+
+    def mutated(self, name, old, new):
+        texts = dict(self.base)
+        self.assertIn(old, texts[name])
+        texts[name] = texts[name].replace(old, new, 1)
+        return texts
+
+    def test_the_real_files_agree_on_the_fields_and_their_order(self):
+        self.assertEqual(brief_field_problems(self.base), [])
+
+    def test_a_field_renamed_dropped_or_reordered_on_either_side_is_found(self):
+        cases = [
+            (LEAD, "`Project:`,\n`Focus:`,", "`Focus:`,\n`Project:`,"),
+            (LEAD, "`Area:`,", "`Name:`,"),
+            (LEAD, "`Focus:`, `Environment:` and `Reader agent:`", "`Environment:` and `Reader agent:`"),
+            (LEAD, "`Environment:` and `Reader agent:`", "`Environment:` and `Reader:`"),
+            (LEAD, "then `Files:` with one path per\nline", "then the paths, one per\nline"),
+            (TOP, "Reader agent: <name>\nFiles:", "Files:"),
+            (TOP, "Area: <name>\nProject:", "Name: <name>\nProject:"),
+            (TOP, "Project: <a sentence or two>\nFocus: <the task's focus, or \"none\">\nEnvironment: <anything your brief said about the environment, such as a git wrapper>\nReader",
+             "Project: <a sentence or two>\nEnvironment: <anything your brief said about the environment, such as a git wrapper>\nReader"),
+        ]
+        for name, old, new in cases:
+            with self.subTest(file=name, cut=old[:40]):
+                self.assertTrue(brief_field_problems(self.mutated(name, old, new)))
+
+
+class FlagHandOffTest(unittest.TestCase):
+    """AC-1: a lead's first-line flag only reaches the report if both sides keep their half."""
+
+    def test_the_real_files_hold_both_halves(self):
+        self.assertEqual(flag_carry_problems(al.texts_of()), [])
+
+    def test_losing_either_half_is_found(self):
+        base = al.texts_of()
+        cases = [
+            (TOP, "puts the flag on the first line of its return,\nand you carry it", "says so,\nand you note it"),
+            (LEAD, "make the first line of your return `NOT A PER-FILE READ: <why>`",
+             "mention in your return `NOT A PER-FILE READ: <why>`"),
+        ]
+        for name, old, new in cases:
+            with self.subTest(file=name):
+                texts = dict(base)
+                self.assertIn(old, texts[name])
+                texts[name] = texts[name].replace(old, new, 1)
+                self.assertTrue(flag_carry_problems(texts))
+
 
 if __name__ == "__main__":
     unittest.main()

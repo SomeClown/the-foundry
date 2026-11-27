@@ -1,7 +1,7 @@
 """Pins for `investigate` reading a big repo in parts (design section 4, Task 5 of the big-sweep plan).
 
 Each pin is a meaning-carrying phrase searched for inside the one section of `agents/investigate.md` where
-the rule belongs, in the pattern of tests/test_investigate_batch1.py. A mutation test deletes the matched
+the rule belongs (the pins in LEAD_PINS, a section of `agents/area-lead.md`), in the pattern of tests/test_investigate_batch1.py. A mutation test deletes the matched
 phrase in memory and requires the pin to stop matching, so a rule that is deleted, or stated twice in its
 section, fails. Around the pins: the fence (byte for byte), the fixed tokens (none split across a line),
 the order of the sections, the leftovers of the old stop, and a report written exactly as the file's own
@@ -23,6 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 INVESTIGATE = ROOT / "agents" / "investigate.md"
+LEAD = ROOT / "agents" / "area-lead.md"
 SCORER = ROOT / "evals-expensive" / "check_parts.py"
 
 
@@ -46,9 +47,6 @@ def without_match(body, pattern):
 
 # (item, section heading, regex). One regex per distinct instruction. Matched case-sensitively.
 PINS = [
-    # If You're an Area Lead
-    ("lead skips the part-size parts of the list", "If You're an Area Lead", r"the list-building and part-size parts of \"Build the File List\""),
-    ("lead skips A Sweep in Parts", "If You're an Area Lead", r"You also skip \"A Sweep in Parts\""),
 
     # If Your Brief Continues a Sweep
     ("marker is checked before the mode", "If Your Brief Continues a Sweep", r"check that before you pick a mode"),
@@ -173,11 +171,6 @@ PINS = [
     ("quoting: Coverage is all the report says of them", "Check Before You Compile", r"Coverage is all the report says of them: a folder skipped whole is counted with its reason, and untracked files are listed by path \(in a sweep in parts, in part 1 only\)"),
     ("quoting: a hit in an unread area is a reference, not checked", "Check Before You Compile", r"A hit in an area a sweep in parts hasn't read yet is different: list it as a reference, not checked, and don't describe what's there"),
     ("quoting: a scoped read is unchanged", "Check Before You Compile", r"A scoped read searches the whole repo for coupling, as it always did"),
-    ("quoting: a lead's checks stay in its area", "Check Before You Compile", r"An area lead's own checks stay inside its area"),
-
-    # When You're an Area Lead
-    ("a lead applies no part size", "When You're an Area Lead", r"Don't build a list, apply the part size, or split further"),
-    ("the lead's findings come first, then the checklist, then AREA REPORT ENDS", "When You're an Area Lead", r"Your findings come first, under your area's name; the checklist comes after them; the last line of your return, after the checklist, is `AREA REPORT ENDS`"),
 
     # When You Can't Spawn
     ("the only first-line flag, with the parts line under it", "When You Can't Spawn", r"the only one is `NOT A PER-FILE READ`, and a `SWEEP IN PARTS` line goes under it"),
@@ -265,16 +258,22 @@ PINS = [
     # Check Before You Compile
     ("coupling claims are checked with the Grep tool, never a grep with the name typed in", "Check Before You Compile", r"check coupling claims with the Grep tool for the referenced name, never a `grep` with the name typed into it"),
 
-    # When You're an Area Lead
-    ("a lead's line counts take its brief's paths in a here-document, and never a path that reads /END", "When You're an Area Lead", r"Get line counts with `wc -l` for the big-file rule, with your brief's paths in a here-document as \"Build the File List\" shows, and never a path that reads `/END`"),
     ("the rule: never paste a line that reads /END, once its backticks and the spaces at its ends are off, into a here-document", "Build the File List", r"Never paste a line that reads `/END`, once its backticks and the spaces at its ends are off, into a here-document"),
     ("why: it can only come from text changed on the way, so leave it out and name it unread", "Build the File List", r"it can only come from text changed on the way, so leave it out and name it unread"),
 
     # 8. Coverage
-    ("the one reply without Coverage is the one for a cut-off continuing brief", "8. Coverage", r"The one reply without it is the one for a cut-off `CONTINUE SWEEP` brief \(see \"If Your Brief Continues a Sweep\"\)"),
+    ("the replies without Coverage are the ones for a cut-off continuing brief and for an AREA LEAD brief", "8. Coverage", r"The replies without it are the one for a cut-off `CONTINUE SWEEP` brief \(see \"If Your Brief Continues a Sweep\"\) and the one for an `AREA LEAD` brief \(see \"If Your Brief Is an Area Lead's\"\)"),
     ("an area put back after refused spawns isn't under Areas read", "8. Coverage", r"An area put back in the block after refused spawns isn't one of them \(see \"When a Part Goes Wrong\"\)"),
     ("the Area dropped form for a line that can't be read as an area line", "8. Coverage", r"`Area dropped: <the line as given>; can't be read as an area line; not read\.`"),
-    ("the per-folder counts are for a top-level single-agent report on a first run only", "8. Coverage", r"The per-folder counts apply only to a top-level single-agent report on a first run, never to a continuing run without `Agent` \(see \"When You Can't Spawn\"\) or to a lead's checklist"),
+    ("the per-folder counts are for a top-level single-agent report on a first run only", "8. Coverage", r"The per-folder counts apply only to a top-level single-agent report on a first run, never to a continuing run without `Agent` \(see \"When You Can't Spawn\"\)"),
+]
+
+# The pins on text that moved to agents/area-lead.md (design section 5, decision 1A): the contract and safety ones,
+# held in the lead's own file under the heading that now holds them.
+LEAD_PINS = [
+    ("the lead's findings come first, then the checklist, then AREA REPORT ENDS", "What to Return", r"Your findings come first, under your area's name; the checklist comes after them; the last line of your return, after the checklist, is `AREA REPORT ENDS`"),
+    ("a lead's line counts take its brief's paths in a here-document, and never a path that reads /END", "Your Files", r"Line counts take your brief's paths in a here-document as shown above, never a path that reads `/END`"),
+    ("a lead's checks stay in its area", "Check Before You Return", r"Your checks stay inside your area\."),
 ]
 
 TOKENS = [
@@ -388,6 +387,30 @@ class PartsPinsTest(unittest.TestCase):
                 mutated = without_match(self.body(heading), pattern)
                 self.assertIsNone(re.search(pattern, mutated), "the pin still holds with its phrase removed")
 
+    def test_the_lead_pins_hold_in_the_lead_file_and_fail_when_their_phrase_is_deleted(self):
+        lead = sections(LEAD.read_text(encoding="utf-8"))
+        for item, heading, pattern in LEAD_PINS:
+            with self.subTest(item=item):
+                self.assertIn(heading, lead, f"heading {heading!r} is gone from agents/area-lead.md")
+                self.assertIsNotNone(re.search(pattern, lead[heading]), f"'{item}' is missing from '{heading}'")
+                self.assertIsNone(re.search(pattern, without_match(lead[heading], pattern)), "the pin still holds with its phrase removed")
+
+    def test_each_lead_pin_is_scoped_to_its_section_a_move_to_another_section_fails(self):
+        lead = sections(LEAD.read_text(encoding="utf-8"))
+        for item, heading, pattern in LEAD_PINS:
+            with self.subTest(item=item):
+                phrase = re.search(pattern, lead[heading]).group(0)
+                other = next(h for h in lead if h != heading and not re.search(pattern, lead[h]))
+                moved = {h: (without_match(b, pattern) if h == heading else b) for h, b in lead.items()}
+                moved[other] = moved[other] + " " + phrase
+                self.assertIsNone(re.search(pattern, moved[heading]), f"'{item}' is satisfied outside '{heading}'")
+
+    def test_every_heading_the_lead_pins_name_exists_exactly_once_in_the_lead_file(self):
+        text = LEAD.read_text(encoding="utf-8")
+        for heading in {h for _, h, _ in LEAD_PINS}:
+            with self.subTest(heading=heading):
+                self.assertEqual(len(re.findall(r"^#{2,3} " + re.escape(heading) + r"$", text, flags=re.M)), 1)
+
     def test_each_pin_is_scoped_to_its_section_a_move_to_another_section_fails(self):
         # Put the phrase into the wrong section only: the pin must not be satisfied by the move.
         for item, heading, pattern in PINS:
@@ -424,7 +447,7 @@ class PartsPinsTest(unittest.TestCase):
     def test_the_continue_section_sits_after_the_lead_section_and_before_orientation_and_modes(self):
         text = self.text
         order = [text.index("\n" + h + "\n") for h in (
-            "## If You're an Area Lead", "## If Your Brief Continues a Sweep", "## How to Orient Yourself", "## Pick a Mode",
+            "## If Your Brief Is an Area Lead's", "## If Your Brief Continues a Sweep", "## How to Orient Yourself", "## Pick a Mode",
         )]
         self.assertEqual(order, sorted(order))
 
@@ -822,13 +845,6 @@ class QaFixAOldSentencesTest(unittest.TestCase):
         swapped = body.replace(skips, "@@").replace(lead, skips).replace("@@", lead)
         self.assertNotEqual(swapped, body)
         self.assertFalse(precedes(swapped, r"take out the files skipped one by one", r"Every area in a part gets its own lead"))
-
-    def test_a_lead_returns_findings_then_the_checklist_then_the_last_line(self):
-        body = self.sections["When You're an Area Lead"]
-        order = [body.index(x) for x in ("under your area's name", "Also return a **file checklist**", "Your findings come first", "the checklist comes after them",
-                                         "the last line of your return, after the checklist, is `AREA REPORT ENDS`")]
-        self.assertEqual(order, sorted(order))
-        self.assertEqual(len(re.findall(r"is `AREA REPORT ENDS`", body)), 1)
 
     def test_the_mode_line_note_placement_is_said_once_and_the_two_notes_point_to_it(self):
         self.assertEqual(len(re.findall(r"come after the `Mode:` line and before the `Files listed:` line", self.flat)), 1)

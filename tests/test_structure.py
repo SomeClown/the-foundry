@@ -228,7 +228,6 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
         flat = self.flat("investigate")
         for value in (
             "Send readers 10 at a time",
-            "batches of 10",
             "about 150 files",
             "The part size is 450 files",
             "over about 1,000 lines",
@@ -273,7 +272,7 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
 
     def test_area_lead_check_comes_before_orientation(self):
         text = self.text("investigate")
-        lead = text.index("## If You're an Area Lead")
+        lead = text.index("## If Your Brief Is an Area Lead's")
         self.assertLess(lead, text.index("## How to Orient Yourself"))
         self.assertLess(lead, text.index("Before reading anything else"))
 
@@ -313,7 +312,7 @@ class PerFileInvestigationDefinitionTest(unittest.TestCase):
     def test_the_continue_section_sits_after_the_area_lead_section_and_before_orientation_and_modes(self):
         text = self.text("investigate")
         heads = [text.index(h) for h in (
-            "\n## If You're an Area Lead\n",
+            "\n## If Your Brief Is an Area Lead's\n",
             "\n## If Your Brief Continues a Sweep\n",
             "\n## How to Orient Yourself\n",
             "\n## Pick a Mode\n",
