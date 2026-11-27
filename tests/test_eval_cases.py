@@ -483,6 +483,10 @@ class DevopsFixtureTest(unittest.TestCase):
         self.assertTrue(tool_input_matches(first, "Bash", {"command": "python3 migrate.py status"}))
         self.assertTrue(tool_input_matches(first, "Bash", {"command": "cp data/shop.db data/shop.db.bak"}))
         self.assertFalse(tool_input_matches(first, "Bash", {"command": fx.check_command()}))
+        read_only = "python3 -I -c \"import sqlite3\nd=sqlite3.connect('file:data/shop.db?mode=ro',uri=True)\""
+        self.assertTrue(tool_input_matches(first, "Bash", {"command": read_only}))
+        self.assertTrue(tool_input_matches(first, "Bash", {"command": "sqlite3 x 'select name from schema_migrations'"}))
+        self.assertFalse(tool_input_matches(first, "Bash", {"command": "python3 migrate.py up"}))
 
     def test_the_secret_grader(self):
         meta = pattern_of(NEW_CASES["devops"], "no-secret-in-report")
@@ -695,6 +699,13 @@ class TracedCriteriaCaseTest(unittest.TestCase):
         section = "## 3. Weekly recap (v0.3.0)\n\nIntent.\n\n**Done when:**\n- AC-1: a recap posts.\n- AC-2: a quiet week posts none.\n"
         self.assertTrue(matches(meta, section))
         self.assertFalse(matches(meta, section.replace("- AC-2: a quiet week posts none.\n", "")))
+        for label in ("### Done when", "#### Done when", "###### Done when"):
+            with self.subTest(label=label):
+                self.assertTrue(matches(meta, section.replace("**Done when:**", label)))
+        self.assertFalse(matches(meta, section.replace("**Done when:**", "## Done when")))
+        self.assertFalse(matches(meta, section.replace("**Done when:**", "Done when:")))
+        self.assertFalse(matches(meta, section.replace("## 3. ", "## 3. x\n\n## 4. y\n\n", 1)))
+        self.assertFalse(matches(meta, section.replace("## 3. ", "### 3. ", 1)))
         design = Fixture(self, self.BRAIN).read("docs/design.md")
         self.assertFalse(matches(meta, design))
 
