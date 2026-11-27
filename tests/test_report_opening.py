@@ -190,6 +190,7 @@ class RealTreeTest(unittest.TestCase):
         self.assertEqual(len(got), 8, got)
         self.assertNotIn("investigate", got)
         self.assertNotIn("file-reader", got)
+        self.assertNotIn("area-lead", got)
         for name, text in texts.items():
             with self.subTest(agent=name):
                 self.assertEqual(text.count("\n" + HEADING + "\n"), 1 if name in got else 0)
@@ -210,7 +211,7 @@ class RealTreeTest(unittest.TestCase):
 
     def test_the_section_is_not_in_investigate_or_file_reader(self):
         texts = agent_texts()
-        for name in ("investigate", "file-reader"):
+        for name in ("investigate", "file-reader", "area-lead"):
             self.assertNotIn(HEADING, texts[name])
 
 

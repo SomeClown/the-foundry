@@ -21,7 +21,7 @@ they're free.
 ```markdown
 ## The Foundry (dev agent team)
 
-A ten-agent development team is installed (investigate, file-reader, architect,
+An eleven-agent development team is installed (investigate, area-lead, file-reader, architect,
 uiux, implement, frontend, test-engineer, qa, devops, docs), plus four skills this
 session runs itself (brainstorm, run-plan, debug, ship). `file-reader` is
 dispatched only by `investigate`. This session is the orchestrator: brief agents

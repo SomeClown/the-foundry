@@ -180,7 +180,7 @@ class AgentFilesTest(unittest.TestCase):
         # No hooks, mcpServers, permissionMode, or skills may creep in.
         self.assertEqual(set(agents()["file-reader"]), {"name", "description", "tools", "model"})
 
-    def test_investigate_is_the_only_read_only_agent_that_can_spawn(self):
+    def test_investigate_and_area_lead_are_the_only_read_only_agents_that_can_spawn(self):
         # "Task" is the Agent tool's other name; the session init lists it that way.
         spawners = {
             name
@@ -188,7 +188,7 @@ class AgentFilesTest(unittest.TestCase):
             if any(re.match(r"(Agent|Task)\b", t) for t in fm["tools"])
             and not WRITE_TOOLS & set(fm["tools"])
         }
-        self.assertEqual(spawners, {"investigate"})
+        self.assertEqual(spawners, {"investigate", "area-lead"})
 
     def test_spawner_detection_catches_scoped_spawning_entries(self):
         # The detector above must see Agent(file-reader) and Task(...) as spawners.
@@ -199,8 +199,8 @@ class AgentFilesTest(unittest.TestCase):
             with self.subTest(entry=entry):
                 self.assertFalse(re.match(r"(Agent|Task)\b", entry))
 
-    def test_team_is_ten(self):
-        self.assertEqual(len(agents()), 10)
+    def test_team_is_eleven(self):
+        self.assertEqual(len(agents()), 11)
 
 
 class PerFileInvestigationDefinitionTest(unittest.TestCase):
@@ -1203,7 +1203,7 @@ class RetroTest(unittest.TestCase):
 
     def test_every_example_line_names_a_real_agent_or_skill_one_kind_word_and_the_shape(self):
         real = set(agents()) | set(skills())
-        self.assertEqual(len(real), 14)
+        self.assertEqual(len(real), 15)
         for name in ("run-plan", "debug"):
             lines = self.example_lines(name)
             with self.subTest(skill=name, count=len(lines)):
@@ -1413,7 +1413,7 @@ class DocsAgreeTest(unittest.TestCase):
             ("README", readme, rf"is {n_agents} specialized subagents"),
             ("README", readme, rf"\b{n_skills} skills that session runs itself"),
             ("README install", readme, rf"{n_agents} agents and {n_skills} skills are now available"),
-            ("orchestrator", orchestrator, rf"A {n_agents}-agent development team"),
+            ("orchestrator", orchestrator, rf"An? {n_agents}-agent development team"),
             ("orchestrator", orchestrator, rf"plus {n_skills} skills this\s+session runs itself"),
             ("plugin.json", plugin["description"], rf"{n_agents} specialized subagents"),
             ("marketplace.json", marketplace["description"], rf"{n_agents}-agent"),

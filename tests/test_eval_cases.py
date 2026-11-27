@@ -344,13 +344,23 @@ class CoverageTest(unittest.TestCase):
     def prompts(self):
         return [(c, (c / "prompt.md").read_text(encoding="utf-8")) for c in case_dirs()]
 
-    def test_every_agent_but_file_reader_has_a_case(self):
+    # The session never dispatches these two, so a routine case can't reach them.
+    # file-reader: covered by the reader graders of evals-expensive/nesting-smoke and the big-sweep case.
+    # area-lead: covered by evals-expensive/nesting-smoke/graders/lead-is-area-lead.md and the big-sweep case.
+    NOT_DISPATCHED_BY_THE_SESSION = {"file-reader", "area-lead"}
+
+    def test_every_agent_the_session_dispatches_has_a_case(self):
         text = "\n".join(t for _, t in self.prompts())
         for agent in sorted(p.stem for p in (ROOT / "agents").glob("*.md")):
-            if agent == "file-reader":
+            if agent in self.NOT_DISPATCHED_BY_THE_SESSION:
                 continue
             with self.subTest(agent=agent):
                 self.assertIn("the-foundry:" + agent, text)
+
+    def test_the_exempt_area_lead_is_covered_by_the_nesting_smokes_grader(self):
+        grader = EXPENSIVE / "nesting-smoke" / "graders" / "lead-is-area-lead.md"
+        self.assertTrue(grader.is_file())
+        self.assertIn("the-foundry:area-lead", re.search(r"^input_match:(.*)$", grader.read_text(encoding="utf-8"), re.M).group(1))
 
     def test_the_five_new_cases_are_tagged_agents_and_hold_the_template_files(self):
         for agent, name in NEW_CASES.items():

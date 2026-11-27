@@ -6,7 +6,7 @@
 A portable software-development agent team for [Claude Code](https://claude.com/claude-code):
 raw requests go in, shipped features come out.
 
-The Foundry is ten specialized subagents plus your orchestrating Claude Code session as the lead, and four skills that session runs itself. Each
+The Foundry is eleven specialized subagents plus your orchestrating Claude Code session as the lead, and four skills that session runs itself. Each
 agent is a single Markdown file with a strict tool allowlist, an assigned model
 tier, and opinionated working instructions.
 Install it, and every project you open gets an investigation specialist (with
@@ -64,6 +64,7 @@ Design principles that came out of that experience:
 |---|---|---|---|
 | `investigate` | Codebase onboarding — reads a project cold, giving each file its own reader; reports structure, data model, coupling, gotchas (only its instructions keep it to `file-reader` and its own leads) | No | sonnet |
 | `file-reader` | Reads one file or section for `investigate` and reports it with line numbers; holds only `Read` | No | haiku |
+| `area-lead` | Leads one area of a big repo for `investigate`: starts a `file-reader` per file, checks what they report, returns the area's findings and a file checklist (only its instructions keep it to `file-reader`) | No | sonnet |
 | `architect` | Turns a feature request (+ investigate report) into an ordered implementation plan with file-level scope | No | opus |
 | `uiux` | Design advisor — aesthetic/creative direction, visual critique in a browser, dataviz, greenfield design systems | No | opus |
 | `implement` | General implementer — backend, business logic, APIs, data models | Yes (app code) | sonnet |
@@ -186,7 +187,7 @@ claude plugin marketplace add SomeClown/the-foundry
 claude plugin install the-foundry@the-foundry
 ```
 
-That's it. The ten agents and four skills are now available in every
+That's it. The eleven agents and four skills are now available in every
 project (the skills as `/the-foundry:brainstorm`, `/the-foundry:run-plan`,
 `/the-foundry:debug` and `/the-foundry:ship`, though your session will
 usually reach for them on its own), they update
