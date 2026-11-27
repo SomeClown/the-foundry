@@ -332,9 +332,6 @@ class LookAlikeTypesTest(Shapes):
         self.assertTranscriptFails(self.run_t(events), r"^transcript: 2 top-level investigate results, 3 part files")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 
 # ---- Task 4 (AC-4): the restarted-lead allowance in the twice-read check --------------------------------------
 
@@ -609,3 +606,223 @@ class BriefReadLineTest(TranscriptBase):
         for bad in (None, ""):
             with self.subTest(prompt=bad):
                 self.assertTranscriptProved(self.run_t(self.change(self.FILE, prompt=bad)))
+
+
+# ---- Fix batch 1 (D1, D2): odd Files: lines, and non-string fields ---------------------------------------------------
+# Each test sends a restarted lead whose Files: list is in an odd shape, with a second reader for one file, and asks
+# whether the scorer allows it (right run: LOOP PROVED with the NOTE) or fails it (wrong run: LOOP FAILED), and never raises.
+
+TOLL = "api/billing/toll.py"
+TOW = "api/billing/tow.py"
+
+
+def listing(body):
+    """A prompt edit: the Files: list is replaced by the body (the restart copies the edited text to both leads)."""
+    return lambda p: p.split("Files:\n")[0] + "Files:\n" + body
+
+
+class FilesLineShapesTest(RestartBase):
+    def run_shape(self, body, second=(TOLL,)):
+        events = self.restart(listed=[TOLL], second=list(second), prompt_edit=listing(body))
+        code, out = self.run_t(events)
+        self.assertNotIn("Traceback", out)
+        self.assertNotIn("CAN'T CHECK", out)
+        self.assertIn(code, (0, 1), out)
+        return code, out
+
+    def path(self, rel=TOLL):
+        return "%s/%s" % (Fixture.repo, rel)
+
+    def allowed(self, body, **kw):
+        code, out = self.run_shape(body, **kw)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out.splitlines()[0], "LOOP PROVED")
+        self.assertIn("lead was started twice", out)
+
+    def refused(self, body, **kw):
+        code, out = self.run_shape(body, **kw)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("LOOP PROVED", out)
+        self.assertNotIn("was started twice", out)
+
+    def test_each_bullet_mark_gets_the_allowance_with_and_without_backticks(self):
+        for mark in ("-", "*", "+"):
+            for fmt in ("%s", "`%s`"):
+                with self.subTest(mark=mark, fmt=fmt):
+                    self.allowed("%s %s" % (mark, fmt % self.path()))
+
+    def test_an_indented_or_tabbed_bullet_gets_the_allowance(self):
+        for lead in ("  - ", "\t* ", "    + "):
+            with self.subTest(lead=repr(lead)):
+                self.allowed(lead + self.path())
+                self.allowed(lead + "`%s`" % self.path())
+
+    def test_bold_around_the_backticks_gets_the_allowance(self):
+        self.allowed("- **`%s`**" % self.path())
+
+    def test_two_backticked_paths_on_a_line_take_the_first_and_the_second_gets_nothing(self):
+        self.allowed("- `%s` (was `%s`)" % (self.path(TOLL), self.path(TOW)))
+        self.refused("- `%s` (was `%s`)" % (self.path(TOW), self.path(TOLL)))
+
+    def test_a_path_named_only_in_a_note_gets_no_allowance(self):
+        self.refused("- `%s` (replaces `%s`)" % (self.path(TOW), self.path(TOLL)))
+        self.refused("(see %s)\n- `%s`" % (self.path(TOLL), self.path(TOW)))
+
+    def test_a_line_that_is_only_a_note_is_no_path_and_does_not_end_the_list(self):
+        self.allowed("(none yet)\n`%s`" % self.path())
+        self.refused("(%s)" % self.path())
+
+    def test_an_empty_line_ends_the_list(self):
+        self.refused("\n`%s`" % self.path())
+        self.refused("`%s`\n\n`%s`" % (self.path(TOW), self.path(TOLL)))
+
+    def test_a_path_with_spaces_in_backticks_is_read_whole_and_does_not_raise(self):
+        self.refused("- `%s`" % self.path("api/billing/toll file.py"))
+        self.refused("- %s" % self.path("api/billing/toll file.py"))
+
+    def test_a_path_in_backticks_with_a_trailing_note_inside_the_line_gets_the_allowance(self):
+        self.allowed("`%s` - billing tolls, 40 lines" % self.path())
+
+    def test_empty_backticks_and_stray_marks_do_not_raise_and_get_nothing(self):
+        for body in ("``", "-", "- ", "* `", "`", "- ``\n- ` `", "\x00", "-\t"):
+            with self.subTest(body=repr(body)):
+                self.refused(body)
+
+    def test_today_an_unbackticked_path_with_a_trailing_note_or_a_numbered_item_gets_no_allowance(self):
+        """Accepted limit: a right run in these shapes fails (the scorer errs to failing). The lead's template says backticks."""
+        self.refused("- %s (a note)" % self.path())
+        self.refused("1. %s" % self.path())
+
+    def test_a_second_reader_for_a_file_the_odd_list_does_not_name_still_fails_the_run(self):
+        for body in ("- `%s`" % self.path(TOW), "* %s" % self.path(TOW), "+ `%s` `%s`" % (self.path(TOW), self.path(TOLL)),
+                     "Files: `%s`" % self.path(TOLL).replace(TOLL, "x/%s" % TOLL)):
+            with self.subTest(body=body[:40]):
+                self.refused(body)
+
+
+class NonStringFieldsTest(TranscriptBase):
+    """D2: a value that is not a string, in a field the transcript check reads, is empty or ignored, never a crash."""
+
+    ODD = (None, 5, 1.5, True, [], {}, ["x"], {"a": 1})
+
+    def first(self, kind, subtype="task_started"):
+        return next(e for e in self.events_ref if e.get("subtype") == subtype and e.get("subagent_type") == kind)
+
+    def run_with(self, change):
+        events = self.events()
+        self.events_ref = events
+        change(events)
+        return self.run_t(events)
+
+    def assertNoCrash(self, code_out, what):
+        code, out = code_out
+        self.assertNotIn("Traceback", out, what)
+        self.assertNotIn("internal error", out, what)
+        self.assertIn(code, (0, 1), "%s: %s" % (what, out[:200]))
+
+    def test_every_field_the_check_reads_from_a_reader_or_a_lead_may_be_any_json_value(self):
+        for kind in (READER, INVESTIGATE):
+            for field in ("prompt", "subagent_type", "spawn_depth", "parent_task_id", "tool_use_id"):
+                for odd in self.ODD:
+                    if field in ("tool_use_id",) and isinstance(odd, (list, dict)):
+                        continue  # unhashable ids are a separate finding, below
+                    with self.subTest(kind=kind, field=field, value=repr(odd)):
+                        def change(events, kind=kind, field=field, odd=odd):
+                            self.first(kind)[field] = odd
+                        self.assertNoCrash(self.run_with(change), field)
+
+    def test_every_field_the_check_reads_from_a_notification_may_be_any_json_value(self):
+        for field in ("status", "summary", "subtype", "usage"):
+            for odd in self.ODD:
+                with self.subTest(field=field, value=repr(odd)):
+                    def change(events, field=field, odd=odd):
+                        note = next(e for e in events if e.get("subtype") == "task_notification")
+                        note[field] = odd
+                    self.assertNoCrash(self.run_with(change), field)
+
+    def test_a_reader_that_never_completes_because_its_status_is_not_a_string_is_not_proved(self):
+        for odd in self.ODD:
+            with self.subTest(value=repr(odd)):
+                def change(events, odd=odd):
+                    reader = next(e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == READER)
+                    note = next(e for e in events if e.get("subtype") == "task_notification" and e["task_id"] == reader["task_id"])
+                    note["status"] = odd
+                code, out = self.run_with(change)
+                self.assertEqual(code, 1, out)
+                self.assertRegex(out, r"never completed")
+
+    def test_a_readable_files_reader_whose_type_is_not_a_string_is_not_counted(self):
+        for odd in self.ODD:
+            with self.subTest(value=repr(odd)):
+                def change(events, odd=odd):
+                    reader = next(e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == READER)
+                    reader["subagent_type"] = odd
+                code, out = self.run_with(change)
+                self.assertEqual(code, 1, out)
+                self.assertRegex(out, r"never had a reader dispatched")
+
+    def assertCantCheckNotProved(self, code_out, what):
+        """The scorer's stated answer to a transcript it can't read: exit 2 and a CAN'T CHECK line, never LOOP PROVED."""
+        code, out = code_out
+        self.assertNotIn("Traceback", out, what)
+        self.assertNotIn("LOOP PROVED", out, what)
+        self.assertIn(code, (1, 2), "%s: %s" % (what, out[:200]))
+        if code == 2:
+            self.assertTrue(out.startswith("CAN'T CHECK"), out[:200])
+
+    # The next three are accepted limits. Ruled by the session, 2026-11-27, fix batch 1: exit 2 with `CAN'T CHECK:
+    # internal error` is the scorer's stated answer to a transcript it can't read, and it never scores such a run as proved.
+
+    def test_today_the_text_of_a_tool_result_block_that_is_not_a_string_is_cant_check(self):
+        for odd in self.ODD:
+            with self.subTest(value=repr(odd)):
+                def change(events, odd=odd):
+                    for e in events:
+                        content = (e.get("message") or {}).get("content") if isinstance(e.get("message"), dict) else None
+                        for block in content if isinstance(content, list) else []:
+                            if isinstance(block, dict) and block.get("type") == "tool_result" and isinstance(block.get("content"), list):
+                                for b in block["content"]:
+                                    if isinstance(b, dict) and "text" in b:
+                                        b["text"] = odd
+                self.assertCantCheckNotProved(self.run_with(change), "text")
+
+    def test_today_a_task_id_or_tool_use_id_that_is_a_list_or_an_object_is_cant_check(self):
+        for field in ("task_id", "tool_use_id"):
+            for odd in ([], {}, ["x"], {"a": 1}):
+                for kind in (READER, INVESTIGATE):
+                    with self.subTest(field=field, kind=kind, value=repr(odd)):
+                        def change(events, field=field, odd=odd, kind=kind):
+                            self.first(kind)[field] = odd
+                        if (field, kind) == ("tool_use_id", READER):
+                            # the check never reads a reader's tool_use_id, so the run is still scored
+                            self.assertNoCrash(self.run_with(change), field)
+                        else:
+                            self.assertCantCheckNotProved(self.run_with(change), field)
+
+    def test_today_a_tool_result_whose_tool_use_id_is_a_list_is_cant_check(self):
+        def change(events):
+            for e in events:
+                content = (e.get("message") or {}).get("content") if isinstance(e.get("message"), dict) else None
+                for block in content if isinstance(content, list) else []:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        block["tool_use_id"] = ["x"]
+        self.assertCantCheckNotProved(self.run_with(change), "tool_use_id")
+
+
+class LeadWithNoTypeTest(TranscriptBase):
+    def test_today_a_lead_whose_type_is_not_a_string_is_the_same_as_a_lead_that_never_ran_and_the_run_still_proves(self):
+        """Accepted limit: the scorer counts what the readers did, not that every area had a lead. A lead dropped from the
+        transcript, or one whose type is None or a number, gives LOOP PROVED with a NOTE that fewer leads ran."""
+        for odd in (None, 5, [], {}):
+            with self.subTest(value=repr(odd)):
+                events = self.events()
+                lead = next(e for e in events if e.get("subtype") == "task_started" and e.get("spawn_depth") == 2
+                            and e.get("subagent_type") == INVESTIGATE)
+                lead["subagent_type"] = odd
+                code, out = self.run_t(events)
+                self.assertEqual(code, 0, out)
+                self.assertIn("NOTE: transcript: 16 area leads ran as the-foundry:investigate", out)
+
+
+if __name__ == "__main__":
+    unittest.main()

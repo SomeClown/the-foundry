@@ -362,6 +362,12 @@ class CoverageTest(unittest.TestCase):
         self.assertTrue(grader.is_file())
         self.assertIn("the-foundry:area-lead", re.search(r"^input_match:(.*)$", grader.read_text(encoding="utf-8"), re.M).group(1))
 
+    def test_the_lead_grader_reads_the_subagent_type_field_and_not_a_mention(self):
+        meta, _ = read_markdown(EXPENSIVE / "nesting-smoke" / "graders" / "lead-is-area-lead.md")
+        self.assertTrue(tool_input_matches(meta, "Agent", {"subagent_type": "the-foundry:area-lead", "prompt": "x"}))
+        self.assertFalse(tool_input_matches(meta, "Agent", {"subagent_type": "area-lead", "prompt": "the-foundry:area-lead"}))
+        self.assertFalse(tool_input_matches(meta, "Agent", {"subagent_type": "the-foundry:investigate", "prompt": "x"}))
+
     def test_the_five_new_cases_are_tagged_agents_and_hold_the_template_files(self):
         for agent, name in NEW_CASES.items():
             case = EVALS / name
@@ -878,6 +884,15 @@ class NoUntouchedSecurityLineGraderTest(unittest.TestCase):
                            ("Security: input: no validation on the upload path", False),
                            ("Security: dependencies: no new ones", True),
                            ("Security: dependencies: a new one, `pyyaml`, pinned in Task 2", False)):
+            with self.subTest(line=line[:40]):
+                self.assertEqual(bool(self.hit(self.PLAN.replace("Security: none", line))), want)
+
+    def test_it_reads_n_a_as_a_word_and_not_inside_a_path(self):
+        for line, want in (("Security: caller text from `tally/main/args` reaches the `_WORD` regex in Task 1", False),
+                           ("Security: input from the CLI (`bin/argv`) reaches the tokenizer; Task 1 bounds n", False),
+                           ("Security: input reaches the regex; the scan/apply split keeps it linear", False),
+                           ("Security: n/a", True), ("Security: input: N/A", True),
+                           ("Security: _n/a_", True), ("Security: __n/a__", True), ("Security: _N/A_", True)):
             with self.subTest(line=line[:40]):
                 self.assertEqual(bool(self.hit(self.PLAN.replace("Security: none", line))), want)
 

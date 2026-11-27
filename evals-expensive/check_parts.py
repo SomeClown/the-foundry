@@ -368,7 +368,8 @@ def restarted_files(leads, relative):
         for line in listing.group(1).replace("\r\n", "\n").split("\n"):
             if not line.strip():
                 break
-            found[relative(line.strip().strip("`"))] = area.group(1)
+            quoted = re.search(r"`([^`\n]+)`", line)
+            found[relative(quoted.group(1) if quoted else re.sub(r"^[-*+]\s+", "", line.strip()))] = area.group(1)
     return found
 
 
@@ -424,8 +425,9 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
         note = done.get(task_id, (None, {}))[1]
         # the brief's own first line, Read `<path>`, is the dispatch; the summary's "Path:" line (bold, backticked or in a bullet or not) only when the brief has none
         brief = e.get("prompt") if isinstance(e.get("prompt"), str) else ""
+        summary = note.get("summary") if isinstance(note.get("summary"), str) else ""
         m = re.match(r"\s*Read `([^`\n]+)`", brief) \
-            or re.search(r"^[ \t>*+-]*[*_`]*Path[*_`]*:[*_`]*[ \t]*[*_`]*([^\s`*]\S*?)[*`]*(?:\s|$)", note.get("summary") or "", re.M)
+            or re.search(r"^[ \t>*+-]*[*_`]*Path[*_`]*:[*_`]*[ \t]*[*_`]*([^\s`*]\S*?)[*`]*(?:\s|$)", summary, re.M)
         if not m:
             unreadable.append(task_id)
             continue

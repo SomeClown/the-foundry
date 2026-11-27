@@ -3255,6 +3255,31 @@ class TranscriptReadersTest(TranscriptBase):
         out = self.assertTranscriptProved(self.run_t(self.restarted(files)))
         self.assertIn("NOTE: transcript: area api-billing's lead was started twice; its 2 files had a second set of readers", out.splitlines())
 
+    def test_a_restarted_leads_bulleted_files_list_still_allows_the_second_readers(self):
+        # AC-4
+        files = ("api/billing/toll.py", "api/billing/tow.py")
+        listing = "\n".join("- `%s/%s` (a note after the path)" % (Fixture.repo, f) for f in files)
+        out = self.assertTranscriptProved(self.run_t(self.restarted(files, listing=listing)))
+        self.assertIn("NOTE: transcript: area api-billing's lead was started twice; its 2 files had a second set of readers", out.splitlines())
+
+    def test_a_bulleted_list_with_no_backticks_is_read_with_the_bullet_off(self):
+        # AC-4
+        files = ("api/billing/toll.py", "api/billing/tow.py")
+        listing = "\n".join("* %s/%s" % (Fixture.repo, f) for f in files)
+        out = self.assertTranscriptProved(self.run_t(self.restarted(files, listing=listing)))
+        self.assertIn("NOTE: transcript: area api-billing's lead was started twice; its 2 files had a second set of readers", out.splitlines())
+
+    def test_a_reader_summary_that_is_not_a_string_is_no_path_and_not_a_crash(self):
+        events = self.events()
+        started = next(e for e in events if e.get("subtype") == "task_started" and e.get("subagent_type") == READER)
+        started["prompt"] = "No read line in this brief."
+        note = next(e for e in events if e.get("subtype") == "task_notification" and e.get("task_id") == started["task_id"])
+        note["summary"] = ["Path: x", "Lines read: 1-2 of 2"]
+        code, out = self.run_t(events)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("CAN'T CHECK", out)
+        self.assertRegex(out, r"transcript: 1 reader tasks name no path")
+
     def test_a_second_lead_prompt_changed_by_one_byte_gives_no_allowance(self):
         # AC-4
         events = self.restarted()

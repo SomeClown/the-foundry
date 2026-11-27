@@ -164,7 +164,7 @@ PINS = [
     ("a cut-off lead return lacks AREA REPORT ENDS", "Check Before You Compile", r"Cut off means its return lacks `AREA REPORT ENDS`"),
     ("a lead's return that arrives as a preview isn't cut off", "Check Before You Compile", r"A return that arrives as a preview, with its full text saved to a file, isn't cut off"),
     ("the saved file is read for the whole return before judging", "Check Before You Compile", r"read the saved file for the whole return before judging it"),
-    ("a lead that failed twice has its files listed unread by path", "Check Before You Compile", r"If that fails too, list every file in its area by path as unread in Coverage"),
+    ("a lead that failed twice has its files listed unread by path", "Check Before You Compile", r"If the restarted lead fails too, list every file in its area by path as unread in Coverage"),
     ("the failed-lead rule wins over the path check in every sweep", "Check Before You Compile", r"This rule wins over the path check above, in every sweep: you send no readers of your own for a failed lead's files"),
     ("quoting: a full sweep, one report or parts", "Check Before You Compile", r"On a full sweep, in one report or in parts, the report holds nothing drawn from the contents of a folder skipped whole or of an untracked file"),
     ("quoting: the whole tree may be searched, hits there are dropped", "Check Before You Compile", r"You may still search the whole tree for your own checks, but a hit in one of those places is dropped: not quoted, not listed in an inventory, not described in a gotcha or the Coupling Map"),
@@ -660,7 +660,7 @@ class PartsPinsTest(unittest.TestCase):
     def test_the_preview_rule_sits_beside_the_cut_off_definition(self):
         body = self.sections["Check Before You Compile"]
         self.assertEqual(body.index("Cut off means its return lacks `AREA REPORT ENDS`") < body.index("arrives as a preview")
-                         < body.index("If that fails too, list every file"), True)
+                         < body.index("If the restarted lead fails too, list every file"), True)
 
 
 # ---------------------------------------------------------------- paths without typing, and a brief that arrives broken

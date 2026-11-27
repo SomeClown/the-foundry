@@ -1,5 +1,5 @@
 ---
 type: tool_used
 tool: Agent
-input_match: the-foundry:area-lead
+input_match: '"subagent_type":\s*"the-foundry:area-lead"'
 ---

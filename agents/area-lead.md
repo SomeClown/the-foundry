@@ -151,9 +151,12 @@ Your Coverage counts are one line:
 
 `Files listed: <n>; read: <n>; skipped: <n>; re-dispatched: <n>; failed: <n>; unread: <n>`
 
+Write that line bare: no backticks, no bullet, no bold.
+
 Files listed is every path in your brief, and equals read + skipped + failed +
 unread. A file your checks leave unread is marked `unread: <why>` in the checklist
-and counted as unread. Add counts with a command, never in your head: `echo $((122 + 36 + 30 + 20))`.
+and counted as unread. Add counts with a command, never in your head: `echo $((122 + 36 + 30 + 20))`. The same goes for any total you give of
+routes, commands or files.
 
 Also return a **file checklist**: every path from your brief, one per line, each
 marked `read`, `read in sections` (with the sections), or `unread: <why>`. The checklist is one line for each path in your brief, with no ranges

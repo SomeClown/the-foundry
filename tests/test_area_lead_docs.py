@@ -102,23 +102,58 @@ class EvalsReadmeRevParseTest(unittest.TestCase):
         self.assertRegex(fold(raw("evals/README.md")), r"--runs 4\b")
 
 
+TOP_HEADING = re.compile(r"^## \[3\.0\.0\]", re.M)
+UNRELEASED_HEADING = re.compile(r"^## \[Unreleased\]", re.M)
+
+
+def top_entry(text):
+    """The body of the area-lead release entry, whether still [Unreleased] or renamed [3.0.0], wherever it sits."""
+    # Once released it is [3.0.0] (and a newer [Unreleased] may sit above it); before, it is [Unreleased].
+    m = TOP_HEADING.search(text) or UNRELEASED_HEADING.search(text)
+    if m is None:
+        return None
+    nxt = re.compile(r"^## \[", re.M).search(text, m.end())
+    return text[m.end():nxt.start() if nxt else len(text)]
+
+
+MADE_UP_BODY = (
+    "\nThe area lead is now its own agent, `area-lead`. This is a major version.\n\n"
+    "**A copy of `investigate` made before this release must be copied again.**\n"
+)
+MADE_UP_SHAPES = {
+    "unreleased on top": "# Changelog\n\n## [Unreleased]" + MADE_UP_BODY + "\n## [2.7.0] \u2014 2026-11-26\n\nold\n",
+    "renamed on top": "# Changelog\n\n## [3.0.0] \u2014 2026-12-01" + MADE_UP_BODY + "\n## [2.7.0] \u2014 2026-11-26\n\nold\n",
+    "renamed under a new empty unreleased":
+        "# Changelog\n\n## [Unreleased]\n\nnext thing\n\n## [3.0.0] \u2014 2026-12-01" + MADE_UP_BODY
+        + "\n## [2.7.0] \u2014 2026-11-26\n\nold\n",
+}
+
+
 class ChangelogTopEntryTest(unittest.TestCase):
-    def setUp(self):
-        self.text = raw("CHANGELOG.md")
-        self.first = re.search(r"^## .*$", self.text, re.M).group(0)
+    def entry(self, text):
+        e = top_entry(text)
+        self.assertIsNotNone(e, "no [Unreleased] or [3.0.0] entry")
+        return fold(e)
 
-    def test_the_top_entry_is_unreleased(self):
-        self.assertEqual(self.first, "## [Unreleased]")
+    def check(self, entry):
+        self.assertIn("copy of `investigate` made before this release must be copied again", entry)
+        self.assertIn("`area-lead`", entry)
+        self.assertRegex(entry, r"major version|3\.0\.0")
 
-    def test_the_top_entry_says_an_old_copy_of_investigate_must_be_copied_again(self):
-        m = re.search(r"^## \[Unreleased\]\n(.*?)(?=^## \[)", self.text, re.M | re.S)
-        self.assertIsNotNone(m)
-        entry = fold(m.group(1))
+    def test_the_entry_is_found_in_every_shape_the_release_can_leave_it(self):
+        for name, text in MADE_UP_SHAPES.items():
+            with self.subTest(shape=name):
+                self.check(self.entry(text))
+
+    def test_an_entry_without_the_notice_is_not_passed(self):
+        self.assertNotIn("must be copied again", self.entry("## [3.0.0] \u2014 x\n\nnothing\n\n## [2.7.0]\n"))
+
+    def test_the_real_entry_says_an_old_copy_of_investigate_must_be_copied_again(self):
+        entry = self.entry(raw("CHANGELOG.md"))
         self.assertIn("copy of `investigate` made before this release must be copied again", entry)
 
-    def test_the_top_entry_names_the_new_agent_and_the_major_version(self):
-        m = re.search(r"^## \[Unreleased\]\n(.*?)(?=^## \[)", self.text, re.M | re.S)
-        entry = fold(m.group(1))
+    def test_the_real_entry_names_the_new_agent_and_the_major_version(self):
+        entry = self.entry(raw("CHANGELOG.md"))
         self.assertIn("`area-lead`", entry)
         self.assertRegex(entry, r"major version|3\.0\.0")
 
