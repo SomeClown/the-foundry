@@ -35,25 +35,30 @@ def between(text, start, end):
     return text[i:j] if j >= 0 else ""
 
 
+def folded_between(text, start, end):
+    """`between` on whitespace-folded text, so a line break moved inside a phrase or an anchor changes nothing."""
+    return between(fold(text), fold(start), fold(end))
+
+
 def problems(texts):
     """Every way the texts break a rule; an empty list means they hold."""
     found = []
-    arch = between(texts.get("architect", ""), "### 4. Risks and Coupling", "### 5. Testing Strategy")
+    arch = folded_between(texts.get("architect", ""), "### 4. Risks and Coupling", "### 5. Testing Strategy")
     for needle in ("`Security:`", "`Security: none`"):
         if needle not in arch:
             found.append("architect's section 4 doesn't hold %s" % needle)
     if "since frontend adds none" not in fold(texts.get("architect", "")):
         found.append("architect doesn't say that frontend adds no dependency")
-    if "Do not add dependencies" not in texts.get("frontend", ""):
+    if "Do not add dependencies" not in fold(texts.get("frontend", "")):
         found.append("frontend lost 'Do not add dependencies', which architect's hand-off relies on")
-    spec = between(texts.get("qa", ""), "## Spec-Check Mode", "Put a spec section first")
+    spec = folded_between(texts.get("qa", ""), "## Spec-Check Mode", "Put a spec section first")
     if "`Security:`" not in spec:
         found.append("qa's spec check doesn't treat a `Security:` line as a requirement")
-    step = fold(between(texts.get("implement", ""), "4. **Make the change.**", "5. **Handle data changes"))
+    step = folded_between(texts.get("implement", ""), "4. **Make the change.**", "5. **Handle data changes")
     for needle in ("your brief doesn't name", "NEEDS_CONTEXT"):
         if needle not in step:
             found.append("implement's step 4 doesn't hold %r" % needle)
-    ground = fold(between(texts.get("brainstorm", ""), "## 4. Ground to cover", "## 5."))
+    ground = folded_between(texts.get("brainstorm", ""), "## 4. Ground to cover", "## 5.")
     if "who may use it" not in ground:
         found.append("brainstorm's ground to cover doesn't ask who may use it")
     look = between(texts.get("qa", ""), "## What to Look For", "## Spec-Check Mode")
@@ -64,7 +69,7 @@ def problems(texts):
         lines = fence.group(1).rstrip("\n").split("\n") if fence else []
         if len(lines) != 2 or not lines[0].startswith("Dependencies: ") or not lines[1].startswith(AUDIT_LINE):
             found.append("qa's Dependencies fence isn't the Dependencies line and the Audit line: %s" % lines)
-    qa_deps = fold(between(texts.get("qa", ""), "### Dependencies", "### Logic Bugs"))
+    qa_deps = folded_between(texts.get("qa", ""), "### Dependencies", "### Logic Bugs")
     for name, text in (("qa's Dependencies subsection", qa_deps), ("orchestrator", fold(texts.get("orchestrator", "")))):
         if SEND_CONDITION not in text:
             found.append("%s doesn't hold %r" % (name, SEND_CONDITION))

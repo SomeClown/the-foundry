@@ -793,10 +793,6 @@ class DependencyReviewCaseTest(unittest.TestCase):
         self.assertEqual(total, 8)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class SecurityNoneGraderTest(unittest.TestCase):
     """AC-8: the architect's plan says `Security: none` in section 4 when the change exposes nothing."""
 
@@ -827,3 +823,7 @@ class SecurityNoneGraderTest(unittest.TestCase):
 
     def test_it_misses_the_design_the_case_builds(self):
         self.assertFalse(self.hit(Fixture(self, self.ARCH).read("docs/design.md")))
+
+
+if __name__ == "__main__":
+    unittest.main()
