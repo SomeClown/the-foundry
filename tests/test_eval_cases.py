@@ -793,15 +793,17 @@ class DependencyReviewCaseTest(unittest.TestCase):
         self.assertEqual(total, 8)
 
 
-class SecurityNoneGraderTest(unittest.TestCase):
-    """AC-8: the architect's plan says `Security: none` in section 4 when the change exposes nothing."""
+class SecurityLineGraderTest(unittest.TestCase):
+    """AC-8: the architect's plan carries a `Security:` line in section 4, `none` or a real exposure."""
 
     ARCH = "architect-plan-format"
     PLAN = ("# Plan\n\n## 4. Risks and Coupling\n\n- Nothing else shares tally/core.py.\n\n"
             "Security: none\n\n## 5. Testing Strategy\n")
+    REAL = ("Security: caller-supplied `text` reaches the existing regex `[a-z]+`, which runs in linear time and "
+            "can't backtrack catastrophically. Task 1 adds no new parser or pattern, so nothing new can go wrong here.")
 
     def hit(self, text):
-        return matches(pattern_of(self.ARCH, "security-none"), text)
+        return matches(pattern_of(self.ARCH, "security-line"), text)
 
     def test_it_matches_the_plain_line(self):
         self.assertTrue(self.hit(self.PLAN))
@@ -809,15 +811,18 @@ class SecurityNoneGraderTest(unittest.TestCase):
     def test_it_matches_the_spellings_a_plan_may_use(self):
         for label, text in (("### heading", self.PLAN.replace("## 4.", "### 4.")),
                             ("bold label", self.PLAN.replace("Security: none", "- **Security:** none.")),
-                            ("notes label", self.PLAN.replace("Security: none", "Security notes: none"))):
+                            ("notes label", self.PLAN.replace("Security: none", "Security notes: none")),
+                            ("an exposure", self.PLAN.replace("Security: none", "Security: input reaches a parser in Task 1")),
+                            ("a long real line", self.PLAN.replace("Security: none", self.REAL))):
             with self.subTest(spelling=label):
                 self.assertTrue(self.hit(text))
 
-    def test_it_misses_a_line_in_the_wrong_place_or_a_real_exposure(self):
+    def test_it_misses_a_line_in_the_wrong_place_or_none_at_all(self):
         moved = self.PLAN.replace("Security: none\n\n## 5. Testing Strategy\n", "## 5. Testing Strategy\nSecurity: none\n")
         for label, text in (("moved under 5", moved),
-                            ("an exposure", self.PLAN.replace("Security: none", "Security: input reaches a parser in Task 1")),
-                            ("section 3", self.PLAN.replace("## 4.", "## 3."))):
+                            ("section 3", self.PLAN.replace("## 4.", "## 3.")),
+                            ("no line", self.PLAN.replace("Security: none\n\n", "")),
+                            ("a mid-line mention", self.PLAN.replace("Security: none", "There is no Security: line needed."))):
             with self.subTest(case=label):
                 self.assertFalse(self.hit(text))
 

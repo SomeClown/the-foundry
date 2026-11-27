@@ -176,40 +176,68 @@ class RewrapTest(Base):
         self.rewrapped("architect", "since frontend adds none", "since frontend\nadds none")
 
 
-class SecurityNoneGraderTest(unittest.TestCase):
-    """AC-8's grader, attacked on the shapes a plan drifts into (AC-9 holds the label the same)."""
+class SecurityLineShapeTest(unittest.TestCase):
+    """AC-8's grader (`security-line`: section 4 carries a `Security:` line), attacked on the shapes a plan drifts
+    into. AC-9 holds the label the same."""
+
+    NAME = "security-line"
 
     def hit(self, text):
-        return T.matches(T.pattern_of(ARCH, "security-none"), text)
+        return T.matches(T.pattern_of(ARCH, self.NAME), text)
 
     def line(self, line):
         return self.hit(PLAN % line)
 
-    def test_a_none_in_a_task_section_before_a_later_section_4_does_not_count(self):
+    def test_a_line_in_a_task_section_before_a_later_section_4_does_not_count(self):
         text = "## 2. Tasks\n\n### Task 1\n\nSecurity: none\n\n## 4. Risks and Coupling\n\n- x\n\n## 5. Testing\n"
         self.assertFalse(self.hit(text))
 
-    def test_a_none_under_a_task_heading_in_section_3_does_not_count(self):
+    def test_a_line_under_a_task_heading_in_section_3_does_not_count(self):
         self.assertFalse(self.hit("## 3. Tasks\n\nSecurity: none\n\n## 4. Risks\n\n- x\n"))
 
     def test_the_variants_a_plan_may_use_count(self):
         for line in ("Security: none", "Security: None.", "**Security:** none", "- **Security:** none.", "`Security: none`",
-                     "Security: none of the above apply", "Security notes: none"):
+                     "1. **Security:** input reaches a parser in Task 1", "> Security: none", "Security notes: none"):
             with self.subTest(line=line):
                 self.assertTrue(self.line(line))
 
-    def test_a_line_that_names_an_exposure_and_says_none_later_does_not_count(self):
-        for line in ("Security: input reaches a parser in Task 1; none of it is secret",
-                     "Security: Task 1 guards the path, none else", "Security: nonexistent", "Security:\nnone"):
+    def test_a_line_that_names_a_real_exposure_counts_with_or_without_none_later(self):
+        for line in ("Security: input reaches a parser in Task 1", "Security: Task 1 guards the path, none else",
+                     "Security: input reaches a parser in Task 1; none of it is secret", "Security:\nnone"):
+            with self.subTest(line=line):
+                self.assertTrue(self.line(line))
+
+    def test_a_label_with_no_colon_does_not_count(self):
+        self.assertFalse(self.line("Security none"))
+
+    def test_a_mid_line_mention_does_not_count(self):
+        self.assertFalse(self.line("There is no Security: line needed."))
+
+    def test_other_security_labels_do_not_count(self):
+        for line in ("Security review: input reaches a parser", "Security considerations: none", "Securityx: none"):
             with self.subTest(line=line):
                 self.assertFalse(self.line(line))
 
-    def test_a_none_past_a_subheading_in_section_4_does_not_count_today(self):
+    def test_capitals_do_not_count_today(self):
+        """Pinned: the match is case-sensitive, so `SECURITY:` and `security:` don't count."""
+        for line in ("SECURITY: none", "security: none"):
+            with self.subTest(line=line):
+                self.assertFalse(self.line(line))
+
+    def test_a_line_inside_a_fenced_block_in_section_4_counts_today(self):
+        """Pinned: the pattern doesn't parse fences, so a sample `Security:` line in a fence satisfies it. Taken as a
+        decision: a plan quoting the label in a fence in its own section 4 is rare, and parsing fences would cost more."""
+        self.assertTrue(self.line("```\nSecurity: none\n```"))
+
+    def test_a_line_after_a_subheading_in_section_4_does_not_count_today(self):
         """Pins the `\\n#{1,3} ` stop: a Security line under a `###` inside section 4 is not found."""
-        text = "## 4. Risks and Coupling\n\n- x\n\n### Security\n\nSecurity: none\n\n## 5. Testing\n"
+        text = "## 4. Risks and Coupling\n\n- x\n\n### Security\n\nSecurity: input reaches a parser\n\n## 5. Testing\n"
         self.assertFalse(self.hit(text))
 
-    def test_a_none_under_a_fourth_level_heading_inside_section_4_counts(self):
+    def test_a_subheading_named_security_is_not_a_line(self):
+        self.assertFalse(self.hit("## 4. Risks\n\n- x\n\n### Security notes:\n\n- y\n"))
+
+    def test_a_line_under_a_fourth_level_heading_inside_section_4_counts(self):
         text = "## 4. Risks and Coupling\n\n- x\n\n#### Security\n\nSecurity: none\n\n## 5. Testing\n"
         self.assertTrue(self.hit(text))
 
@@ -219,16 +247,14 @@ class SecurityNoneGraderTest(unittest.TestCase):
     def test_a_section_4_heading_at_the_top_level_does_not_count_today(self):
         self.assertFalse(self.hit(PLAN.replace("## 4.", "# 4.") % "Security: none"))
 
+    def test_a_line_in_section_5_does_not_count(self):
+        self.assertFalse(self.hit("## 4. Risks\n\n- x\n\n## 5. Testing Strategy\nSecurity: none\n"))
+
     def test_windows_line_endings_still_count(self):
         self.assertTrue(self.hit((PLAN % "Security: none").replace("\n", "\r\n")))
 
-    def test_a_none_line_beside_a_real_exposure_line_counts_today(self):
-        """A plan that says both an exposure and `Security: none` passes; the grader reads only for the none."""
-        text = PLAN % "Security: input reaches a parser in Task 1\nSecurity: none"
-        self.assertTrue(self.hit(text))
-
     def test_the_path_the_grader_reads_is_the_one_the_prompt_saves_to(self):
-        meta = T.pattern_of(ARCH, "security-none")
+        meta = T.pattern_of(ARCH, "security-line")
         path = meta["target"]["path"] if isinstance(meta["target"], dict) else None
         prompt = (T.EVALS / ARCH / "prompt.md").read_text(encoding="utf-8")
         self.assertIsNotNone(path)
@@ -596,13 +622,13 @@ class GraderTextTest(unittest.TestCase):
             with self.subTest(grader=name):
                 self.assertFalse(T.matches(T.pattern_of(QAC, name), trace))
 
-    def test_security_none_is_not_satisfied_by_the_design_the_prompt_or_the_scaffold_text(self):
+    def test_security_line_is_not_satisfied_by_the_design_the_prompt_or_the_scaffold_text(self):
         import tempfile
         tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, tmp, True)
         out = subprocess.run(["bash", str(T.EVALS / ARCH / "scaffold.sh")], cwd=tmp, capture_output=True, text=True)
         self.assertEqual(out.returncode, 0, out.stderr)
-        meta = T.pattern_of(ARCH, "security-none")
+        meta = T.pattern_of(ARCH, "security-line")
         texts = [p.read_text(encoding="utf-8", errors="replace") for p in sorted(Path(tmp).rglob("*")) if p.is_file()]
         texts.append((T.EVALS / ARCH / "prompt.md").read_text(encoding="utf-8"))
         for text in texts:
@@ -619,7 +645,7 @@ class JavaScriptParityTest(unittest.TestCase):
             self.skipTest("node isn't installed")
         head = "Status: DONE\n"
         cases = [
-            ("architect-plan-format", "security-none", [PLAN % "Security: none", PLAN % "**Security:** None.",
+            ("architect-plan-format", "security-line", [PLAN % "Security: none", PLAN % "**Security:** None.",
                                                          PLAN % "Security: input reaches a parser; none of it",
                                                          "## 4. R\n\n### Sub\n\nSecurity: none\n", (PLAN % "Security: none").replace("\n", "\r\n"),
                                                          "## 2. T\n\nSecurity: none\n\n## 4. R\n"]),
