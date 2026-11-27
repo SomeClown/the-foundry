@@ -75,3 +75,4 @@ What the behavior cases scored, release by release. `evals/scorecard.py` writes 
 | 2026-11-27 09:10 | 2.7.0 | 22231bc | 2.1.318 | debug-production-report | 4 | 4 | none | $0.64 |
 | 2026-11-27 09:10 | 2.7.0 | 22231bc | 2.1.318 | debug-user-fix-is-right | 4 | 4 | none | $0.77 |
 | 2026-11-27 09:10 | 2.7.0 | 22231bc | 2.1.318 | debug-wrong-total | 4 | 4 | none | $1.00 |
+| 2026-11-27 13:25 | 2.7.0 | fd1e42a | 2.1.318 | architect-plan-format | 4 | 4 | none | $2.42 |

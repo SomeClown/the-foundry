@@ -695,7 +695,8 @@ class NoUntouchedLineAttackTest(Base):
     def test_right_lines_pass(self):
         for line in ("Security: none", "Security: None.", "Security: input reaches a parser in Task 1",
                      "Security: the new endpoint takes user input; no new dependency is added",
-                     "Security: a new dependency, `pyyaml`; nothing else", "Security: secrets: none are read",
+                     "Security: a new dependency, `pyyaml`; nothing else", "Security: input: no validation on the upload path",
+                     "Security: input is not validated", "Security: dependency pyyaml added; no new transitive ones",
                      "Security: Node 20 is required", "Security: none, nor a new call out", "Security: nonexistent risk"):
             with self.subTest(line=line):
                 self.assertFalse(self.line(line))
@@ -709,6 +710,16 @@ class NoUntouchedLineAttackTest(Base):
         """Accepted limit: a keyword anywhere on the line fails it, even beside a real exposure."""
         self.assertTrue(self.line("Security: input reaches a parser in Task 1; auth is unaffected"))
 
+    def test_a_kind_word_then_a_negative_about_something_else_fails_today(self):
+        """Accepted limit of the kind-word-then-negative alternative: a line that opens with a kind and then says
+        `nothing`/`none`/`unchanged` of something else is failed, though it names a real exposure. The architect
+        can open with the exposure instead; a keyword grader can't tell the two apart."""
+        for line in ("Security: input: nothing is trusted, so Task 2 validates it",
+                     "Security: auth: nothing exists yet, Task 1 adds login",
+                     "Security: input: unchanged paths still reach open()"):
+            with self.subTest(line=line):
+                self.assertTrue(self.line(line))
+
     def test_a_line_starting_no_that_goes_on_to_a_real_exposure_fails_today(self):
         self.assertTrue(self.line("Security: no user input reaches the parser, but a file mode changes in Task 2"))
 
@@ -717,14 +728,15 @@ class NoUntouchedLineAttackTest(Base):
         for line in ("Security: no new dependency", "Security: NO new dependency", "Security: no", "Security: No.",
                      "- **Security:** no new dependency", "- **Security**: no new dependency", "1. Security: n/a",
                      "Security notes: secrets not affected", "`Security: auth is untouched`", "> Security: no new call out",
-                     "Security: the parser is not affected", "Security: auth doesn't touch it"):
+                     "Security: the parser is not affected", "Security: secrets: none are read",
+                     "Security: dependencies: unchanged", "Security: dependencies. None are added (an anti-goal)", "Security: auth doesn't touch it"):
             with self.subTest(line=line):
                 self.assertTrue(self.line(line))
 
     # wrong plans it passes: limits of a keyword grader
     def test_wrong_lines_it_passes_today(self):
         """Pinned: each only says a kind isn't touched, in words the pattern doesn't list."""
-        for line in ("Security: dependencies: unchanged", "Security: nothing changes for secrets",
+        for line in ("Security: nothing changes for secrets",
                      "Security: auth stays as it is", "Security: (none of the five kinds apply)",
                      "Security: not a concern", "Security: not relevant here", "Security: nil"):
             with self.subTest(line=line):

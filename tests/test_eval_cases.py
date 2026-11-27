@@ -865,6 +865,22 @@ class NoUntouchedSecurityLineGraderTest(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertEqual(bool(self.hit(self.PLAN.replace("Security: none", line))), want)
 
+    def test_it_reads_a_line_that_names_a_kind_only_to_say_nothing_changed(self):
+        run4 = ("Security: dependencies. None are added (the design lists one as an anti-goal), the \"Rules for "
+                "every agent\" header carries this, and both tasks use only the standard library.")
+        run1 = ("Security: caller-supplied `text` reaches a regex parser (`[a-z]+`). That pattern is linear-time "
+                "with no backtracking risk, and this change does not alter it. Task 1 keeps `_WORD` unchanged. "
+                "No dependency is added.")
+        for line, want in ((run4, True), (run1, False), ("Security: secrets: none are read", True),
+                           ("Security: auth - unchanged", True),
+                           ("Security: input reaches a parser in Task 1", False),
+                           ("Security: input is not validated", False),
+                           ("Security: input: no validation on the upload path", False),
+                           ("Security: dependencies: no new ones", True),
+                           ("Security: dependencies: a new one, `pyyaml`, pinned in Task 2", False)):
+            with self.subTest(line=line[:40]):
+                self.assertEqual(bool(self.hit(self.PLAN.replace("Security: none", line))), want)
+
     def test_it_fails_a_line_that_only_says_a_kind_isnt_touched(self):
         for line in self.BAD:
             with self.subTest(line=line):
