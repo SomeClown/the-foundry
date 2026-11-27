@@ -1879,40 +1879,140 @@ which the session updates at release.
 
 ### As built (2026-11-27)
 
-`agents/area-lead.md` is 231 lines (the design guessed about 170);
-`agents/investigate.md` went from 703 lines to 678. Every lead ran as
-`the-foundry:area-lead` in the head-to-head and the smoke.
+`agents/area-lead.md` is 237 lines (the design guessed about 170);
+`agents/investigate.md` went from 703 lines to 685 (678 on the move alone,
+before the two fix batches). Every lead ran as `the-foundry:area-lead` in the
+head-to-head and the smoke.
 
-**Measured, before (2.7.0's text) and after (0608ebd, the move alone).**
+**Measured, in the order it happened.**
 
-- Big sweep, before: 3 `LOOP PROVED` of 3 counted runs, each 945 of 945 files
-  read once each and 33 of 33 facts. Two further runs were lost to a safety
-  classifier stopping the test session's write of a part, and aren't counted.
-- Big sweep, after: 2 `LOOP PROVED` and 2 `LOOP FAILED` of 4 counted runs,
-  and one more run lost to a classifier stop, not counted. **AC-2's big-sweep
-  bar, as many `LOOP PROVED` after as before, was missed, two against
-  three.** Each failed run failed on one line of the top level's own report:
-  one dropped the clause ", and tell any agent you brief to do the same" from
-  the `Environment:` line it copies into part 2; the other wrote part 3's
-  counts line (238 listed, 234 read, 4 skipped, the right numbers) wrapped in
-  backticks, where the scorer wants the bare line. Scored again against a
-  scratch copy with that one line put right, each had nothing else wrong: every
-  file read once, no fact missed. The sentences that give both lines are the
-  same as in 2.7.0. The "before" runs copied the `Environment:` line word for
-  word 5 of 5 times; the "after" runs 2 of 3. Three counted runs before
-  and four after can't say whether the move caused the two failures or not. For scale, the 2.3.0 record
-  (the build log of `docs/plans/2026-11-23-big-sweep-in-parts.md`) shows the
-  text that shipped failing this scorer before. Under the plan's rule a missed
-  bar stops the plan; the numbers went to the owner on 2026-11-27, who
-  answered "Go on to the probe". The miss stands as a miss.
-- Head-to-head, four runs a side: before, 48 of 48 in all four (one run used
-  no area leads on the 191-file repo, so the four can't be scored as one
-  set); after, 48 of 48 in all four, made up 0, `BAR MET`.
-- Nesting smoke, once, after: 9 of 9 graders, `lead-is-area-lead` among them.
-- Architect, four runs on fd1e42a: 4 of 4 on every grader as scored. By
+- Before (2.7.0's text): the big sweep gave 3 `LOOP PROVED` of 3 counted
+  runs, each 945 of 945 files read once each and 33 of 33 facts. Two further
+  runs were lost to a safety classifier stopping the test session's write of a
+  part, and aren't counted. The head-to-head found 48 of 48 in all four runs
+  (one used no area leads on the 191-file repo, so the four can't be scored as
+  one set).
+- The move alone (0608ebd): the big sweep gave 2 `LOOP PROVED` and 2
+  `LOOP FAILED` of 4 counted runs, and one more run lost to a classifier stop,
+  not counted. **AC-2's big-sweep bar, as many `LOOP PROVED` after as before,
+  was missed, two against three.** Each failed run failed on one line of the
+  top level's own report: one dropped the clause ", and tell any agent you
+  brief to do the same" from the `Environment:` line it copies into part 2;
+  the other wrote part 3's counts line (238 listed, 234 read, 4 skipped, the
+  right numbers) wrapped in backticks, where the scorer wants the bare line.
+  Scored again against a scratch copy with that one line put right, each had
+  nothing else wrong: every file read once, no fact missed. The "before" runs
+  copied the `Environment:` line word for word 5 of 5 times; the "after" runs
+  2 of 3. The sentences behind those lines in `investigate.md` are the same as
+  in 2.7.0; the lead's counts-line template is new, so that the move didn't
+  change them is true of one file only. Three counted runs before and four
+  after can't say whether the move caused the two failures. For scale, the
+  2.3.0 record (the build log of `docs/plans/2026-11-23-big-sweep-in-parts.md`)
+  shows the text that shipped failing this scorer before. Under the plan's
+  rule a missed bar stops the plan; the numbers went to the owner on
+  2026-11-27, who answered "Go on to the probe". The miss stands as a miss.
+  The head-to-head after the move: 48 of 48 in all four runs, made up 0,
+  `BAR MET`; the nesting smoke 9 of 9 graders, `lead-is-area-lead` among them.
+- The architect, four runs on fd1e42a: 4 of 4 on every grader as scored. By
   reading, one of the four plans still had a stray `Security:` line, down from
   2 of 4 on 2.6.0. AC-7's wish of none is met as the sentence and the grader
   have it, not in every run.
+- The final review's two fix batches (below), then the final text (16eb845):
+  the big sweep gave 3 `LOOP PROVED` and 1 `LOOP FAILED` of 4 counted runs
+  (fb2-1, fb2-2 and fb2-4 proved, each 945 of 945 once each and 33 of 33
+  facts; none lost to a classifier or the limit). As a count, the bar "as many
+  `LOOP PROVED` as before" is met, three and three. As a rate it is 3 of 4
+  against 3 of 3, and three runs before against four after is a small sample:
+  it doesn't show the final text is as careful as 2.7.0's. The one failure
+  (fb2-3) has two causes: the last part wrote the block's `Project:` line
+  under `0 areas not read`, where the procedure says a last part has none (the
+  slip the probe's runs made, so it isn't the probe's alone); and two files had
+  a second reader (the parts' counts lines say re-dispatched: 1 each), for one
+  of which both readers completed with a report. The lead's text allows one new
+  reader for a gap; the scorer fails any second reader that a restarted lead
+  doesn't explain. In all four runs every counts line was bare and every
+  `Environment:` line carried the clause for agents, and the vendored route
+  below was in none of the transcripts. The head-to-head on the final text:
+  48, 48, 48, 48 found, made up 0, `BAR MET`, 54 of 54 graders in each run;
+  the smoke 9 of 9 with the tightened `lead-is-area-lead` grader.
+
+All the day's big sweeps, counted runs only:
+
+| Text | Proved | Failed | What failed |
+|---|---|---|---|
+| 2.7.0 (before) | 3 | 0 | - |
+| the move alone (0608ebd) | 2 | 2 | a clause dropped from `Environment:`; a counts line in backticks |
+| the probe (66a10de) | 2 | 2 | block lines under a last part; the vendored route, with a second reader |
+| fix batch 1 (b79a0bf) | 0 | 1 | the vendored route (one run; the rest stopped as superseded) |
+| the final text (16eb845) | 3 | 1 | block lines under a last part, with two second readers |
+
+**A regression the runs found.** The vendored decoy route
+(`/v3/legacy/imports/reassign`, from `web/vendor/speedlib.py`, a folder
+skipped whole) reached a report in a probe run and in the first run on fix
+batch 1's text. Traced: an `area-lead`'s Grep searched the whole tree, hit the
+vendored file, and its return named the route ("Outside this area: the Grep
+also found ... not in my brief"); the top level then wrote it down. Transcripts
+that name the route anywhere: 0 of 5 before the move, 9 of 11 after it, 0 of 4
+on the final text. Under 2.7.0 a lead read the paragraph that says a hit in a
+folder skipped whole or an untracked file is dropped, closing "An area lead's
+own checks stay inside its area."; `area-lead.md` kept only "Your checks stay
+inside your area." The final review raised it and the session declined it as
+covered by that sentence; the runs show the decline was wrong. It is the one
+failure traced to the move. Fix batch 2 restores the rule.
+
+**The final review's fix batches.** Two reviewers read the branch at f86438f.
+Fix batch 1 (b79a0bf), seven sentences in the two agent files and the checks
+around them: the counts line is written bare (no backticks, bullet or bold) in
+both files; the `Environment:` line goes to a lead whole and a continuing run
+copies it from the brief it was given; the restart paragraph's order, and which
+rule wins for a lead that couldn't spawn and grouped its checklist; totals are
+added with a command in the lead's file; the last-line rule names its one
+exception (the `AREA LEAD` reply); both lead names refused after the areas were
+made drops them; every shared row is held as a whole block; the architect
+grader stops reading `n/a` inside a path; the smoke grader matches the
+`subagent_type` field; the scorer takes a bulleted `Files:` list. Declined (the
+vendored-route paragraph, above, wrongly). Parked: `area-lead` keeps "Bash is
+for reading, and for running the project's builds and tests" as a lead had
+under 2.7.0, and the Grep tool can show a credential file's lines in both
+agents; the restart allowance doesn't check that the first lead failed; two
+more ways `compare.py` reads a "must not return" or a bold lead-in wrongly.
+Fix batch 2 (16eb845): the lead gives the Grep tool a path inside its area and
+drops a hit from a file outside its brief; the top level drops a hit a lead's
+return names and doesn't say it left it out; the paragraphs are held whole by
+tests. Two sweeps still running on batch 1's text were stopped as superseded.
+The final text got its four sweeps, four head-to-head runs and the smoke, the
+last measurement round.
+
+**The probe (Part 4).** On 66a10de, on `probe/sweep-in-parts-file`: the
+procedure (256 lines, moved byte for byte) sat in `procedures/sweep-in-parts.md`
+and `investigate` (446 lines there) read it by `${CLAUDE_PLUGIN_ROOT}` only when
+a full sweep was above the part size or its brief started `CONTINUE SWEEP`. No
+rewording was used. Bars and numbers:
+- Load check: passed. One Read at the plugin's real path, 15,257 characters,
+  no literal `${CLAUDE_PLUGIN_ROOT}` left in it. It wrote the block's field
+  lines under the `0 areas not read` line.
+- Big sweep, four runs, bar "at least as many `LOOP PROVED` as the after-runs"
+  (2): 2 proved and 2 failed, met as written. probe-1 and probe-4 proved;
+  probe-2 failed on the block's `Project:` line under a last part's `0 areas
+  not read`; probe-3 failed on the vendored route (part 1) and a file with two
+  readers. Each run read the file 3 times, once a part.
+- Head-to-head, four runs: 48, 48, 48, 48 found, made up 0, `BAR MET`, 54 of 54
+  graders in each run. Smoke: 9 of 9. No head-to-head or smoke trace mentions
+  the file (0 in all five).
+- Verdict by the plan's rule: proved out.
+What the bars don't show: the sweep bar matched an after-count that had itself
+missed its bar (2 of 4 against 3 of 3); the block lines under a last part's
+`0 areas not read` turned up twice in the probe's five runs of the procedure
+and in none of the seven counted before and after runs, and once more in four
+runs with the procedure inline (fb2-3), so the slip isn't the probe's alone;
+probe-3's decoy belongs to the move, not to loading from a file (the same
+route failed a run on the branch's own text). On this evidence neither failed
+probe sweep is clearly caused by loading the procedure from a file. The
+mechanism held every time: the path resolved, the file was read once a part,
+and no run below the part size read it.
+
+Where it stands: at this commit the procedure is inline in `investigate.md`.
+The owner was asked on 2026-11-27 whether to move it, and the answer isn't in.
 
 **Pins (1A).** Counts from the pin manifest: 9 restatement pins cut, 11
 contract and safety pins kept and re-pointed (10 at `agents/area-lead.md`, 1
@@ -1976,5 +2076,6 @@ restarts leads), 5 reworded.
 - The account's spend limit cut off two "after" runs and two probe runs; each
   is void and was run again, and a run the limit cut off doesn't use up the one
   rerun a classifier stop gets.
-- The docs were written while the probe's runs went, and the probe's result
-  was added in a second round.
+- The docs were first written while the probe's runs went, without its
+  result; a second round added the probe, the two fix batches and the final
+  numbers.

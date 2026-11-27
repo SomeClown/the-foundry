@@ -9,7 +9,7 @@ All notable changes to The Foundry. Format loosely follows
 The area lead is now its own agent, `area-lead`, the eleventh. A lead
 used to be `investigate` told to act as a copy of itself, so every lead
 loaded all 703 lines of `investigate` and was told which of them to skip;
-it now reads a file written for it, and `investigate` (678 lines) holds no
+it now reads a file written for it, and `investigate` (685 lines) holds no
 lead-only text. `investigate` starts a lead as `the-foundry:area-lead`,
 then by the bare name `area-lead`, and `area-lead` starts only
 `file-reader`; as before, only instructions keep each to that. The brief a
@@ -41,23 +41,44 @@ touched. On `architect-plan-format`, all four runs passed as scored; read
 by hand, one of the four plans still had such a line (on 2.6.0, 2 of 4
 did). The new grader `no-untouched-security-line` checks it.
 
-Measured, and one bar missed. The big sweep, as many `LOOP PROVED` after
-the move as before, was missed as scored: before (2.7.0) 3 of 3 counted
-runs proved; after (the move alone) 2 proved and 2 failed of 4 counted.
-Each failed run failed on one line of the top level's own report (a clause
-dropped from a copied `Environment:` line; a counts line with the right
-numbers wrapped in backticks), with every file read once and no fact
-missed, and the sentences behind both lines are the same as in 2.7.0. Three
-counted runs before and four after can't say whether the move caused it. The owner saw the numbers
-on 2026-11-27 and chose to go on. The head-to-head found 48 of 48 in all
-four runs after the move, made up nothing, and scored `BAR MET`; the
-nesting smoke passed 9 of 9. Two grader-tuning rounds fixed `compare.py`
-and `check_parts.py` reading right answers as wrong. Nine restatement pins
-on moved text were cut; 11 contract and safety pins were kept and
-re-pointed at `agents/area-lead.md`, and 5 were reworded. `file-reader`'s
-description now says `investigate` and `area-lead` start it. The README,
+Fixed during the build: a lead's search stays in its area, and a hit from
+a file outside its brief is dropped. A lead under 2.7.0 read that rule; the
+move left it out of `area-lead.md`, and leads began naming a route from the
+vendored folder skipped whole, which then reached a report. Transcripts
+naming that route: 0 of 5 before the move, 9 of 11 after it, 0 of 4 on the
+final text. The counts line is now written bare (no backticks) and the
+`Environment:` line is copied whole, clause for agents included, since each
+cost a big-sweep run on the move alone. `area-lead.md` is 237 lines.
+
+Measured, and one bar missed on the move alone. The big sweep, as many
+`LOOP PROVED` after as before: before (2.7.0) 3 of 3 counted runs proved;
+after the move alone, 2 proved and 2 failed of 4 counted, each on one line of
+the top level's own report (a clause dropped from a copied `Environment:`
+line; a counts line with the right numbers wrapped in backticks), with every
+file read once and no fact missed. The owner saw the numbers on 2026-11-27
+and chose to go on. On the final text it is 3 proved and 1 failed of 4
+counted: as a count the bar is met (three and three), as a rate it is 3 of 4
+against 3 of 3, and three runs against four is a small sample that doesn't
+show the text is as careful as 2.7.0's. The one failure had two causes: block
+lines written under a last part's `0 areas not read`, and two second readers
+that the scorer fails and the lead's text allows for a gap. The head-to-head
+found 48 of 48 in all four runs after the move and again on the final text,
+made up nothing, and scored `BAR MET` both times; the nesting smoke passed
+9 of 9 both times. Two grader-tuning rounds fixed `compare.py` and
+`check_parts.py` reading right answers as wrong. Nine restatement pins on
+moved text were cut; 11 contract and safety pins were kept and re-pointed at
+`agents/area-lead.md`, and 5 were reworded. `file-reader`'s description now
+says `investigate` and `area-lead` start it. The README,
 `docs/orchestrator.md`, PRIVACY.md, CONTRIBUTING.md and `evals/README.md`
 say eleven agents and who starts which.
+
+The probe moved the sweep-in-parts procedure (256 lines) into a file
+`investigate` reads only for a sweep above the part size, and met every bar
+it was given: the sweep case 2 proved of 4 against the after-runs' 2, the
+head-to-head 48 of 48 in four runs, the smoke 9 of 9, and no small run read
+the file. Its bars matched a count that had itself missed, and neither of its
+two failed sweeps is clearly caused by the file. The procedure stays inline
+in `investigate.md` in this entry.
 
 ## [2.7.0] — 2026-11-26
 

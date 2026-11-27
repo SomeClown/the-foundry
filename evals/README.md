@@ -385,8 +385,9 @@ planted fact; the nine before found 48 of 48.
 
 **The results, on the move to `area-lead` (2026-11-27).** The move was measured
 on its own commit (0608ebd, the agent split and nothing else), against the "before"
-runs on 2.7.0's text (four head-to-head runs; three counted big-sweep runs). The big-sweep bar the design set, as many
-`LOOP PROVED` after as before, was missed, and the owner chose to go on.
+runs on 2.7.0's text (four head-to-head runs; three counted big-sweep runs). The
+big-sweep bar the design set, as many `LOOP PROVED` after as before, was missed
+on the move alone, and the owner chose to go on.
 
 - Big sweep, before (2.7.0): 3 `LOOP PROVED` of 3 counted runs, each 945 of 945
   files read once each and 33 of 33 facts. Two further runs were lost to a
@@ -400,19 +401,47 @@ runs on 2.7.0's text (four head-to-head runs; three counted big-sweep runs). The
   other wrote part 3's counts line with the right numbers wrapped in
   backticks. Scored again with that one line put right, each had nothing else
   wrong: every file read once, no fact missed. The sentences behind both lines
-  are the same as in 2.7.0. Three counted runs before and four after can't tell whether the move
+  in `investigate.md` are the same as in 2.7.0 (the lead's counts-line template
+  is new). Three counted runs before and four after can't tell whether the move
   caused the two failures; the 2.3.0 record above shows shipped text has
   failed this scorer before. The numbers went to the owner on 2026-11-27, who
   answered "Go on to the probe".
-- Head-to-head, four runs a side: before, 48 of 48 in all four, one run used no
-  area leads on the 191-file repo (so the four can't be scored as one set);
-  after, 48 of 48 in all four, made up 0, every lead ran as
-  `the-foundry:area-lead`, and `compare.py` said `BAR MET`.
-- Nesting smoke, once: 9 of 9 graders, `lead-is-area-lead` among them.
+- A regression the runs found: leads searched the whole tree, hit the vendored
+  decoy route in `web/vendor/speedlib.py` (a folder skipped whole), and named
+  it in their returns, and it reached a report twice. Transcripts naming the
+  route: 0 of 5 before the move, 9 of 11 after it, 0 of 4 on the final text.
+  A lead under 2.7.0 read the rule that such a hit is dropped; the move left
+  it out of `area-lead.md`, and fix batch 2 restored it.
+- Big sweep, the final text (16eb845, after the review's two fix batches): 3
+  `LOOP PROVED` and 1 `LOOP FAILED` of 4 counted runs, none lost to a
+  classifier or the limit. As a count the bar is met, three and three; as a
+  rate it is 3 of 4 against 3 of 3, and three runs against four can't show the
+  text is as careful as 2.7.0's. The one failure had two causes: block lines
+  written under a last part's `0 areas not read`, and two files with a second
+  reader (the lead's text allows one new reader for a gap; the scorer fails
+  any second reader a restarted lead doesn't explain). All counts lines were
+  bare and all `Environment:` lines whole.
+- Head-to-head: before, 48 of 48 in all four runs, one of which used no area
+  leads on the 191-file repo (so the four can't be scored as one set); after the
+  move, 48 of 48 in all four, made up 0, every lead ran as
+  `the-foundry:area-lead`, `BAR MET`; on the final text, 48, 48, 48, 48, made
+  up 0, `BAR MET`, 54 of 54 graders in each run.
+- Nesting smoke: 9 of 9 graders after the move and on the final text,
+  `lead-is-area-lead` among them.
 - Architect, `architect-plan-format`, four runs on fd1e42a: 4 of 4 on every
   grader as scored. Read by hand, one of the four plans still had a stray
   `Security:` line that only says a kind isn't touched (on 2.6.0, 2 of 4 did);
   the grader missed it and was tuned once to catch it.
+- The probe (66a10de): the 256-line sweep-in-parts procedure in a file read on
+  demand. The load check passed (one Read, 15,257 characters, the plugin path
+  resolved). The sweep case gave 2 proved and 2 failed of 4, against the bar of
+  2, with the file read 3 times in every run, once a part; the head-to-head
+  found 48 in all four runs, made up 0, `BAR MET`; the smoke 9 of 9; no
+  head-to-head or smoke trace mentions the file. By the plan's rule it proved
+  out. The bars matched an after-count that had itself missed, and neither
+  failed sweep is clearly caused by the file: one failed on block lines under a
+  last part (which also happened once in four runs with the procedure inline),
+  one on the vendored route, a rule the lead's file had dropped.
 
 The scorers were tuned twice during the build, which is all the stopping rule
 allowed: `compare.py` takes a list of routes under a line that says they are
