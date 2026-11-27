@@ -940,6 +940,11 @@ class BreakingMigrationCaseTest(MigrationCaseChecks, unittest.TestCase):
         self.assertFalse(matches(meta, hand_back(cut)))
         self.assertFalse(matches(meta, hand_back(self.REPORT.replace("not tried", "untried"))))
 
+    def test_rollback_line_matches_a_capital_tried(self):
+        meta = self.grader("rollback-line")
+        report = self.REPORT.replace("; not tried: stopped before applying", ". Tried: `cmp` on the backup (exit 0)")
+        self.assertTrue(matches(meta, hand_back(report)))
+
     def test_the_running_code_reads_the_renamed_column_and_the_graders_are_the_existing_ones(self):
         self.assertIn("email", Fixture(self, self.CASE).read("app/orders.py"))
         self.assertEqual((EVALS / self.CASE / "graders" / "status-needs-context.md").read_bytes(),
@@ -1012,6 +1017,13 @@ class RollbackOnACopyCaseTest(MigrationCaseChecks, unittest.TestCase):
                             ("a later not", "Rollback: down; tried in a copy (exit 0); not tried on the server")):
             with self.subTest(spelling=label):
                 self.assertTrue(matches(meta, hand_back(self.report(line))))
+
+    def test_rollback_tried_matches_a_capital_tried_and_misses_not_tried(self):
+        meta = self.grader("rollback-tried")
+        self.assertTrue(matches(meta, hand_back(self.report(
+            "Rollback: `python3 migrate.py down`. Tried: `cmp` on the backup (exit 0)"))))
+        self.assertFalse(matches(meta, hand_back(self.report(
+            "Rollback: down. Not tried: no scratch folder (exit 0 expected)"))))
 
     def test_rollback_tried_misses_not_tried_no_exit_and_a_failed_exit(self):
         meta = self.grader("rollback-tried")

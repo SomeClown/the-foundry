@@ -24,7 +24,9 @@ ROLL_BACK_IF = "roll back if"
 WATCH_DEFAULT = "30 minutes"
 NOT_TRIED = "not tried"
 NO_SERVICE = "nothing to watch: no running service"
-COPY_CHECK = "confirm the tool will open the copy"
+NO_TOOL_FOR_A_TRY = "Never run the project's migration tool for a try"
+PATH_IN_COMMAND = "with the copy's path written in each command"
+DOWN_DIR_CHECK = '[ -d "$T" ]'
 ROLLBACK_SHAPE = "tried: `<command>` (exit <n>) | not tried: <why>"
 WATCH_SHAPE = "; for <how long>; roll back if <condition>"
 BOTH_FIRST = "first the code that works with both"
@@ -51,7 +53,9 @@ def problems(texts):
     found += lacks("devops's Data Changes and Rollbacks section", section,
                    KINDS + ("even when your brief says to apply it", "Treat the change as breaking running code"))
     found += lacks("devops's Data Changes and Rollbacks section", section,
-                   (OFF_PRODUCTION, COPY_CHECK, "unless your brief names a scratch database", WATCH_DEFAULT, ROLL_BACK_IF))
+                   (OFF_PRODUCTION, NO_TOOL_FOR_A_TRY, PATH_IN_COMMAND, "unless your brief names a scratch database", WATCH_DEFAULT, ROLL_BACK_IF))
+    found += lacks("devops's Data Changes and Rollbacks section", between(devops, "## Data Changes and Rollbacks", "## Hard Rules"),
+                   (DOWN_DIR_CHECK,))
     found += lacks("devops's Data Changes and Rollbacks section", section,
                    ("can't tell whether it reads the thing", "is no stop", "where that code reads",
                     "not tried, unless your brief names a scratch database", "Never create one on the production host",
@@ -173,10 +177,10 @@ class MutationTest(unittest.TestCase):
         texts = self.mutated("devops", lambda t: t.replace("**breaks running code**", "**breaking**", 1))
         self.caught(texts, "**breaks running code**")
 
-    def test_a_dropped_copy_check_fails(self):
-        """AC-3, AC-12: a try runs only after confirming the tool opens the copy."""
-        texts = self.mutated("devops", lambda t: re.sub(r"confirm\s+the\s+tool\s+will\s+open\s+the\s+copy", "use the copy", t, 1))
-        self.caught(texts, COPY_CHECK)
+    def test_a_try_that_runs_the_migration_tool_fails(self):
+        """AC-3, AC-12: a try never runs the project's migration tool."""
+        texts = self.mutated("devops", lambda t: re.sub(r"Never\s+run\s+the\s+project's\s+migration\s+tool\s+for\s+a\s+try", "Run the project's migration tool for a try", t, 1))
+        self.caught(texts, NO_TOOL_FOR_A_TRY)
 
     def test_the_hard_rule_removed_fails(self):
         """AC-3, AC-12: the Hard Rules bullet keeps a try off production."""
@@ -259,7 +263,7 @@ class MutationTest(unittest.TestCase):
 
     def test_a_line_break_moved_inside_a_phrase_still_holds(self):
         def rewrap(t):
-            return t.replace("confirm the\n  tool will open the copy", "confirm\n  the tool will open the copy", 1)
+            return t.replace("with the copy's path written in each command", "with the copy's path\n  written in each command", 1)
         self.assertEqual(problems(self.mutated("devops", rewrap)), [])
 
     def test_a_missing_section_gives_a_message_not_a_crash(self):

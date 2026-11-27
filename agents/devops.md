@@ -101,10 +101,15 @@ made or with a command that only reads.
 
 - **A file datastore** (SQLite and the like) can always be tried. Open
   the backup and compare it with the original (an integrity check, a
-  row count). For a down migration, copy the project and the file into
-  a `mktemp -d` folder and run up, then down, there. First confirm the
-  tool will open the copy: read where its config points, and if that's
-  outside the copy, an environment variable or a server, don't run it.
+  row count). For a down migration, copy the database file into a new
+  scratch folder and run the migration's own SQL on the copy, up then
+  down, with the copy's path written in each command
+  (`sqlite3 "$T/try.db" < '<the down file>'`). Make the folder first
+  and check it's there
+  (`T=$(mktemp -d "${TMPDIR:-/tmp}/try.XXXXXX") && [ -d "$T" ]`); if
+  it can't be made, that's not tried. Never run the project's
+  migration tool for a try: it opens whatever its config names, and
+  from the wrong folder that's the live database.
 - **A database on a server:** not tried, unless your brief names a
   scratch database for it. Never create one on the production host.
 - **The previous code:** check it still exists with a command that only
