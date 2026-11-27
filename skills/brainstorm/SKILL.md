@@ -98,6 +98,8 @@ is written, you should know:
 - what exists today and what they've already tried
 - prior art they like or hate
 - the details they care about, and the ones they don't
+- who may use it, what private or secret data it keeps or sends, and what
+  it reaches outside itself; a feature with none of these needs no question
 
 **How it gets made.** Find out early which build choices the user wants to make
 (language, framework, storage, hosting, dependencies) and which they're handing

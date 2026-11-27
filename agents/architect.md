@@ -100,6 +100,23 @@ What else shares the files being touched; what could break; anything that needs 
 human decision before starting (flag it clearly rather than guessing).
 An id no task covers is one of these, never dropped quietly.
 
+Then one `Security:` line for each of these the change touches: input from
+outside the process reaching a query, a command, a path, a template or a
+parser; who or what may do something (login, roles, whose record it is, a
+file mode, a CI permission); secrets or personal data kept, logged or sent;
+a new call out of the process; a dependency added or changed. Each line
+says what could go wrong and which task guards it. That task's What to do
+and Verify carry the guard too, since its builder sees only its own
+section. Unsure whether the change touches one? It does. A change that
+touches none gets one line: `Security: none`.
+
+A dependency added or changed is decided here, not found in a report:
+name the package, where it comes from, and why the project's own code or
+standard library won't do, with a version only when the project or the
+design fixes one. Its task names it in What to do and goes to implement,
+since frontend adds none. Where the rules say no new dependencies, it's a
+question for the user.
+
 ### 5. Testing Strategy
 Which of the tasks need new tests, what kind (unit/integration/end-to-end), and what
 the test engineer should cover. If the project has no test infrastructure, note the
