@@ -4,6 +4,61 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+The area lead is now its own agent, `area-lead`, the eleventh. A lead
+used to be `investigate` told to act as a copy of itself, so every lead
+loaded all 703 lines of `investigate` and was told which of them to skip;
+it now reads a file written for it, and `investigate` (678 lines) holds no
+lead-only text. `investigate` starts a lead as `the-foundry:area-lead`,
+then by the bare name `area-lead`, and `area-lead` starts only
+`file-reader`; as before, only instructions keep each to that. The brief a
+lead gets, the reports, Coverage, the `SWEEP IN PARTS` line and the
+`CONTINUE SWEEP` brief are unchanged. If both names of the lead are
+refused while `file-reader` still works, that is "can't spawn": a flagged
+read naming the missing agent. This is a major version because a new agent
+is, by CONTRIBUTING's rule.
+
+**A copy of `investigate` made before this release must be copied again.**
+Such a copy (the plan-mode copy in `~/.claude/agents/` the README
+describes) sends its leads to `the-foundry:investigate`, which no longer
+works an `AREA LEAD` brief: it answers with a two-line reply that says to
+send it to `area-lead` and to copy the agent files again, and the area's
+files show up as unread. Copy `agents/investigate.md` again.
+
+Fixed: a lead that returned its checklist as groups ("`src/api/`: 41 files
+read") got its word taken, or the files reported unread though they were
+read. The lead's text now asks for one line for each path in its brief,
+and `investigate` counts a checklist that isn't one line a path as no
+checklist, so the lead is started once more with the same brief and, if
+that fails too, its files are listed unread by path. No real run could be
+made to group a checklist on demand; this is held by tests on both texts
+and a made-up transcript for the scorer, which now allows the second set of
+readers a restarted lead sends.
+
+`architect` writes no `Security:` line that only says a kind isn't
+touched. On `architect-plan-format`, all four runs passed as scored; read
+by hand, one of the four plans still had such a line (on 2.6.0, 2 of 4
+did). The new grader `no-untouched-security-line` checks it.
+
+Measured, and one bar missed. The big sweep, as many `LOOP PROVED` after
+the move as before, was missed as scored: before (2.7.0) 3 of 3 counted
+runs proved; after (the move alone) 2 proved and 2 failed of 4 counted.
+Each failed run failed on one line of the top level's own report (a clause
+dropped from a copied `Environment:` line; a counts line with the right
+numbers wrapped in backticks), with every file read once and no fact
+missed, and the sentences behind both lines are the same as in 2.7.0. Three
+counted runs before and four after can't say whether the move caused it. The owner saw the numbers
+on 2026-11-27 and chose to go on. The head-to-head found 48 of 48 in all
+four runs after the move, made up nothing, and scored `BAR MET`; the
+nesting smoke passed 9 of 9. Two grader-tuning rounds fixed `compare.py`
+and `check_parts.py` reading right answers as wrong. Nine restatement pins
+on moved text were cut; 11 contract and safety pins were kept and
+re-pointed at `agents/area-lead.md`, and 5 were reworded. `file-reader`'s
+description now says `investigate` and `area-lead` start it. The README,
+`docs/orchestrator.md`, PRIVACY.md, CONTRIBUTING.md and `evals/README.md`
+say eleven agents and who starts which.
+
 ## [2.7.0] — 2026-11-26
 
 `devops` now sorts a schema or data change before applying it (adds

@@ -36,7 +36,7 @@ per-project agent overrides — that's what `.claude/agents/` shadowing is for.
    claude plugin validate --profile directory .
    ```
    `tests/run_tests.py` runs each test file as its own process, the smaller of 8 and your core count at a time (`-j N` sets it, `--timeout S` the limit per file, 900 by default), and ends with the summary `unittest` prints. `python3 -m unittest discover -s tests -q` still runs the same tests in one process, which also catches a test that leaves state behind for another file. GitHub Actions runs `.github/workflows/ci.yml` on every push to `main` and every pull request: the tests on macOS on `/usr/bin/python3` and a current Python, side by side and once in one process, and the three validates. It holds no secrets and writes nothing back.
-   A change to `investigate` or `file-reader` also gets the nesting smoke
+   A change to `investigate`, `area-lead` or `file-reader` also gets the nesting smoke
    case, and the head-to-head in `evals-expensive/`. A change to `investigate`
    also gets the `big-sweep-in-parts` loop there, which reads a 990-file repo
    in parts and is scored by `check_parts.py`.

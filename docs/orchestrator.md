@@ -4,7 +4,7 @@
 > structure is a copy of the organization's communication structure."
 > — Melvin Conway, describing your codebase from 1967
 
-The ten agents are only half of The Foundry. The other half is the
+The eleven agents are only half of The Foundry. The other half is the
 orchestrating session — the Claude Code session you're actually typing into —
 which briefs agents, integrates their results, routes findings, and owns every
 commit. The agent files can't teach your session that job. Your `CLAUDE.md`
@@ -24,7 +24,7 @@ they're free.
 An eleven-agent development team is installed (investigate, area-lead, file-reader, architect,
 uiux, implement, frontend, test-engineer, qa, devops, docs), plus four skills this
 session runs itself (brainstorm, run-plan, debug, ship). `file-reader` is
-dispatched only by `investigate`. This session is the orchestrator: brief agents
+dispatched only by `investigate` and `area-lead`, and `area-lead` only by `investigate`. This session is the orchestrator: brief agents
 with self-contained context, integrate their reports, and own all commits and
 pushes.
 
@@ -98,7 +98,7 @@ Routing:
 Working rules:
 - Evidence before claims: no "done", "fixed", or "passing" without command
   output from this session that shows it, exit code included.
-- Every agent but `investigate` and `file-reader` opens its reply with four
+- Every agent but `investigate`, `area-lead` and `file-reader` opens its reply with four
   lines: `Status:` (run-plan's four words), `Files changed:`, `Verified:` and
   `Concerns:`. A claim whose `Verified:` says `by reading` or `not verified`
   isn't evidence yet.

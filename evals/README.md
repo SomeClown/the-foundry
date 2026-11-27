@@ -127,7 +127,7 @@ The exact commands (`WORK` is a scratch folder, as an absolute path, since the b
 The first run of the new version:
 
 ```bash
-git rev-parse HEAD:agents/investigate.md HEAD:agents/file-reader.md
+git rev-parse HEAD:agents/investigate.md HEAD:agents/area-lead.md HEAD:agents/file-reader.md
 claude plugin eval . --eval-dir evals-expensive --case investigate-head-to-head --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 1 --no-publish --output-dir "$WORK/results/new-first"
 python3 evals-expensive/compare.py --key evals-expensive/head-to-head-key.json --summary "$WORK/results/new-first/aggregate-result.json"
 ```
@@ -383,18 +383,56 @@ nothing. The third run read every file and left out the three references
 planted as "runbook section" ones. It's the first run on the branch to miss a
 planted fact; the nine before found 48 of 48.
 
+**The results, on the move to `area-lead` (2026-11-27).** The move was measured
+on its own commit (0608ebd, the agent split and nothing else), against the "before"
+runs on 2.7.0's text (four head-to-head runs; three counted big-sweep runs). The big-sweep bar the design set, as many
+`LOOP PROVED` after as before, was missed, and the owner chose to go on.
+
+- Big sweep, before (2.7.0): 3 `LOOP PROVED` of 3 counted runs, each 945 of 945
+  files read once each and 33 of 33 facts. Two further runs were lost to a
+  safety classifier stopping the test session's write of a part, and aren't
+  counted.
+- Big sweep, after (the move alone): 2 `LOOP PROVED` and 2 `LOOP FAILED` of 4
+  counted runs. One more run was lost to a classifier stop and isn't counted.
+  Two runs were cut off by the account's spend limit, are void, and were run
+  again. Each failed run failed on one line of the top level's own report: one
+  dropped a clause from the `Environment:` line it copies into part 2, the
+  other wrote part 3's counts line with the right numbers wrapped in
+  backticks. Scored again with that one line put right, each had nothing else
+  wrong: every file read once, no fact missed. The sentences behind both lines
+  are the same as in 2.7.0. Three counted runs before and four after can't tell whether the move
+  caused the two failures; the 2.3.0 record above shows shipped text has
+  failed this scorer before. The numbers went to the owner on 2026-11-27, who
+  answered "Go on to the probe".
+- Head-to-head, four runs a side: before, 48 of 48 in all four, one run used no
+  area leads on the 191-file repo (so the four can't be scored as one set);
+  after, 48 of 48 in all four, made up 0, every lead ran as
+  `the-foundry:area-lead`, and `compare.py` said `BAR MET`.
+- Nesting smoke, once: 9 of 9 graders, `lead-is-area-lead` among them.
+- Architect, `architect-plan-format`, four runs on fd1e42a: 4 of 4 on every
+  grader as scored. Read by hand, one of the four plans still had a stray
+  `Security:` line that only says a kind isn't touched (on 2.6.0, 2 of 4 did);
+  the grader missed it and was tuned once to catch it.
+
+The scorers were tuned twice during the build, which is all the stopping rule
+allowed: `compare.py` takes a list of routes under a line that says they are
+removed as stated dead, and `check_parts.py` takes the reader brief's own
+`Read` line as which file a reader was sent to. Both had failed right answers
+in the saved "before" runs, and every saved run was scored again with them.
+
 **After a change to `investigate`,** run the nesting smoke and the
 head-to-head again, on top of the loop. They use a repo under 200 files, so
 they show the one-report case still works, not that parts do:
 
 ```bash
+git rev-parse HEAD:agents/investigate.md HEAD:agents/area-lead.md HEAD:agents/file-reader.md
 claude plugin eval . --eval-dir evals-expensive --case nesting-smoke --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 1 --no-publish --output-dir "$WORK/results/smoke"
-claude plugin eval . --eval-dir evals-expensive --case investigate-head-to-head --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 3 --no-publish --output-dir "$WORK/results/h2h-new"
+claude plugin eval . --eval-dir evals-expensive --case investigate-head-to-head --ablation none --scaffold --trust-plugin --allow-tools Bash --model sonnet --judge-model sonnet --threshold 0 --runs 4 --no-publish --output-dir "$WORK/results/h2h-new"
 python3 evals-expensive/compare.py --key evals-expensive/head-to-head-key.json --new "$WORK/results/h2h-new/aggregate-result.json" --baseline "$WORK/results/baseline/aggregate-result.json"; echo "compare exit=$?"
 ```
 
-The smoke passes when all 8 graders pass and its last message holds
-`INVESTIGATE REPORT ENDS`. The head-to-head passes on `BAR MET` with exit 0,
+The smoke passes when all 9 graders pass and its last message holds
+`INVESTIGATE REPORT ENDS`. The head-to-head, four runs, passes on `BAR MET` with exit 0,
 and its `control-new-area-leads` grader passing shows the 181-file repo still
 comes back as one report. The baseline is the results of the 1.7.6 run
 described above; point `--baseline` at where you kept them.

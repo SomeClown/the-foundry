@@ -548,8 +548,21 @@ class DesignAsBuiltPlacementTest(unittest.TestCase):
     def test_section_4_holds_no_other_as_built(self):
         _before, sec4, sub = design_parts(self.text)
         self.assertEqual(re.findall(r"^### As built", sec4, re.M), [])
-        self.assertEqual(len(re.findall(r"^### As built", self.text, re.M)), 4)
         self.assertEqual(len(re.findall(r"^### As built", sub, re.M)), 1)
+        # holds as sections are added: no section has two, and the file's total is the number of sections that have one
+        sections = re.split(r"(?m)^(?=## \d+\. )", self.text)[1:]
+        per = [len(re.findall(r"^### As built", s, re.M)) for s in sections]
+        self.assertTrue(all(n <= 1 for n in per), per)
+        self.assertEqual(len(re.findall(r"^### As built", self.text, re.M)), sum(per))
+        self.assertGreaterEqual(sum(per), 4)
+
+    def test_section_5_has_one_as_built_and_it_is_the_last_heading_of_section_5(self):
+        sections = {m.group(1): s for s in re.split(r"(?m)^(?=## \d+\. )", self.text)[1:]
+                    for m in [re.match(r"## (\d+)\. ", s)]}
+        sec5 = sections["5"]
+        self.assertEqual(len(re.findall(r"^### As built \(\d{4}-\d{2}-\d{2}\)$", sec5, re.M)), 1)
+        headings = re.findall(r"^### .*$", sec5, re.M)
+        self.assertTrue(headings[-1].startswith("### As built"), headings[-1])
 
 
 def as_built_table(sub):
