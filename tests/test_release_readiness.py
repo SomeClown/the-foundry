@@ -17,6 +17,7 @@ from test_security_in_planning import between, folded_between  # noqa: E402
 from test_security_rules import agent_texts, fold  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+DECISIONS = ROOT / "evals" / "ship-decisions"
 KINDS = ("**adds only**", "**breaks running code**", "**can't be undone**")
 OFF_PRODUCTION = "never on production"
 ROLL_BACK_IF = "roll back if"
@@ -79,6 +80,56 @@ def problems(texts):
             found.append("devops uses %r, not a plain word" % word)
     if SLO.search(work):
         found.append("devops uses SLO, not a plain word")
+    ship = texts.get("ship", "")
+    preflight = folded_between(ship, "## 2. Preflight", "## 3. One ask")
+    found += lacks("ship's preflight", preflight, KINDS + ("no data change", NO_SERVICE, "send it back to be split"))
+    handover = folded_between(ship, "## 8. Hand over the deploy", "## 9. Close the loop")
+    found += lacks("ship's hand-over", handover,
+                   (NOT_TRIED, OFF_PRODUCTION, ROLL_BACK_IF, WATCH_DEFAULT, "what to look at", "for how long"))
+    found += lacks("ship's hand-over", handover, ("never the value", "Run nothing on the server yourself"))
+    flags = ship[ship.find("## Red flags"):] if "## Red flags" in ship else ""
+    rows = {
+        '| "The rollback is just the previous tag"': "tried or not tried",
+        '| "It answered once, so it\'s fine"': ROLL_BACK_IF,
+        '| "One error line is probably nothing"': ROLL_BACK_IF,
+    }
+    for start, cell in rows.items():
+        row = [line for line in flags.split("\n") if line.startswith(start)]
+        if not row:
+            found.append("ship's Red flags has no row starting %s" % start)
+        elif cell not in row[0].strip().strip("|").split("|")[-1]:
+            found.append("ship's Red flags row %s doesn't hold %r in its last cell" % (start, cell))
+    ship_all = fold(ship)
+    for word in PLAIN:
+        if word in ship_all.lower():
+            found.append("ship uses %r, not a plain word" % word)
+    if SLO.search(ship_all):
+        found.append("ship uses SLO, not a plain word")
+    section = folded_between(texts.get("architect", ""), "### 3. Data / Schema Changes", "### 4. Risks and Coupling")
+    found += lacks("architect's section 3", section, ("breaks the code running now", "two releases"))
+    return found
+
+
+def situation_problems(prompt_text, grader_stems):
+    """Every way the ship-decisions prompt and its graders disagree; an empty list means they match."""
+    found = []
+    letters = [m.group(1) for m in re.finditer(r"^([a-z])\. (.+)$", prompt_text, re.M)]
+    want = [chr(c) for c in range(ord("a"), ord("k") + 1)]
+    if letters != want:
+        found.append("the prompt's situations are %s, not a to k with no gap" % letters)
+    stems = sorted(grader_stems)
+    if stems != ["item-" + c for c in want]:
+        for c in want:
+            if "item-" + c not in stems:
+                found.append("no grader item-%s for situation %s" % (c, c))
+        found.append("the grader stems are %s, not item-a to item-k" % stems)
+    for stem in stems:
+        path = DECISIONS / "graders" / (stem + ".md")
+        body = fold(path.read_text(encoding="utf-8")) if path.is_file() else ""
+        if not body.startswith("--- type: llm focus: last_message ---"):
+            found.append("%s isn't a last_message llm grader" % stem)
+        if "item (%s)" % stem[-1] not in body:
+            found.append("%s doesn't judge item (%s)" % (stem, stem[-1]))
     return found
 
 
@@ -101,9 +152,9 @@ class MutationTest(unittest.TestCase):
         texts[name] = new
         return texts
 
-    def caught(self, texts, needle):
+    def caught(self, texts, needle, who="devops"):
         found = problems(texts)
-        self.assertTrue(any(needle in p and "devops" in p for p in found), found)
+        self.assertTrue(any(needle in p and who in p for p in found), found)
 
     def test_a_renamed_kind_fails(self):
         """AC-1, AC-12: the three kinds keep their labels."""
@@ -146,6 +197,54 @@ class MutationTest(unittest.TestCase):
         texts = self.mutated("devops", lambda t: t.replace("the changed page).", "the changed page), canary.", 1))
         self.caught(texts, "canary")
 
+    def test_ships_preflight_loses_a_label_fails(self):
+        """AC-5, AC-12: ship sorts with the same three labels as devops."""
+        texts = self.mutated("ship", lambda t: t.replace("**can't be undone**", "**irreversible**", 1))
+        self.caught(texts, "**can't be undone**", "ship")
+
+    def test_ships_hand_over_without_roll_back_if_fails(self):
+        """AC-6, AC-7, AC-12: the watch in section 8 names a roll back if condition."""
+        def drop(t):
+            i, j = t.index("## 8. Hand over the deploy"), t.index("## 9. Close the loop")
+            return t[:i] + t[i:j].replace(ROLL_BACK_IF, "revert when") + t[j:]
+        self.caught(self.mutated("ship", drop), ROLL_BACK_IF, "ship")
+
+    def test_a_hand_over_that_prints_the_value_fails(self):
+        """AC-6, AC-12: the check for a new secret never prints the value."""
+        texts = self.mutated("ship", lambda t: t.replace("never the value", "the value", 1))
+        self.caught(texts, "never the value", "ship")
+
+    def test_a_red_flag_row_removed_fails(self):
+        """AC-7, AC-12: the red-flag rows stay."""
+        def drop(t):
+            i = t.index('| "It answered once')
+            return t[:i] + t[t.index("\n", i) + 1:]
+        self.caught(self.mutated("ship", drop), "It answered once", "ship")
+
+    def test_a_jargon_word_in_ships_hand_over_fails(self):
+        """AC-12: plain words only."""
+        texts = self.mutated("ship", lambda t: t.replace("## 9. Close the loop", "canary\n\n## 9. Close the loop", 1))
+        self.caught(texts, "canary", "ship")
+
+    def test_one_release_in_the_architects_section_3_fails(self):
+        """AC-13: the architect splits a breaking change across two releases."""
+        texts = self.mutated("architect", lambda t: t.replace("two releases", "one release", 1))
+        self.caught(texts, "two releases", "architect")
+
+    def test_devops_and_ship_hold_the_same_three_labels(self):
+        """AC-12: the labels are typed the same in both files."""
+        devops = folded_between(self.base["devops"], "## Data Changes and Rollbacks", "## Hard Rules")
+        ship = folded_between(self.base["ship"], "## 2. Preflight", "## 3. One ask")
+        for kind in KINDS:
+            with self.subTest(kind=kind):
+                self.assertIn(kind, devops)
+                self.assertIn(kind, ship)
+
+    def test_a_line_break_moved_inside_ships_phrase_still_holds(self):
+        def rewrap(t):
+            return t.replace("send it\n  back to be split", "send\n  it back to be split", 1)
+        self.assertEqual(problems(self.mutated("ship", rewrap)), [])
+
     def test_a_line_break_moved_inside_a_phrase_still_holds(self):
         def rewrap(t):
             return t.replace("confirm the\n  tool will open the copy", "confirm\n  the tool will open the copy", 1)
@@ -154,6 +253,23 @@ class MutationTest(unittest.TestCase):
     def test_a_missing_section_gives_a_message_not_a_crash(self):
         self.assertEqual(between("no headings", "## A", "## B"), "")
         self.assertTrue(problems({"devops": "no headings"}))
+
+
+class ShipDecisionsSituationsTest(unittest.TestCase):
+    def real(self):
+        prompt = (DECISIONS / "prompt.md").read_text(encoding="utf-8")
+        return prompt, [p.stem for p in (DECISIONS / "graders").glob("*.md")]
+
+    def test_the_real_files_agree(self):
+        """AC-11: situations a to k each have a grader that judges its own item."""
+        prompt, stems = self.real()
+        self.assertEqual(situation_problems(prompt, stems), [])
+
+    def test_a_missing_grader_names_its_situation(self):
+        """AC-11: a situation with no grader is reported."""
+        prompt, stems = self.real()
+        found = situation_problems(prompt, [s for s in stems if s != "item-k"])
+        self.assertTrue(any("item-k" in p and "situation k" in p for p in found), found)
 
 
 if __name__ == "__main__":

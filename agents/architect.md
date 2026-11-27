@@ -94,6 +94,10 @@ keep it exact). For each:
 ### 3. Data / Schema Changes
 Any model, schema, or migration changes, and exactly how they get applied given the
 project's migration mechanism. Say "none" explicitly if none.
+A change that breaks the code running now (a column it reads dropped or
+renamed, a tighter rule on data it writes) is split across two releases:
+first the code that works with both, then the breaking change. Say which
+goes first, the data change or the code.
 
 ### 4. Risks and Coupling
 What else shares the files being touched; what could break; anything that needs a

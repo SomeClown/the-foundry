@@ -15,6 +15,12 @@ tried, and a rollback is tried only on a copy or with a command that
 only reads. It names what to watch after the change, for how long, and
 what means roll back. Two new cases: `devops-holds-a-breaking-migration`
 and `devops-tries-the-rollback-on-a-copy`.
+`ship`'s preflight sorts data changes the same way and sends one that
+breaks the running code back to be split; its hand-over checks a new
+setting without printing it, marks the rollback tried or not tried,
+gives the watch, and when pasted output meets the roll back if
+condition, hands over the rollback for the user to run.
+The architect splits a change that breaks the running code across two releases.
 
 ## [2.6.0] — 2026-11-26
 
