@@ -4,7 +4,7 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [2.5.0] — 2026-11-26
 
 The test files now run side by side (`tests/run_tests.py`, about 85 s where it
 took 283 s), and `python3 -m unittest discover -s tests -q` still runs them in
