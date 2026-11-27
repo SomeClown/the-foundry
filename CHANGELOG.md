@@ -4,7 +4,7 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [2.7.0] — 2026-11-26
 
 `devops` now sorts a schema or data change before applying it (adds
 only, breaks running code, can't be undone), checks it against the code
