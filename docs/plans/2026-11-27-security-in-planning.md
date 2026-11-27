@@ -611,6 +611,7 @@ Stopping rule, stated to the owner before the build: one architect pass, one bui
 
 ### Progress
 - Task 1: built (from ffe9343; every anchor matched; the session's targeted run of the eight named test files `Ran 392`, exit 0; the builder's whole-suite run `Ran 2425`, exit 0, 12 more than the baseline: 8 in `tests/test_security_in_planning.py`, 4 in `SecurityNoneGraderTest`). Committed before Task 2 so each can be reverted alone; the adversarial round and the gate run over both; AC-1, AC-2, AC-3, AC-4, AC-6, AC-9, AC-10, with AC-8 waiting on Task 3's run
+- Task 2: built (from e3a42ef; the session's targeted run of the eight named test files `Ran 354`, exit 0; the fixture builds in a scratch directory and both package files parse; the builder's whole-suite run `Ran 2436`, exit 0, 11 more than after Task 1: 2 in `tests/test_security_in_planning.py`, 9 in `DependencyReviewCaseTest`); AC-5, AC-9, with AC-7 waiting on Task 3's run
 
 ### Decisions made during the build
 - Ruling (plan, §4 question 1): A, qa runs an audit that sends the dependency list only when its brief says the list may be sent. The session took the architect's recommendation instead of stopping for the owner. Why: it is the conservative answer, it matches the rule that nothing from the repo leaves on a file's say-so, and the owner asked for bounded rounds. If wrong: an audit the owner wanted isn't run until a brief says so; one sentence in qa and one in the orchestrator note change it. Told to the owner when the plan came back.

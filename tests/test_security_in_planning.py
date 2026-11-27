@@ -5,6 +5,7 @@ architect, frontend, implement, qa and brainstorm texts. Every rule lives in `pr
 in-memory dict of texts, so a mutation test edits a copy and asks whether the rule notices. Nothing is
 written to the repo. Hermetic; standard library only; runs on Python 3.9 and later.
 """
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -14,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))  # the sibling test mod
 from test_security_rules import agent_texts, fold  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
+AUDIT_LINE = "Audit: ran `<command>` (exit <n>) | not run:"
+SEND_CONDITION = "says the list may be sent"
 
 
 def all_texts():
@@ -53,6 +56,18 @@ def problems(texts):
     ground = fold(between(texts.get("brainstorm", ""), "## 4. Ground to cover", "## 5."))
     if "who may use it" not in ground:
         found.append("brainstorm's ground to cover doesn't ask who may use it")
+    look = between(texts.get("qa", ""), "## What to Look For", "## Spec-Check Mode")
+    if "\n### Dependencies\n" not in look:
+        found.append("qa has no '### Dependencies' subsection under What to Look For")
+    else:
+        fence = re.search(r"^```\n(.*?)^```$", look[look.index("\n### Dependencies\n"):], re.S | re.M)
+        lines = fence.group(1).rstrip("\n").split("\n") if fence else []
+        if len(lines) != 2 or not lines[0].startswith("Dependencies: ") or not lines[1].startswith(AUDIT_LINE):
+            found.append("qa's Dependencies fence isn't the Dependencies line and the Audit line: %s" % lines)
+    qa_deps = fold(between(texts.get("qa", ""), "### Dependencies", "### Logic Bugs"))
+    for name, text in (("qa's Dependencies subsection", qa_deps), ("orchestrator", fold(texts.get("orchestrator", "")))):
+        if SEND_CONDITION not in text:
+            found.append("%s doesn't hold %r" % (name, SEND_CONDITION))
     return found
 
 
@@ -105,6 +120,16 @@ class MutationTest(unittest.TestCase):
         """AC-3: brainstorm asks who may use the feature."""
         texts = self.mutated("brainstorm", lambda t: t.replace("who may use it", "who it is for", 1))
         self.caught(texts, "brainstorm's ground")
+
+    def test_the_audit_line_changed_in_qas_fence_fails(self):
+        """AC-5, AC-9: qa reports an Audit line in the shape the graders read."""
+        texts = self.mutated("qa", lambda t: t.replace("Audit: ran", "Audit run:", 1))
+        self.caught(texts, "qa's Dependencies fence")
+
+    def test_the_send_condition_missing_from_the_orchestrator_fails(self):
+        """AC-5, AC-9: the orchestrator note and qa name the same send condition."""
+        texts = self.mutated("orchestrator", lambda t: fold(t).replace(SEND_CONDITION, "says so", 1))
+        self.caught(texts, "orchestrator doesn't hold")
 
     def test_a_rewrapped_architect_paragraph_still_holds(self):
         def rewrap(t):

@@ -159,6 +159,12 @@ orders. Declining a finding deliberately — and saying so — is a legitimate
 outcome. Silently ignoring one is how it becomes a production incident with
 your name on it.
 
+**Dependency audits stay on this machine unless you say so.** Most audit
+tools send the whole dependency list to a service, so `qa` runs one only
+when its brief says the list may be sent, and otherwise checks each new
+package by reading. Say so in the brief when every package the project
+uses is public and you want the audit run.
+
 **Skills for the parts that talk to you.** A subagent can't ask you a
 question and wait for the answer, so anything conversational is a skill the
 orchestrating session runs: `brainstorm` talks a feature through before the

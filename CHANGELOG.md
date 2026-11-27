@@ -12,6 +12,11 @@ line for each kind it touches, naming the task that guards it, or
 its task. `brainstorm` asks who may use a feature, what private data it
 keeps and what it reaches outside itself, and `implement` adds only a
 dependency its brief names, pinned, and reports its version and license.
+`qa` now checks a changed manifest or lock file: what moved, each new
+package by hand (a look-alike name, the pin, the source, an install
+script), and an audit tool only when one is installed and sends nothing,
+or the brief says the dependency list may be sent. `qa-dependency-review`
+is a new case.
 
 ## [2.5.0] — 2026-11-26
 

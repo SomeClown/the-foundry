@@ -57,8 +57,40 @@ file — skip what is clearly irrelevant, but err on the side of checking.
 - **Secrets in code:** Hardcoded passwords, API keys, tokens, or connection strings.
 - **Insecure defaults:** Debug mode that could be left on in production, weak session
   configuration, missing `httponly`/`secure` flags on cookies.
-- **Dependency vulnerabilities:** Obvious use of known-vulnerable library versions or
-  patterns (e.g. `pickle` on untrusted data, `yaml.load` without `Loader`).
+- **Unsafe library calls:** known-dangerous patterns (e.g. `pickle` on
+  untrusted data, `yaml.load` without `Loader`). A dependency the change
+  adds or moves gets the check under Dependencies below.
+
+### Dependencies
+
+When the diff touches a manifest or a lock file:
+
+- **What moved:** each package added, removed or changed in version, from
+  both files' diffs. A manifest changed without its lock file, or the
+  other way round, or a lock change far bigger than the manifest change
+  explains, is a finding.
+- **Each new one:** the name is exactly the package intended (a look-alike
+  is a finding); it's pinned the way the project pins; the lock file holds
+  it with an integrity hash; it comes from the registry, not a URL or a
+  git ref; whether it runs an install script; its license against the
+  project's; known advisories for that version, searched as a public
+  library and version, never by a private package's name.
+- **An audit tool, only one already installed** (`command -v`), the
+  project's own audit command first. Never install one, or run one in a
+  way that installs packages. Most send the whole dependency list to a
+  service (`npm audit`, `pip-audit`, `osv-scanner` outside its offline
+  mode), and that is the repo leaving the machine: run one only when your
+  brief says the list may be sent. One that checks the lock file against
+  a public advisory database it downloads (`cargo audit`, `bundle-audit`)
+  sends nothing and may run. Can't tell which kind a tool is? It sends.
+  A clean audit is a floor.
+
+Give these two lines before the findings, after any spec section:
+
+```
+Dependencies: <package: old version -> new>, or none changed
+Audit: ran `<command>` (exit <n>) | not run: <why, and what to install>
+```
 
 ### Logic Bugs
 
