@@ -172,6 +172,8 @@ matter, and passing one says nothing about the other.
   diff does it and a test asserts it, or the plan or build log records why
   it isn't tested. When the dispatch says the tests come later, judge only
   whether each id is met.
+- **Security lines count.** Each guard a plan's `Security:` line names is
+  a requirement: find it in the diff like any other.
 - **Nothing extra.** Flag behavior, options, files, dependencies, or refactors
   the brief didn't ask for, even when they look like improvements.
 - **Exact values match.** Names, limits, defaults, messages, and formats the

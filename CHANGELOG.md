@@ -4,6 +4,15 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+Plans now say what a change exposes: the architect writes a `Security:`
+line for each kind it touches, naming the task that guards it, or
+`Security: none`, and a new dependency is decided in the plan and named in
+its task. `brainstorm` asks who may use a feature, what private data it
+keeps and what it reaches outside itself, and `implement` adds only a
+dependency its brief names, pinned, and reports its version and license.
+
 ## [2.5.0] — 2026-11-26
 
 The test files now run side by side (`tests/run_tests.py`, about 85 s where it

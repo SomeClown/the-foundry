@@ -46,7 +46,10 @@ density.
    the id finds it.
 4. **Make the change.** Prefer minimal, surgical diffs over rewrites. Don't
    refactor code the task didn't ask you to touch, don't reformat unrelated lines,
-   and don't add dependencies without flagging it in your report.
+   and don't add a dependency your brief doesn't name: needing one is a
+   NEEDS_CONTEXT stop. Add a named one with the project's own package tool,
+   pinned the way the project pins, and let the tool write the lock file,
+   never by hand.
 5. **Handle data changes correctly.** If the change touches persistent state,
    use the project's actual migration mechanism (found in its docs or CLI) — never
    assume an ORM auto-migrates.
@@ -82,6 +85,8 @@ density.
 - **What changed** — one line per file under `Files changed`, on what and why
 - **Covers** — when the brief has a **Covers** line, one line per id:
   `AC-n: met at <file:line>` or `AC-n: not met: <why>`
+- **Dependencies** — when you added or changed one: name, version, license
+  (from the package's own metadata) and the command that added it
 - **How it was verified** — what each command on your `Verified` line
   showed, the linter, formatter and type checker included (quote failures
   honestly; a failing test reported honestly is a good report), including the

@@ -685,7 +685,7 @@ class TracedCriteriaCaseTest(unittest.TestCase):
         trace = json.dumps(self.PLAN.replace("AC-3: Task 1; command: python3 -c 'import tally'\n", ""))
         self.assertFalse(matches(pattern_of(self.ARCH, "coverage-lines"), trace))
         self.assertTrue(matches(pattern_of(self.ARCH, "covers-line"), trace))
-        self.assertEqual(pattern_of(self.ARCH, "coverage-lines")["weight"], 3)
+        self.assertEqual(pattern_of(self.ARCH, "coverage-lines")["weight"], 4)
 
     def test_the_architect_graders_miss_the_design_the_case_builds(self):
         design = Fixture(self, self.ARCH).read("docs/design.md")
@@ -716,3 +716,35 @@ class TracedCriteriaCaseTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SecurityNoneGraderTest(unittest.TestCase):
+    """AC-8: the architect's plan says `Security: none` in section 4 when the change exposes nothing."""
+
+    ARCH = "architect-plan-format"
+    PLAN = ("# Plan\n\n## 4. Risks and Coupling\n\n- Nothing else shares tally/core.py.\n\n"
+            "Security: none\n\n## 5. Testing Strategy\n")
+
+    def hit(self, text):
+        return matches(pattern_of(self.ARCH, "security-none"), text)
+
+    def test_it_matches_the_plain_line(self):
+        self.assertTrue(self.hit(self.PLAN))
+
+    def test_it_matches_the_spellings_a_plan_may_use(self):
+        for label, text in (("### heading", self.PLAN.replace("## 4.", "### 4.")),
+                            ("bold label", self.PLAN.replace("Security: none", "- **Security:** none.")),
+                            ("notes label", self.PLAN.replace("Security: none", "Security notes: none"))):
+            with self.subTest(spelling=label):
+                self.assertTrue(self.hit(text))
+
+    def test_it_misses_a_line_in_the_wrong_place_or_a_real_exposure(self):
+        moved = self.PLAN.replace("Security: none\n\n## 5. Testing Strategy\n", "## 5. Testing Strategy\nSecurity: none\n")
+        for label, text in (("moved under 5", moved),
+                            ("an exposure", self.PLAN.replace("Security: none", "Security: input reaches a parser in Task 1")),
+                            ("section 3", self.PLAN.replace("## 4.", "## 3."))):
+            with self.subTest(case=label):
+                self.assertFalse(self.hit(text))
+
+    def test_it_misses_the_design_the_case_builds(self):
+        self.assertFalse(self.hit(Fixture(self, self.ARCH).read("docs/design.md")))

@@ -559,8 +559,8 @@ class ArchitectGraderShapeTest(unittest.TestCase):
     def test_a_colon_inside_the_bold_is_refused_today(self):
         self.assertFalse(self.coverage("**AC-1:** Task 1\n**AC-2:** Task 1\n**AC-3:** Task 1"))
 
-    def test_the_weight_is_three(self):
-        self.assertEqual(T.pattern_of(ARCH, "coverage-lines")["weight"], 3)
+    def test_the_weight_is_four(self):
+        self.assertEqual(T.pattern_of(ARCH, "coverage-lines")["weight"], 4)
 
 
 class DoneWhenGraderShapeTest(unittest.TestCase):
