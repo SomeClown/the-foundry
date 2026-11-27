@@ -20,10 +20,15 @@ COVERS = "**Covers**"
 DONE_WHEN = "**Done when"  # the bold label, with its colon inside (`**Done when:**`) or outside
 COVERS_IN = ("architect", "implement", "frontend", "test-engineer", "qa", "run-plan")
 DONE_WHEN_IN = ("brainstorm", "architect", "qa", "run-plan", "orchestrator")
-STATE_RE = re.compile(r"AC-(?:n|[0-9]+) ((?:[A-Z]{3,} ?)+)\b")
-ID_RE = re.compile(r"AC-(?:n|N|[0-9]+)\b")
+# the state is the capitalized words after the id on its own line, single spaces between them, never across a line break
+STATE_RE = re.compile(r"AC-(?:n|[0-9]+)[ \t]+([A-Z]{3,}(?: [A-Z]{3,})*)\b")
+ID_RE = re.compile(r"AC-(?:n|N|[1-9][0-9]*)\b")
+# every spelling that looks like an id: AC1, ac-1, AC -1, AC-01, AC-x, a bare `AC-`
+LOOKS_LIKE_ID = re.compile(r"\b[Aa][Cc](?:[ \t]*-[ \t]*\w*|[0-9]\w*)")
+GAPS_SENTENCE = "Any `NOT MET` or `UNTESTED` line makes it GAPS."
 COVERS_BULLET = "- **Covers** — when the brief has"
 FENCE_SHAPE = [
+    re.compile(r"Spec: MATCHES \| GAPS$"),
     re.compile(r"AC-n MET "),
     re.compile(r"AC-n NOT MET:"),
     re.compile(r"AC-n UNTESTED "),
@@ -45,12 +50,12 @@ def all_texts():
 
 
 def spec_fence(qa):
-    """The lines of the first fence after `Put a spec section first`, or None."""
+    """The lines of the first fence after `Put a spec section first` (the `Spec:` line first), or None."""
     i = qa.find("Put a spec section first")
     if i < 0:
         return None
     m = re.search(r"^```\n(.*?)^```$", qa[i:], re.S | re.M)
-    return m.group(1).rstrip("\n").split("\n")[1:] if m else None  # without the `Spec:` line
+    return m.group(1).rstrip("\n").split("\n") if m else None
 
 
 def qa_states(qa):
@@ -66,6 +71,10 @@ def covers_bullet(text):
         return None
     m = re.search(r"\n(?=- |\n|#)", text[i:])
     return fold(text[i: i + m.start()] if m else text[i:])
+
+
+def text_of(texts, name):
+    return texts.get(name, "")
 
 
 def problems(texts):
@@ -88,9 +97,12 @@ def problems(texts):
     if len(allowed) != 5:
         found.append("qa names %d id states, wants 5: %s" % (len(allowed), sorted(allowed)))
     for name in ("run-plan", "architect", "orchestrator"):
-        for m in STATE_RE.finditer(fold(texts.get(name, ""))):
+        for m in STATE_RE.finditer(text_of(texts, name)):
             state = m.group(1).strip()
-            if state not in allowed:
+            line_end = text_of(texts, name).find("\n", m.end())
+            at_line_end = not text_of(texts, name)[m.end(): line_end if line_end >= 0 else None].strip()
+            wrapped = at_line_end and any((a + " ").startswith(state + " ") for a in allowed)
+            if state not in allowed and not wrapped:
                 found.append("%s names the id state %r, which qa doesn't have" % (name, state))
     a, b = covers_bullet(texts.get("implement", "")), covers_bullet(texts.get("frontend", ""))
     if a is None or b is None:
@@ -98,9 +110,11 @@ def problems(texts):
     elif a != b:
         found.append("the Covers bullet differs between implement and frontend")
     for name, text in texts.items():
-        for m in re.finditer(r"\bAC(?:-\w*|[0-9]\w*)", text):
+        for m in LOOKS_LIKE_ID.finditer(text):
             if not ID_RE.match(text[m.start():]):
                 found.append("%s writes an id as %r" % (name, m.group(0)))
+    if GAPS_SENTENCE not in fold(texts.get("qa", "")):
+        found.append("qa lost the sentence that a NOT MET or UNTESTED line makes it GAPS")
     if "`AC-n: Task N; test`" not in texts.get("architect", ""):
         found.append("architect lost the `AC-n: Task N; test` coverage line")
     return found
@@ -177,6 +191,23 @@ class MutationTest(unittest.TestCase):
     def test_an_id_written_without_its_dash_or_digit_fails(self):
         self.caught(self.mutated("brainstorm", lambda t: t + "\nSee AC1 above.\n"), "writes an id as")
         self.caught(self.mutated("run-plan", lambda t: t + "\nSee AC-x above.\n"), "writes an id as")
+
+    def test_the_gaps_sentence_dropped_from_qa_fails(self):
+        texts = self.mutated("qa", lambda t: t.replace(GAPS_SENTENCE, "", 1))
+        self.caught(texts, "makes it GAPS")
+
+    def test_a_changed_first_fence_line_fails(self):
+        texts = self.mutated("qa", lambda t: t.replace("Spec: MATCHES | GAPS\nAC-n MET", "Whatever\nAC-n MET", 1))
+        self.caught(texts, "spec fence")
+
+    def test_other_id_spellings_fail(self):
+        for bad in ("AC-01", "ac-1", "AC -1"):
+            with self.subTest(spelling=bad):
+                self.caught(self.mutated("brainstorm", lambda t: t + "\nSee %s now.\n" % bad), "writes an id as")
+
+    def test_a_state_never_runs_over_a_line_break(self):
+        texts = self.mutated("run-plan", lambda t: t + "\n`AC-2 MET`\nAPI notes follow.\n")
+        self.assertEqual(problems(texts), [])
 
     def test_architect_without_the_coverage_line_shape_fails(self):
         texts = self.mutated("architect", lambda t: t.replace("`AC-n: Task N; test`", "`AC-n: Task N`", 1))
