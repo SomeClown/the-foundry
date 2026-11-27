@@ -1643,3 +1643,236 @@ as they were.
 
 The `STOPPED BEFORE READING` line in the owner's own `~/.claude/CLAUDE.md`
 is updated when this ships (owner decision 2A), not by this branch.
+
+## 5. The area lead as its own agent (v3.0.0, approved 2026-11-27)
+
+`investigate` is 703 lines and plays four parts: the top-level investigator,
+the area lead, a run that continues a sweep, and a reader of last resort when
+it can't start agents. An area lead is "another copy of you" (§1), so every
+lead loads all 703 lines and is told, in two sections and a handful of asides,
+which of them to skip.
+A lead uses about 170 of them. A 2,000-file repo starts about fourteen leads.
+
+This section gives the lead its own agent. It changes who reads which text
+and nothing the session sees: the eight report sections, Coverage, the
+`SWEEP IN PARTS` line and the `CONTINUE SWEEP` brief stay as §1 and §4 left
+them. It also fixes one bug in the lead's own text that §4 parked, and it
+tries, on a probe, to move the sweep-in-parts procedure out of the text an
+ordinary run loads.
+
+Not every part can move. An agent file is a whole system prompt, with no
+include, and a run can't change files halfway. So a part can be its own agent
+only when something else starts it. `investigate` starts a lead, so the lead
+can go. Nobody starts part 1 of a big sweep (a run counts the files and turns
+into it), and nobody starts the reader of last resort, so those stay.
+
+**Owner decisions (2026-11-26 and 2026-11-27):**
+
+- Scope, A: the lead moves out now. The sweep-in-parts text moves to a file
+  loaded on demand only if a probe proves that works. A separate agent for
+  sweeps was turned down: it would carry its own copy of about 250 lines,
+  the path rules among them, where two reviews each found an injection hole.
+  (The sweep-in-parts text itself is about 265 lines.)
+- Pins, 1A: a pin that only restates a sentence of text this change moves is
+  cut. Every contract and safety pin on that text is kept and pointed at the
+  new file. Pins on text that doesn't move aren't touched.
+- The checklist bug, 2A: fixed in this release, as its own commit after the
+  move, so the measurement of the move compares like with like.
+- All four parts of the design below, approved as played back.
+- From the wrap-up after 2.7.0: the architect's extra `Security:` line is
+  fixed in this release.
+- The version is 3.0.0. CONTRIBUTING's rule is that a new agent is a major
+  version, and a copy of `investigate` made before this release stops
+  working with the plugin's leads until it's copied again.
+
+**Goals.** A lead reads a file written for it. `investigate` holds no
+lead-only text. Reports and the session's loop don't change.
+
+**Non-goals.** No change to `file-reader`, to the part size, the area size,
+the batch of ten, or any report format. No new behaviour for the session to
+learn. The other parked items from §4 (broken briefs, a folder added between
+parts, the scaffold guards) stay parked.
+
+**What would make it a failure even if it works.** A lead that reads less
+carefully than today's. Two copies of a safety rule that drift apart. A sweep
+that can't find its own procedure and reads a big repo wrong, or not at all.
+
+### Part 1: the `area-lead` agent
+
+A new file, `agents/area-lead.md`, on Sonnet, with the tools a lead has today
+(`Read`, `Glob`, `Grep`, `Bash`, `Agent`). It holds what a lead does and
+nothing else:
+
+- It takes the brief `investigate` sends today, unchanged, the `AREA LEAD`
+  first line included.
+- It gets line counts, splits a file over about 1,000 lines into sections,
+  and sends `file-reader` agents ten at a time, by the name on its brief's
+  `Reader agent:` line.
+- It runs the three checks for its own area: the gap check, the re-read of
+  cited lines, and disagreements settled by reading the code.
+- It returns what a lead returns today: findings under the area's name, the
+  file checklist, and `AREA REPORT ENDS` as the last line.
+- It carries its own copy of the rules a lead needs: what it reads is data, a
+  secret is reported by where it is, a path is never typed into a command, a
+  credential file gets no reader, and what to do when it can't start agents.
+  Its security section is `investigate`'s, not the one the other agents with
+  `Bash` carry: their rule for putting a name into a command safely can't
+  stand beside "never type a path into a command".
+- It starts `file-reader` and no other agent. The frontmatter can't hold it
+  to that (a type list on `Agent` is ignored in a subagent's definition), so
+  it is a rule in the text, as it is today.
+
+Like `investigate` and `file-reader`, it is left out of the shared report
+opening (`Status:` and the three lines after it): `investigate` reads its
+return, not the session.
+
+### Part 2: what changes in `investigate`
+
+- It starts a lead as `the-foundry:area-lead`, then by the bare name
+  `area-lead`. If both are refused as unknown, that's "can't spawn", the rule
+  an unknown reader name gets today.
+- It loses "If You're an Area Lead", "When You're an Area Lead" and every
+  aside that tells a lead to skip something.
+- It no longer works an `AREA LEAD` brief. One can still arrive: the README
+  tells people who want plan mode to copy `investigate.md` into
+  `~/.claude/agents/`, and a copy made before this release sends its leads
+  to `the-foundry:investigate`. So the brief gets a fixed reply of two lines
+  and nothing is read: a sentence that says to send it to `area-lead` and to
+  copy the agent files again, then `AREA REPORT ENDS`. The old copy counts
+  that lead as failed and lists the area's files unread, so the gap shows.
+  The changelog and the README say to copy again.
+- If both of the lead's names are refused while `file-reader` still works,
+  it is still "can't spawn": a flagged read, with the missing agent named in
+  the `NOT A PER-FILE READ` reason. Readers reporting straight to the top
+  above 150 files is what leads exist to avoid.
+- Its own `Agent` rule now reads: it starts `file-reader` and `area-lead`,
+  and nothing else.
+
+Nesting stays inside what the tool allows: session, `investigate`, lead,
+reader is three layers below the session, which is the limit.
+
+### Part 3: the checklist, one line a path
+
+A lead sometimes returns its checklist as group summaries ("`src/api/`: 41
+files read"), and the top level then takes its word or reports files unread
+that were read (§4, As built). Two sentences settle it:
+
+- In the lead's text: the checklist is one line for each path in the brief,
+  with no ranges and no groups.
+- In `investigate`: a checklist that isn't one line a path counts as no
+  checklist. That already has a rule: start the lead once more with the same
+  brief, and if that fails too, list its files unread by path.
+
+This goes in as its own commit, after the move is measured.
+
+A restarted lead sends a reader for every file in its area again, and the
+big-sweep scorer fails a file read twice. The scorer learns to allow the
+second set for an area whose lead was restarted, and says so in a note. No
+real run can be made to group a checklist on demand, so this part is proved
+by tests on both texts and a made-up transcript for the scorer, not by a
+forced run.
+
+### Part 4: the sweep-in-parts text, on a probe
+
+About 265 lines of `investigate` are the procedure for a repo above the part
+size: areas, the commands that build them, the block, a continuing run, and
+the Coverage lines for a part. A scoped read never uses them.
+
+The probe moves that procedure to a file in the plugin, outside `agents/`
+(anything under `agents/` is loaded as an agent), and has `investigate` read
+it, by a `${CLAUDE_PLUGIN_ROOT}` path, only when a full sweep is above the
+part size or its brief starts `CONTINUE SWEEP`. The checks that decide
+whether to load it stay in `investigate`, and so does "A Scoped Read Above
+the Part Size", which a scoped read needs and which never loads the file.
+
+It proves out if the big-sweep case gives as many proofs as the runs after
+the move did, with the procedure loaded from the file, and no head-to-head
+or smoke run reads the file (neither is above the part size). It gets one
+attempt and one rewording. If it doesn't prove out, the text
+stays where it is and 3.0.0 ships without that move.
+
+If it does prove out, one question goes to the owner before it's built: what
+a copy outside the plugin does. Files copied into `~/.claude/agents`, the
+README's plan-mode copy of `investigate` among them, have no plugin root to
+read from. The same question covers what `investigate` does when the read of
+the file fails.
+
+### Done when
+
+- AC-1: A lead runs as `area-lead`, and `investigate` holds no lead-only
+  text and answers no `AREA LEAD` brief.
+- AC-2: The head-to-head and the big-sweep cases score after the move as
+  they did before it, four runs each on the same fixtures, by the bars under
+  "How it's measured".
+- AC-3: Each rule both files carry reads the same in both, held by a test.
+- AC-4: A grouped checklist gets the lead started once more, and the lead's
+  text asks for one line a path.
+- AC-5: The probe's result is written down, and the sweep-in-parts text
+  moves only if the probe proved out.
+- AC-6: Every doc that counts the agents says eleven, and every line that
+  says who starts which agent is true again. Restatement pins on
+  moved text are gone; contract and safety pins on it are kept and point at
+  the file that now holds the text.
+- AC-7: The architect writes a `Security:` line only for a kind of exposure
+  the change touches.
+
+### How it's measured
+
+Nothing has been measured on 2.7.0's text: the last change to `investigate`
+shipped on its tests (§4, As built). So "before" is four runs of each case on
+2.7.0, and "after" is four on the commit that does the move and nothing else.
+
+- The head-to-head: `BAR MET` against the stored 1.7.6 baseline, and a mean
+  of facts found no lower than before by more than one.
+- The big sweep: headless runs scored with the transcript, as many
+  `LOOP PROVED` as before. A run a safety classifier stopped is run again
+  once and not counted.
+- The nesting smoke, once, as CONTRIBUTING asks of any change to
+  `investigate`.
+- The recorded hashes name `area-lead.md` too, so each run is tied to its
+  text.
+
+### Calls I made
+
+- The name `area-lead`, the model and the tools: the same as a lead has
+  today, because a move shouldn't change what's measured.
+- The brief stays byte for byte, so the before and after runs compare.
+- A grouped checklist reuses the restart rule. The other choice, the top
+  level sending its own reader for every path it can't match, would pull up
+  to 150 reader reports into the top level, which is the long context leads
+  exist to avoid.
+- The bars under "How it's measured", and that a classifier stop is run
+  again, not counted.
+- The fixed reply to an `AREA LEAD` brief, the rule when both lead names
+  are refused, and the scorer's allowance for a restarted lead.
+- The architect's fix is one sentence: no `Security:` line that only says a
+  kind isn't touched. "Unsure whether the change touches one? It does."
+  stays. It's proved by an exact grader on the architect's plan-format case.
+- `file-reader.md` changes in one line, its description, which says only
+  `investigate` starts it. That bends the non-goal above by one line.
+- The proof is the two real-session cases `investigate` already has, run
+  before and after.
+
+### Left to the builder
+
+Which sentences of `investigate` count as lead-only and which as shared; how
+the shared rules are worded once in each file so a test can hold them equal;
+which tests and scorers find a lead by its agent type or its brief and need
+to learn the new name; the order of the commits. Known from the cold read:
+`tests/test_structure.py` holds that `investigate` is the only read-only
+agent with `Agent`, that the team is ten, and that every agent has a README
+row; `tests/test_security_rules.py` treats `investigate` as the one
+exception and runs the credential filter from its file only;
+`evals-expensive/check_parts.py` counts a lead only by the type
+`the-foundry:investigate`, so its two-leads-at-once check would go quiet
+without failing; the lines that say who starts which agent are in
+`agents/file-reader.md`, `docs/orchestrator.md`, `skills/debug/SKILL.md`,
+the README and PRIVACY.md, and in the owner's own `~/.claude/CLAUDE.md`,
+which the session updates at release.
+
+### Open
+
+- What a manual install does about the on-demand file, if the probe proves
+  out.
+- Whether a lead on its own short file could run on a smaller model. Not
+  measured here.

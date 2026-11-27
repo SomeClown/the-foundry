@@ -490,23 +490,28 @@ class ScriptListsTest(unittest.TestCase):
 # docs/design.md: section 4's "As built (2026-11-24)"
 
 def design_parts(text):
-    """(text before section 4, section 4 up to the As built heading, the As built subsection or '')."""
+    """(text before section 4, section 4 up to the As built heading, the As built subsection or '').
+
+    The As built subsection runs to the next top-level section (a line starting "## "), or to the end of the file."""
     start = re.search(r"^## 4\. ", text, re.M).start()
     i = text.find(AS_BUILT)
-    return text[:start], text[start: i if i >= 0 else len(text)], text[i:] if i >= 0 else ""
+    if i < 0:
+        return text[:start], text[start:], ""
+    nxt = re.compile(r"^## ", re.M).search(text, i)
+    return text[:start], text[start:i], text[i: nxt.start() if nxt else len(text)]
 
 
 class DesignAsBuiltPlacementTest(unittest.TestCase):
     def setUp(self):
         self.text = raw("docs/design.md")
 
-    def test_exactly_one_new_heading_and_it_is_the_last_heading_in_the_file(self):
+    def test_exactly_one_new_heading_and_it_is_the_last_heading_in_section_4(self):
         self.assertEqual(self.text.count("\n" + AS_BUILT + "\n"), 1)
         _before, sec4, sub = design_parts(self.text)
         self.assertEqual(re.findall(r"^#{1,6} .*$", sub, re.M), [AS_BUILT])
-        self.assertTrue(self.text.rstrip().endswith(sub.rstrip()))
+        self.assertNotRegex(sub, r"(?m)^## ")
 
-    def test_it_comes_after_every_amended_subsection_of_section_4_and_is_the_last_subsection_of_the_file(self):
+    def test_it_comes_after_every_amended_subsection_of_section_4_and_is_the_last_subsection_of_section_4(self):
         # not tied to which amendment is the last one: a later amendment goes above the As built heading and this still holds
         _before, sec4, sub = design_parts(self.text)
         amended = [m.start() for m in re.finditer(r"^### Amended", sec4, re.M)]
@@ -517,7 +522,7 @@ class DesignAsBuiltPlacementTest(unittest.TestCase):
         headings = re.findall(r"^#{1,6} .*$", sec4, re.M)
         self.assertTrue(headings[-1].startswith("### Amended"), headings[-1])
         self.assertEqual(re.findall(r"^#{1,6} .*$", sub, re.M), [AS_BUILT])
-        self.assertTrue(self.text.rstrip().endswith(sub.rstrip()))
+        self.assertNotRegex(sub, r"(?m)^## ")
 
     def test_the_subsections_of_section_4_run_parts_one_to_eight_then_the_amendments_in_date_order(self):
         # holds over time: it says nothing about how many amendments there are, only how they are laid out
