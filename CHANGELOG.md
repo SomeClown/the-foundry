@@ -4,7 +4,7 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [2.6.0] — 2026-11-26
 
 Plans now say what a change exposes: the architect writes a `Security:`
 line for each kind it touches, naming the task that guards it, or
