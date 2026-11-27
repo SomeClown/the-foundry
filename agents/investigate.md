@@ -482,8 +482,8 @@ you send no readers of your own for a failed lead's files. A lead whose return s
 On a full sweep, in one report or in parts, the report holds nothing drawn from the
 contents of a folder skipped whole or of an untracked file. You may still search the
 whole tree for your own checks, but a hit in one of those places is dropped: not
-quoted, not listed in an inventory, not described in a gotcha or the Coupling Map.
-Coverage is all the report says of them: a folder skipped whole is counted with its
+quoted, not listed in an inventory, not described in a gotcha or the Coupling Map. That goes for a hit a lead's return
+names too: leave it out, and don't say that you left it out. Coverage is all the report says of them: a folder skipped whole is counted with its
 reason, and untracked files are listed by path (in a sweep in parts, in part 1 only). A hit in an area a sweep in parts
 hasn't read yet is different: list it as a reference, not checked, and don't describe
 what's there. A scoped read searches the whole repo for coupling, as it always did.

@@ -890,5 +890,105 @@ class LeadGraderInputShapesTest(unittest.TestCase):
         self.assertTrue(self.hit({"subagent_type": "the-foundry:investigate", "meta": {"subagent_type": "the-foundry:area-lead"}}))
 
 
+HIT_RULE_LEAD = ("Your checks stay inside your area. Give the Grep tool a path inside your area, never the whole tree. "
+                 "A hit in a file that isn't in your brief is dropped: not quoted, not listed in an inventory, "
+                 "not described, and not mentioned as left out.")
+HIT_RULE_TOP = ("That goes for a hit a lead's return names too: leave it out, and don't say that you left it out.")
+
+
+def everything_red(texts):
+    """Every check there is on the two rules: shared/held blocks, the top level's lead text, the lead-only text,
+    the fences, and the two token pins of ContractTest (replayed on the in-memory copies)."""
+    found = list(al.problems(texts)) + al.lead_text_problems(texts[TOP]) + lead_only_problems(texts[LEAD])
+    found += fence_problems(texts)
+    return found + pin_problems(texts)
+
+
+def pin_problems(texts):
+    """The builder's two ContractTest pins, replayed on in-memory copies."""
+    found = []
+    if "Give the Grep tool a path inside your area" not in al.fold(texts[LEAD]):
+        found.append("pin: grep path")
+    if "A hit in a file that isn't in your brief is dropped" not in al.fold(texts[LEAD]):
+        found.append("pin: drop")
+    if ("a hit a lead's return names too: leave it out, and don't say that you left it out"
+            not in al.fold(texts[TOP])):
+        found.append("pin: top")
+    return found
+
+
+class HitRuleMutationTest(unittest.TestCase):
+    def setUp(self):
+        self.base = al.texts_of()
+
+    def mutated(self, name, old, new):
+        """Replace `old` (matched across line breaks) in the raw text, keeping its line structure otherwise."""
+        texts = dict(self.base)
+        pattern = re.compile(r"\s+".join(re.escape(w) for w in old.split()))
+        self.assertEqual(len(pattern.findall(texts[name])), 1, old)
+        texts[name] = pattern.sub(lambda m: new, texts[name])
+        return texts
+
+    def test_the_pins_alone_fail_when_their_sentence_is_deleted(self):
+        """Job 3: each token pin goes red by itself (the held-paragraph check is not what turns it red)."""
+        self.assertEqual(pin_problems(self.base), [])
+        grep = self.mutated(LEAD, "Give the Grep tool a path inside your area, never the whole tree.", "")
+        self.assertIn("pin: grep path", pin_problems(grep))
+        drop = self.mutated(LEAD, "A hit in a file that isn't in your brief is dropped:", "A hit is")
+        self.assertIn("pin: drop", pin_problems(drop))
+        top = self.mutated(TOP, HIT_RULE_TOP, "")
+        self.assertIn("pin: top", pin_problems(top))
+
+    def test_the_real_texts_pass_every_check(self):
+        self.assertEqual(everything_red(self.base), [])
+
+    def test_never_the_whole_tree_turned_around_in_the_lead_is_found(self):
+        for new in ("always the whole tree", "the whole tree", "never a path inside your area"):
+            with self.subTest(new=new):
+                texts = self.mutated(LEAD, "never the whole tree", new)
+                self.assertTrue(everything_red(texts))
+
+    def test_a_hit_that_is_dropped_turned_into_a_hit_that_is_kept_is_found(self):
+        texts = self.mutated(LEAD, "is dropped: not quoted", "is kept: quoted")
+        self.assertTrue(everything_red(texts))
+
+    def test_dropping_not_mentioned_as_left_out_in_the_lead_is_found(self):
+        texts = self.mutated(LEAD, ", and not mentioned as left out.", ".")
+        self.assertTrue(everything_red(texts))
+
+    def test_turning_not_mentioned_as_left_out_into_mention_it_is_found(self):
+        texts = self.mutated(LEAD, "and not mentioned as left out.", "and mentioned as left out.")
+        self.assertTrue(everything_red(texts))
+
+    def test_unless_the_hit_is_a_route_added_after_the_lead_rule_is_found(self):
+        texts = self.mutated(LEAD, "mentioned as left out.", "mentioned as left out. Unless the hit is a route.")
+        self.assertTrue(everything_red(texts))
+
+    def test_unless_the_hit_is_a_route_added_inside_the_lead_rule_is_found(self):
+        texts = self.mutated(LEAD, "is dropped: not quoted", "is dropped unless it is a route: not quoted")
+        self.assertTrue(everything_red(texts))
+
+    def test_deleting_the_top_levels_new_sentence_is_found(self):
+        texts = self.mutated(TOP, HIT_RULE_TOP, "")
+        self.assertTrue(everything_red(texts))
+
+    def test_rewording_the_top_levels_sentence_to_mention_that_you_left_it_out_is_found(self):
+        texts = self.mutated(TOP, "and don't say that you left it out", "and mention that you left it out")
+        self.assertTrue(everything_red(texts))
+
+    def test_dropping_the_top_levels_dont_say_clause_is_found(self):
+        texts = self.mutated(TOP, "leave it out, and don't say that you left it out.", "leave it out.")
+        self.assertTrue(everything_red(texts))
+
+    def test_a_clause_added_after_the_top_levels_sentence_is_found(self):
+        texts = self.mutated(TOP, "and don't say that you left it out.",
+                             "and don't say that you left it out, unless the hit is a route.")
+        self.assertTrue(everything_red(texts))
+
+    def test_a_clause_added_before_the_top_levels_sentence_is_found(self):
+        texts = self.mutated(TOP, HIT_RULE_TOP, "Except a route. " + HIT_RULE_TOP)
+        self.assertTrue(everything_red(texts))
+
+
 if __name__ == "__main__":
     unittest.main()
