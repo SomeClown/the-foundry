@@ -2011,8 +2011,15 @@ probe sweep is clearly caused by loading the procedure from a file. The
 mechanism held every time: the path resolved, the file was read once a part,
 and no run below the part size read it.
 
-Where it stands: at this commit the procedure is inline in `investigate.md`.
-The owner was asked on 2026-11-27 whether to move it, and the answer isn't in.
+Where it stands: the probe proved out by its bars, and the owner chose not to
+move the procedure in this release. On 2026-11-27 they answered "Leave it as
+suggested": the procedure stays inline in `investigate.md` for 3.0.0, the
+probe's result stays on record, and the move can be made later as its own
+change. The reasons given were that the gain is about 240 lines on runs that
+never sweep in parts, and that moving it now would mean a build task and
+another round of big sweeps. AC-5's "moves only if the probe proved out" is a
+condition, not an instruction: the inline text isn't a failed probe. The probe
+branch (`probe/sweep-in-parts-file`, 66a10de) was never merged.
 
 **Pins (1A).** Counts from the pin manifest: 9 restatement pins cut, 11
 contract and safety pins kept and re-pointed (10 at `agents/area-lead.md`, 1

@@ -77,8 +77,9 @@ The probe moved the sweep-in-parts procedure (256 lines) into a file
 it was given: the sweep case 2 proved of 4 against the after-runs' 2, the
 head-to-head 48 of 48 in four runs, the smoke 9 of 9, and no small run read
 the file. Its bars matched a count that had itself missed, and neither of its
-two failed sweeps is clearly caused by the file. The procedure stays inline
-in `investigate.md` in this entry.
+two failed sweeps is clearly caused by the file. The owner chose on 2026-11-27 to leave
+the procedure inline in `investigate.md` for this release, with the move left
+for a change of its own.
 
 ## [2.7.0] — 2026-11-26
 

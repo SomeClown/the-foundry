@@ -442,6 +442,8 @@ on the move alone, and the owner chose to go on.
   failed sweep is clearly caused by the file: one failed on block lines under a
   last part (which also happened once in four runs with the procedure inline),
   one on the vendored route, a rule the lead's file had dropped.
+  The owner chose on 2026-11-27 to leave the procedure inline in
+  `investigate.md` for this release, with the move left for a change of its own.
 
 The scorers were tuned twice during the build, which is all the stopping rule
 allowed: `compare.py` takes a list of routes under a line that says they are
