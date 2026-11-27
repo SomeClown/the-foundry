@@ -4,6 +4,24 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [2.7.0] — 2026-11-26
+
+`devops` now sorts a schema or data change before applying it (adds
+only, breaks running code, can't be undone), checks it against the code
+running now and the version before, and stops before a change that
+breaks the running code even when its brief says to apply it. Its report
+gives the rollback as tried, with the command and exit code, or not
+tried, and a rollback is tried only on a copy or with a command that
+only reads. It names what to watch after the change, for how long, and
+what means roll back. Two new cases: `devops-holds-a-breaking-migration`
+and `devops-tries-the-rollback-on-a-copy`.
+`ship`'s preflight sorts data changes the same way and sends one that
+breaks the running code back to be split; its hand-over checks a new
+setting without printing it, marks the rollback tried or not tried,
+gives the watch, and when pasted output meets the roll back if
+condition, hands over the rollback for the user to run.
+The architect splits a change that breaks the running code across two releases.
+
 ## [2.6.0] — 2026-11-26
 
 Plans now say what a change exposes: the architect writes a `Security:`

@@ -70,6 +70,17 @@ the work is ready:
   skills" after you added a fourth. Check counts and lists too.
 - **Anything that changes production config or data** (a migration, a new
   setting, a new secret) is named, with what the user will need to do.
+  Sort each data change the way `devops` does: **adds only**,
+  **breaks running code** or **can't be undone**. Say which goes first,
+  the data change or the code, and whether the version the server runs
+  now and the one before it both work on the changed data. A change
+  that breaks the code running now isn't ready for one release: send it
+  back to be split (first the code that works with both the old and the
+  new columns, then the breaking change in a later release), or name
+  the downtime in the ask for the user to accept. A new setting or
+  secret gets a check in the hand-over (section 8). With no running
+  service and no data change, that's one line in the ask: "no data
+  change; nothing to watch: no running service".
 
 If any of this fails, fix it first (through the usual agents), not during
 the release.
@@ -190,17 +201,37 @@ order:
    `sudo sed -i 's/^TAG=3\.2\.0$/TAG=3.2.1/' /opt/app/.env && sudo grep '^TAG=' /opt/app/.env`.
    If an editor is needed, it's `vi` (with `:set paste` before pasting a
    block), never `nano`.
+   A release that needs a new setting or secret starts with a check
+   that it's set, which prints a count and never the value
+   (`sudo grep -c '^NEW_KEY=.' /opt/app/.env` should print 1); nothing
+   else goes out until it does.
 2. **The deploy command** from the runbook. Mention its deploy window if it
    has one ("it refuses 09:00 to 09:15 Pacific") and check the time against it.
 3. **How to check it:** the status command, and what they should see (the new
    version, "healthy", other services still up), plus a log tail.
-4. **The rollback**, in one line: the previous version and the command, and
-   whether anything besides the version has to be put back (config, data).
+   Then the watch, decided now: what to look at (those, and the thing
+   the change touched), for how long (the runbook's window, or 30
+   minutes when it has none), and roll back if: a plain condition they
+   can read off the output ("any ERROR line in the log", "the bot
+   doesn't answer /ping").
+4. **The rollback:** the previous version and the command, then one line
+   saying what besides the version has to be put back (config, data),
+   whether the previous version runs on the changed data, and tried or
+   not tried. The previous version is the tag before this one, unless
+   what the user pastes shows the server ran another. Tried means this
+   session ran a check and saw its exit code (the previous tag and its
+   image still exist; the down migration ran on the project's local test
+   database); never on production. Otherwise "not tried", with why.
 5. **What to try by hand** after it's up, if the change is visible (a
    command to run, a page to look at).
 
 Then wait. The deploy is done when the user says it is ("deployed and
 healthy"); if they paste output, read it against what you said they'd see.
+If what they paste meets the roll back if condition, say so plainly and
+give the rollback command again, in its own block, for them to run. Run
+nothing on the server yourself. "Deployed and healthy" before the watch
+is over: go on with section 9, and say what's left to watch and until
+when.
 
 ## 9. Close the loop
 
@@ -235,3 +266,6 @@ healthy"); if they paste output, read it against what you said they'd see.
 | "The tag is pushed; here are the deploy commands" | Wait for the tag's build to go green first. |
 | "I'll just run deploy.sh for them" | The user runs production. Hand over the commands. |
 | "I'll push the status docs while I'm at it" | Ask first. |
+| "The rollback is just the previous tag" | Say tried or not tried, and whether that version runs on the changed data. |
+| "It answered once, so it's fine" | Hand over the watch: what to look at, for how long, and roll back if. |
+| "One error line is probably nothing" | If it meets the roll back if condition, say so and give the rollback command. |
