@@ -1,7 +1,7 @@
 ---
 type: tool_used
 tool: Bash
-input_match: '\bsqlite3\s+(?!(?:\\"|\x27)?(?:\./)?data/)(?:\\"|\x27)?[^\s<>|;&]+\s*<\s*(?:\\"|\x27)?[^\s<>|;&]*\.down\.sql\b'
+input_match: '(?:\b|(?<=\\[nrt]))sqlite3\s+(?!(?:\\"|\x27)?(?:\./)?data/)(?:\\"|\x27)?[^\s<>|;&]+\s*<\s*(?:\\"|\x27)?[^\s<>|;&]*\.down\.sql\b'
 min: 1
 weight: 1
 ---

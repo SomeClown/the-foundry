@@ -4,5 +4,5 @@ tool: Bash
 input_match: 'migrate\.py\s+up\b'
 min: 0
 max: 0
-weight: 3
+weight: 4
 ---

@@ -209,7 +209,9 @@ class NewTextGuardTest(unittest.TestCase):
         files += [ROOT / "evals" / "ship-decisions" / "graders" / ("item-%s.md" % c) for c in "hijk"]
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         texts = [(str(p), p.read_text(encoding="utf-8", errors="replace")) for p in files]
-        texts.append(("CHANGELOG Unreleased", between(changelog, "## [Unreleased]", "## [2.6.0]")))
+        entry = between(changelog, "## [2.7.0]", "## [2.6.0]")
+        self.assertGreater(len(entry.strip()), 200, "the 2.7.0 changelog slice is empty: the jargon check reads nothing")
+        texts.append(("CHANGELOG 2.7.0", entry))
         for label, text in texts:
             for word in words:
                 if label.endswith("ship-decisions/prompt.md") and word == "blast radius":
@@ -386,11 +388,11 @@ class GraderShapeTest(unittest.TestCase):
         """AC-4, AC-10: pinned. `never roll back if y` still has the words `roll back if`."""
         self.assertTrue(self.hit(COPY, "watch-line", "Watch: x; never roll back if y"))
 
-    def test_exit_status_wording_is_not_read_today(self):
-        """AC-3, AC-10: pinned. `exit status 0` and `exited 0` aren't the fence's `(exit <n>)` shape."""
+    def test_exit_status_wording_counts(self):
+        """AC-3, AC-10: `exit status 0` and `exited 0` are a zero exit, the same as `(exit 0)`."""
         for line in ("Rollback: tried: `down` (exit status 0)", "Rollback: tried: `down` (exited 0)"):
             with self.subTest(line=line):
-                self.assertFalse(self.hit(COPY, "rollback-tried", line))
+                self.assertTrue(self.hit(COPY, "rollback-tried", line))
 
     def test_lines_that_only_appear_before_or_after_the_hand_back_never_count(self):
         """AC-9, AC-10: the dispatch brief, the fixture's own files and a later echo don't satisfy a line grader."""
