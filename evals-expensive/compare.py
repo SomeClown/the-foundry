@@ -50,7 +50,7 @@ ROUTE = re.compile(r"/v2/[a-z0-9_/-]*[a-z0-9]")
 COMMAND = re.compile(r"\bfxctl ([A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*)")
 # Whole words only: a hyphen joins words ("dead-letter" is not "dead"), except in these compounds.
 DEAD_WORDS = re.compile(
-    r"(?<![\w-])(?:commented[ -]out|taken[ -]out|no[ -]longer|commented|removed|disabled|dead|deprecated|inactive|"
+    r"(?<![\w-])(?:commented[ -]out|taken[ -]out|no[ -]longer|must\s+not\s+(?:come\s+back|return)(?=\s*(?:$|[:.;,)]|under\b))|commented|removed|disabled|dead|deprecated|inactive|"
     r"retired|obsolete|unused|legacy|stale|stub)(?![\w-])", re.I)
 LIST_ITEM = re.compile(r"^\s*(?:[-*+]|\d+[.)]|\|)\s")
 HEADING = re.compile(r"^\s{0,3}#{1,6}\s")
@@ -95,7 +95,7 @@ def is_label(line):
 
 
 def lead_in_line(lines, i):
-    """The line that introduces the list block holding lines[i], when it ends with a colon or opens with a bold marker label, else None."""
+    """The line that introduces the list block holding lines[i], when it is the line straight above the list, or ends with a colon or opens with a bold marker label, else None."""
     start = i
     for j in range(i - 1, -1, -1):
         line = lines[j]
@@ -103,10 +103,13 @@ def lead_in_line(lines, i):
             break
         start = j
     j = start - 1
+    straight = j >= 0 and bool(lines[j].strip())
     if j >= 0 and not lines[j].strip():
         j -= 1
     if j < 0 or not lines[j].strip() or LIST_ITEM.match(lines[j]) or HEADING.match(lines[j]):
         return None
+    if straight and not re.match(r"^\s*(?:>\s*)?(\*\*|__)", lines[j]):
+        return lines[j]
     if lines[j].rstrip(" *_`").endswith(":"):
         return lines[j]
     run_in = None if is_label(lines[j]) else RUN_IN.match(lines[j])

@@ -3334,6 +3334,56 @@ class TranscriptReadersTest(TranscriptBase):
                 e["summary"] = "nothing useful"
         self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 reader tasks name no path \(task ids %s\)$" % tid, r"never had a reader dispatched: cli/cmd_booth\.py")
 
+    def test_a_reader_whose_summary_labels_the_path_in_bold_is_counted_for_its_file(self):
+        events = self.events()
+        notes = [e for e in events if e.get("subtype") == "task_notification" and e["summary"].startswith("Path: ")]
+        for e, shape in zip(notes[:30], ("**Path:** %s", "**Path**: %s", "- **Path:** `%s`", "Path: `%s`", "__Path:__ %s", "  `Path:` **%s**") * 5):
+            path = e["summary"].split("\n", 1)[0][len("Path: "):]
+            e["summary"] = e["summary"].replace("Path: " + path, shape % path, 1)
+            for started in events:   # the real run's brief had a backticked /v3/ and no Read line, so only the summary names the file
+                if started.get("subtype") == "task_started" and started["task_id"] == e["task_id"]:
+                    started["prompt"] = "Project: tollway, HTTP routes under `/v3/`."
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_reader_with_no_path_line_takes_the_path_from_the_briefs_read_line_not_a_later_backtick(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid:
+                e["prompt"] = "Read `cli/cmd_booth.py`\nProject: tollway, a toy. HTTP routes under `/v3/`, and `/abs/other.py` too.\nFocus: none"
+                e["summary"] = "nothing useful"
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_reader_whose_summary_and_brief_give_no_path_even_with_a_backticked_path_later_still_names_no_path(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid:
+                e["prompt"] = "Read the booth command.\nProject: tollway, a toy. See `%s/cli/cmd_booth.py`." % Fixture.repo
+                e["summary"] = "nothing useful"
+        self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 reader tasks name no path \(task ids %s\)$" % tid)
+
+    def test_a_reader_whose_brief_names_the_file_and_whose_summary_has_another_prefix_is_counted_for_the_file(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid:
+                e["prompt"] = "Read `cli/cmd_booth.py`\nProject: tollway, a toy.\nFocus: none"
+                if e.get("subtype") == "task_notification":
+                    e["summary"] = e["summary"].replace(str(Fixture.repo), "/Users/nobody/elsewhere", 1)
+        for e in events:
+            if e.get("task_id") == tid and e.get("subtype") == "task_notification":
+                self.assertTrue(e["summary"].startswith("Path: /Users/nobody/elsewhere/cli/cmd_booth.py"))
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_reader_whose_brief_has_no_read_line_is_counted_from_its_summary_path_line(self):
+        events = self.events()
+        tid = find_reader(events, "cli/cmd_booth.py")[0]
+        for e in events:
+            if e.get("task_id") == tid and e.get("subtype") == "task_started":
+                e["prompt"] = "Project: tollway, a toy. HTTP routes under `/v3/`."
+        self.assertTranscriptProved(self.run_t(events))
+
     def test_each_problem_is_a_line_of_its_own(self):
         events = self.events()
         for tid in find_reader(events, "api/app.py"):
@@ -3793,7 +3843,7 @@ class TranscriptMutationTest(MutantBase):
 
     def test_a_crash_on_an_odd_transcript_is_exit_2_and_without_the_handler_it_would_be_exit_1(self):
         events = self.events()
-        events.append({"type": "system", "subtype": "task_started", "task_id": "odd", "subagent_type": READER, "prompt": 12})
+        events.append({"type": "system", "subtype": "task_started", "task_id": ["odd"], "subagent_type": READER, "prompt": "Read `x.py`"})
         real = self.run_at(SCRIPT, events)
         self.assertEqual(real[0], 2, real[1])
         self.assertIn("CAN'T CHECK: internal error", real[1])

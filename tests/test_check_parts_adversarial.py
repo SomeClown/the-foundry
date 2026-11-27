@@ -91,7 +91,10 @@ def m_reader_never_completes(events):
 
 
 def m_reader_outside(events):
-    notification(events, first_reader(events)["task_id"])["summary"] = "Path: /elsewhere/nothing.md\nLines read: 1-1 of 1"
+    # the brief's Read line is the dispatch and wins over the summary, so the reader is sent outside in its brief (summary kept in step)
+    reader = first_reader(events)
+    reader["prompt"] = reader["prompt"].replace(reader["prompt"].split("`")[1], "/elsewhere/nothing.md", 1)
+    notification(events, reader["task_id"])["summary"] = "Path: /elsewhere/nothing.md\nLines read: 1-1 of 1"
     return events
 
 
@@ -505,3 +508,104 @@ class LeadShapesAndNoteTest(RestartBase):
         self.assertFalse([l for l in lines if l.startswith("transcript:")], out)
         rest = [l for l in lines if "was started twice" not in l and "area leads ran as" not in l]  # two more leads ran, so that count moves
         self.assertEqual(rest, [l for l in base_out.splitlines() if "area leads ran as" not in l])
+
+
+# ---- The brief's Read line wins over the reader's summary (tuning round) ---------------------------------------
+# A reader's dispatch is the brief's first line, Read `<path>`; the summary's Path line is read only when the brief
+# has none. What the check is for: every readable file had a reader dispatched, once. Nothing here restates the
+# pattern; each test sends a wrong run and asks whether it still fails (or pins an accepted limit, named _today).
+
+class BriefReadLineTest(TranscriptBase):
+    FILE = "cli/cmd_booth.py"
+    OTHER = "api/app.py"
+
+    def change(self, rel, prompt=None, summary=None, events=None):
+        events = events if events is not None else self.events()
+        tid = tcp.find_reader(events, rel)[0]
+        for e in events:
+            if e.get("task_id") == tid:
+                if e["subtype"] == "task_started" and prompt is not None:
+                    e["prompt"] = prompt
+                if e["subtype"] == "task_notification" and summary is not None:
+                    e["summary"] = summary
+        return events
+
+    def failures(self, events):
+        code, out = self.run_t(events)
+        self.assertEqual((code, out.splitlines()[0]), (1, "LOOP FAILED"), out)
+        return self.failure_lines(out)
+
+    def test_a_brief_naming_a_file_outside_the_repo_fails_even_when_the_summary_names_the_right_file(self):
+        events = self.change(self.FILE, prompt="Read `/etc/passwd`\nProject: tollway, a toy.")
+        lines = self.failures(events)
+        self.assertTrue(any("never had a reader dispatched: cli/cmd_booth.py" in l for l in lines), lines)
+        self.assertTrue(any("outside the readable files: /etc/passwd" in l for l in lines), lines)
+
+    def test_a_reader_briefed_for_one_file_and_reporting_another_readable_one_is_counted_for_the_brief_today(self):
+        # accepted limit: the dispatch is what the check is for, and nothing compares it with the summary. The file it
+        # reports is dispatched on its own anyway; were it not, that file would fail as never dispatched (next test).
+        events = self.change(self.FILE, prompt="Read `%s`\nProject: tollway, a toy." % self.FILE, summary="Path: %s\nLines read: 1-5 of 5" % self.OTHER)
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_file_only_a_summary_reports_having_read_is_still_never_dispatched(self):
+        events = self.change(self.FILE, prompt="Read `%s`\nx" % self.FILE, summary="Path: %s\nLines read: 1-5 of 5" % self.OTHER)
+        for tid in tcp.find_reader(events, self.OTHER):
+            events = tcp.without_task(events, tid)
+        self.assertTrue(any("never had a reader dispatched: api/app.py" in l for l in self.failures(events)))
+
+    def test_a_brief_with_two_read_lines_is_counted_for_the_first_only_so_the_second_file_still_needs_its_own_reader(self):
+        events = self.change(self.FILE, prompt="Read `%s`\nRead `%s`\nProject: tollway, a toy." % (self.FILE, self.OTHER))
+        for tid in tcp.find_reader(events, self.OTHER):
+            events = tcp.without_task(events, tid)
+        lines = self.failures(events)
+        self.assertEqual([l for l in lines if "never had a reader" in l], ["transcript: 1 readable files never had a reader dispatched: api/app.py"])
+
+    def test_two_section_readers_of_one_file_are_still_dispatched_more_than_once(self):
+        # the scorer read a section reader's summary path as the file before this tuning, so two of them counted twice then too
+        events = self.events()
+        tid = tcp.find_reader(events, self.FILE)[0]
+        idx = [k for k, e in enumerate(events) if e.get("task_id") == tid]
+        twin = copy.deepcopy([events[k] for k in idx])
+        for e in twin:
+            e["task_id"] += "s"
+            e["tool_use_id"] += "s"
+        for e in events:
+            if e.get("task_id") == tid and e["subtype"] == "task_started":
+                e["prompt"] = "Read `%s` lines 1 to 30\nProject: tollway, a toy." % self.FILE
+        for e in twin:
+            if e["subtype"] == "task_started":
+                e["prompt"] = "Read `%s` lines 31 to 62\nProject: tollway, a toy." % self.FILE
+        events[idx[-1] + 1:idx[-1] + 1] = twin
+        self.assertIn("transcript: 1 readable files had a reader dispatched more than once: cli/cmd_booth.py (2 times)", self.failures(events))
+
+    def test_a_read_line_path_with_a_space_inside_the_backticks_is_counted_for_the_file(self):
+        events = self.change(self.FILE, prompt="Read `%s `\nx" % self.FILE, summary="nothing useful")
+        self.assertTranscriptProved(self.run_t(events))
+
+    def test_a_read_line_with_no_backticks_is_not_a_dispatch_so_a_summary_outside_the_repo_fails_it(self):
+        events = self.change(self.FILE, prompt="Read %s\nx" % self.FILE, summary="Path: /elsewhere/nothing.md\nLines read: 1-1 of 1")
+        lines = self.failures(events)
+        self.assertTrue(any("never had a reader dispatched: cli/cmd_booth.py" in l for l in lines), lines)
+        self.assertTrue(any("outside the readable files: /elsewhere/nothing.md" in l for l in lines), lines)
+
+    def test_a_read_line_that_is_not_the_first_line_is_not_a_dispatch(self):
+        events = self.change(self.FILE, prompt="Please start.\nRead `%s`\nx" % self.FILE, summary="Path: /elsewhere/nothing.md\nLines read: 1-1 of 1")
+        lines = self.failures(events)
+        self.assertTrue(any("outside the readable files: /elsewhere/nothing.md" in l for l in lines), lines)
+
+    def test_a_prompt_that_is_not_a_string_is_a_brief_with_no_read_line_so_the_summary_path_line_counts(self):
+        for bad in (5, ["Read `%s`" % self.FILE], {"a": 1}):
+            with self.subTest(prompt=bad):
+                self.assertTranscriptProved(self.run_t(self.change(self.FILE, prompt=bad)))
+
+    def test_a_prompt_that_is_not_a_string_and_a_summary_with_no_path_line_names_no_path(self):
+        for bad in (5, ["Read `%s`" % self.FILE], {"a": 1}):
+            with self.subTest(prompt=bad):
+                events = self.change(self.FILE, prompt=bad, summary="nothing useful")
+                tid = next(e["task_id"] for e in events if e.get("subtype") == "task_started" and e.get("prompt") == bad)
+                self.assertTranscriptFails(self.run_t(events), r"^transcript: 1 reader tasks name no path \(task ids %s\)$" % tid)
+
+    def test_a_prompt_of_none_or_empty_falls_back_on_the_summary(self):
+        for bad in (None, ""):
+            with self.subTest(prompt=bad):
+                self.assertTranscriptProved(self.run_t(self.change(self.FILE, prompt=bad)))

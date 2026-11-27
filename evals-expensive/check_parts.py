@@ -422,7 +422,10 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
         if e.get("subagent_type") != READER:
             continue
         note = done.get(task_id, (None, {}))[1]
-        m = re.search(r"^Path: (\S+)", note.get("summary") or "", re.M) or re.search(r"`(/[^`\n]+)`", e.get("prompt") or "")
+        # the brief's own first line, Read `<path>`, is the dispatch; the summary's "Path:" line (bold, backticked or in a bullet or not) only when the brief has none
+        brief = e.get("prompt") if isinstance(e.get("prompt"), str) else ""
+        m = re.match(r"\s*Read `([^`\n]+)`", brief) \
+            or re.search(r"^[ \t>*+-]*[*_`]*Path[*_`]*:[*_`]*[ \t]*[*_`]*([^\s`*]\S*?)[*`]*(?:\s|$)", note.get("summary") or "", re.M)
         if not m:
             unreadable.append(task_id)
             continue

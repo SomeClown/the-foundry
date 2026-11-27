@@ -1311,7 +1311,55 @@ class CompareTest(unittest.TestCase):
     def test_a_lead_in_without_a_colon_does_not_clear_the_decoy(self):
         token = self.DECOYS[1]
         self.assertEqual(self.decoys_made_up("These routes were removed.", "", "- " + token), [("decoy", token)])
-        self.assertEqual(self.decoys_made_up("These routes were removed", "- " + token), [("decoy", token)])
+        # a sentence straight above the list is its lead-in whatever it ends with (see test_a_sentence_straight_above_a_list_leads_it)
+        self.assertEqual(self.decoys_made_up("These routes were removed", "- " + token), [])
+        self.assertEqual(self.decoys_made_up("These routes were removed", "", "- " + token), [("decoy", token)])
+
+    REAL_PARAGRAPH = ("Removed routes per `docs/removed-endpoints.md:5-7`. Grep finds them only in that doc, so no code serves them. "
+                      "They \"must not come back under the same path\".")
+
+    def test_a_sentence_straight_above_a_list_leads_it(self):
+        # the real paragraph-and-list shape from the h2h-before runs 1 and 4: it ends with a full stop, not a colon
+        items = ["- `%s`" % d for d in self.DECOYS[:3]]
+        self.assertEqual(self.decoys_made_up(self.REAL_PARAGRAPH, *items), [])
+
+    def test_a_sentence_with_no_dead_word_straight_above_a_list_leaves_it_live(self):
+        text = "Grep finds them only in that doc, so no code serves them. They are listed in the docs."
+        items = ["- `%s`" % d for d in self.DECOYS[:3]]
+        self.assertEqual(self.decoys_made_up(text, *items), [("decoy", d) for d in self.DECOYS[:3]])
+
+    def test_the_real_run_4_line_and_list_are_not_live(self):
+        # h2h-before run 4: no other dead word, the document's own "must not return" wording
+        items = ["  - `%s`" % d for d in self.DECOYS[:3]]
+        self.assertEqual(self.decoys_made_up("- `docs/removed-endpoints.md:5-7` lists three paths that must not return:", *items), [])
+
+    def test_must_not_come_back_and_must_not_return_are_dead_phrases_across_whitespace_and_case(self):
+        t = self.DECOYS[0]
+        for line in ("They MUST NOT come back:", "They must  not   return:", "They must not\treturn:", "Must not come back."):
+            with self.subTest(line=line):
+                self.assertEqual(self.decoys_made_up(line, "- " + t), [])
+
+    def test_the_dead_phrases_count_only_when_nothing_is_being_returned(self):
+        t = self.DECOYS[0]
+        for line in ("They must not return.", "They must not return;", "They must not return, ever", "(they must not return)", "They must not return",
+                     "They must not return under the same path", "They must not come back under /v2", "They must not come back"):
+            with self.subTest(line=line):
+                self.assertEqual(self.decoys_made_up(line, "- " + t), [])
+        for line in ("These calls must not return an error:", "These calls must not return errors.", "These calls must not return a 5xx.",
+                     "Calls that must not return errors are these:", "These must not return `404`:", "These calls must not come back empty:"):
+            with self.subTest(line=line):
+                self.assertEqual(self.decoys_made_up(line, "- " + t), [("decoy", t)])
+        self.assertEqual(self.decoys_made_up("- These calls must not return 404:", "  - " + t), [("decoy", t)])
+
+    def test_a_list_under_a_must_return_sentence_is_live(self):
+        items = ["- `%s`" % d for d in self.DECOYS[:3]]
+        self.assertEqual(self.decoys_made_up("these paths must return a 200:", *items), [("decoy", d) for d in self.DECOYS[:3]])
+        self.assertEqual(self.decoys_made_up("these paths must not be slow and must come back with a 200:", *items), [("decoy", d) for d in self.DECOYS[:3]])
+
+    def test_a_blank_line_between_the_sentence_and_the_list_breaks_the_lead_in(self):
+        # a colon line is still read across one blank line, a sentence that ends otherwise is not
+        items = ["- `%s`" % d for d in self.DECOYS[:3]]
+        self.assertEqual(self.decoys_made_up(self.REAL_PARAGRAPH, "", *items), [("decoy", d) for d in self.DECOYS[:3]])
 
     def test_a_lead_in_two_paragraphs_up_does_not_clear_the_decoy(self):
         token = self.DECOYS[1]
@@ -2332,7 +2380,9 @@ class CompareRunInLabelTest(unittest.TestCase):
 
     def test_a_bold_run_that_does_not_open_the_line_does_not_clear(self):
         t = self.token()
-        self.assertEqual(self.decoys("See the **retired** routes below.", "- " + t), [("decoy", t)])
+        # straight above the list a plain sentence is the lead-in whatever it ends with; a blank line breaks that
+        self.assertEqual(self.decoys("See the **retired** routes below.", "- " + t), [])
+        self.assertEqual(self.decoys("See the **retired** routes below.", "", "- " + t), [("decoy", t)])
 
     def test_an_unclosed_bold_does_not_clear(self):
         t = self.token()
