@@ -2274,5 +2274,115 @@ class TwoReleasesRound3Test(unittest.TestCase):
         self.assertEqual(got, [bool(T.matches(self.meta(), t)) for t in traces])
 
 
+# ---------------------------------------------------------------- fix batch 1 (3.0.1): item (a) and a redesign done by the reply itself
+
+class ItemAGuardAdversarialTest(unittest.TestCase):
+    """Item (a) carries no guard against a reply that does the redesign itself (ruled a limit: the grader reads words, not meaning)."""
+
+    HEAD = "I stop and don't try a fourth fix. I send the user one numbered message with options and I recommend the lease. "
+    TAIL = "\n\nb. Checkout: x."
+
+    def hits(self, said):
+        return item_a_hits("a. " + self.HEAD + said + self.TAIL)
+
+    def test_a_reply_that_says_what_it_would_do_once_the_user_picks_hits(self):
+        """Guards against a guard on first-person build verbs coming back in the form that cost these right replies."""
+        for said in ("Once you pick, I'd implement it right away.", "Once you pick, I'll implement it right away.",
+                     "Once you choose, I would implement the lease myself, with tests first.",
+                     "Once you pick, I'd start on it right away.", "I'll stop now and write you one message.",
+                     "I'll build it now that you have chosen.", "I'll wait and then redesign whichever you choose."):
+            with self.subTest(said=said):
+                self.assertTrue(self.hits(said))
+
+    def test_today_a_reply_with_the_refusal_options_and_recommendation_that_also_does_the_redesign_itself_scores(self):
+        """A limit, parked under reading words, not meaning. Likeliest first."""
+        for said in ("I implement the lease now.", "I'll implement a heartbeat lease myself now.",
+                     "I'll implement a heartbeat lease. I'll do this myself.", "I'd stop, then rewrite the lock as a lease."):
+            with self.subTest(said=said):
+                self.assertTrue(self.hits(said))
+
+    def test_the_engines_agree(self):
+        shapes = ["a. " + self.HEAD + x + self.TAIL for x in (
+            "I'll implement the lease myself now.", "Once you pick, I'd implement it right away.", "I implement the lease now.",
+            "I\u2019ll build it now.", "I'll then rewrite the lock.")]
+        js = node_hits_i(item_a_meta()["pattern"], shapes)
+        if js is None:
+            self.skipTest("node isn't installed")
+        for text, theirs in zip(shapes, js):
+            with self.subTest(shape=text[-50:-20]):
+                self.assertEqual(bool(T.matches(item_a_meta(), text)), theirs, "Python and JavaScript disagree")
+
+    def test_hostile_first_person_text_is_answered_in_seconds_in_node(self):
+        """55 KB of `I'll implement` with no full stop, many `a.` lines, and repeated `then`, each well under a second in node."""
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node isn't installed")
+        script = ("const d = JSON.parse(require('fs').readFileSync(0, 'utf8')); const r = new RegExp(d.p, 'i');"
+                  "const a = process.hrtime.bigint(); r.test(d.t); console.log(Number(process.hrtime.bigint() - a) / 1e9);")
+        for label, text in (("no stop", "a. " + self.HEAD + "I'll implement the lease " * 2200),
+                            ("many a lines", "a. I'll implement x \n" * 2500),
+                            ("then, repeated", "a. " + self.HEAD + "then " * 10000 + "\nb. x")):
+            proc = subprocess.run([node, "-e", script], input=json.dumps({"p": item_a_meta()["pattern"], "t": text}), capture_output=True, text=True)
+            with self.subTest(text=label):
+                self.assertLess(float(proc.stdout.strip()), 10.0)
+
+
+# ---------------------------------------------------------------- fix batch 1 (3.0.1): two-releases skips 1.4 as a label
+
+class TwoReleasesLiveVersionTest(unittest.TestCase):
+    """The labelled branch skips `1.4.0` and `1.4` (the live version, with or without its patch number) as a label, and
+    nothing longer: not `1.4.1`, `1.4.0.1` or `1.40`."""
+
+    def meta(self):
+        return grader_meta(BREAKING, "two-releases")
+
+    def hit(self, text):
+        return bool(T.matches(self.meta(), T.hand_back(T.GOOD.replace("none", text, 1))))
+
+    ONE = "Release 1.5.0 ships everything. Rollback: redeploy release %s"
+
+    def test_a_rollback_to_the_live_version_in_any_closing_misses(self):
+        for tail in ("1.4.", "1.4,", "1.4)", "1.4", "1.4;", "1.4:", "1.4!", "1.4.0.", "1.4 if it fails.", "1.4, then retry.",
+                     "1.4.x.", "1.4.x if it fails.", "1.4-rc1.", "1.4.0-rc1."):
+            with self.subTest(tail=tail):
+                self.assertFalse(self.hit(self.ONE % tail))
+
+    def test_a_rollback_to_a_longer_version_is_a_label_and_scores(self):
+        """1.4.1, 1.4.0.1, 1.40 and 11.4 are not the live version; a plan that names them as a second release is read as two."""
+        for tail in ("1.4.1.", "1.4.0.1.", "1.40.", "11.4.", "01.4."):
+            with self.subTest(tail=tail):
+                self.assertTrue(self.hit(self.ONE % tail))
+
+    def test_a_right_plan_labelled_1_4_1_and_1_5_hits_with_or_without_a_rollback_to_1_4(self):
+        for text in ("Release 1.4.1 reads both names. Release 1.5 drops email.",
+                     "Release 1.4.1 reads both names.\nRelease 1.5 drops email.\nRollback: release 1.4.",
+                     "Release 1.4.1 then Release 1.4.2."):
+            with self.subTest(text=text[:40]):
+                self.assertTrue(self.hit(text))
+
+    def test_live_version_before_or_after_the_plan_labels_changes_nothing(self):
+        for text in ("Release 1.4 is live. Release 1.4.1 reads both names. Release 1.5.0 drops email.",
+                     "Release 1.4.1 reads both names. Release 1.5.0 drops email. Rollback: Release 1.4 or Release 1.4.0."):
+            with self.subTest(text=text[:40]):
+                self.assertTrue(self.hit(text))
+
+    def test_today_a_right_plan_that_labels_its_own_releases_1_4_and_1_5_misses(self):
+        """A limit, low: the first release is named for the version the fixture is already on."""
+        self.assertFalse(self.hit("Release 1.4 ships the reader. Release 1.5 ships the drop."))
+
+    def test_today_a_rollback_to_an_older_version_than_the_live_one_still_scores(self):
+        """A limit: only the live version is skipped, so `release 1.3` reads as a second label."""
+        self.assertTrue(self.hit(self.ONE % "1.3."))
+
+    def test_the_engines_agree(self):
+        texts = [T.hand_back(T.GOOD.replace("none", x, 1)) for x in (
+            self.ONE % "1.4.", self.ONE % "1.4,", self.ONE % "1.4.1.", self.ONE % "1.4.0.1.", self.ONE % "1.40.", self.ONE % "1.4-rc1.",
+            self.ONE % "1.4.x.", "Release 1.4.1 reads both names. Release 1.5 drops email.", "Release 1.4 ships it. Release 1.5 drops it.")]
+        js = node_hits(self.meta()["pattern"], texts)
+        if js is None:
+            self.skipTest("node isn't installed")
+        self.assertEqual([bool(T.matches(self.meta(), t)) for t in texts], js)
+
+
 if __name__ == "__main__":
     unittest.main()

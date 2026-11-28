@@ -1239,5 +1239,85 @@ class SecondReaderCountLineTest(tcp.TranscriptBase):
         self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"))
 
 
+# ---------------------------------------------------------------- fix batch 1 (3.0.1): digits that int() cannot convert
+
+class DigitFieldsNeverReachInternalErrorTest(tcp.Base):
+    """Fix batch 1, A1 and A2: no numeric field of a part, in any digit script, ends the run in `CAN'T CHECK: internal error`.
+    Model-written text is a failure line (exit 1) or a count the check reads, never a raised ValueError. Each case is
+    (part, text in the base part, text with a `{}` for the number). The base parts are tcp.build_parts(tcp.base_areas())."""
+
+    FIELDS = (
+        ("part-1.md", "SWEEP IN PARTS: 7 areas", "SWEEP IN PARTS: {} areas"),
+        ("part-1.md", "Mode: full sweep, 10 area", "Mode: full sweep, {} area"),
+        ("part-1.md", "Files listed: 368;", "Files listed: {};"),
+        ("part-1.md", "read: 367;", "read: {};"),
+        ("part-1.md", "skipped: 1; re-d", "skipped: {}; re-d"),
+        ("part-1.md", "re-dispatched: 0;", "re-dispatched: {};"),
+        ("part-1.md", "failed: 0; unread: 0\nSkip", "failed: {}; unread: 0\nSkip"),
+        ("part-1.md", "unread: 0\nSkip reasons: 1", "unread: {}\nSkip reasons: 1"),
+        ("part-1.md", "Areas not read: 7 areas, 582 files", "Areas not read: {} areas, 582 files"),
+        ("part-1.md", "7 areas, 582 files", "7 areas, {} files"),
+        ("part-1.md", "Whole repo: 990 tracked", "Whole repo: {} tracked"),
+        ("part-1.md", "; 40 in folders", "; {} in folders"),
+        ("part-1.md", "; 3 untracked", "; {} untracked"),
+        ("part-1.md", "web/vendor/: 40,", "web/vendor/: {},"),
+        ("part-1.md", "- root: (root) (6 files)", "- root: (root) ({} files)"),
+        ("part-1.md", "from `rules/r0123_ledger.py` to `rules/r0244_queue.py` (122 files)",
+         "from `rules/r0123_ledger.py` to `rules/r0244_queue.py` ({} files)"),
+        ("part-3.md", "SWEEP IN PARTS: 0 areas", "SWEEP IN PARTS: {} areas"),
+        ("part-3.md", "Mode: full sweep, 4 area", "Mode: full sweep, {} area"),
+        ("part-3.md", "- web: `web/` except `web/vendor/` (30 files)", "- web: `web/` except `web/vendor/` ({} files)"),
+    )
+
+    def sweep(self, digits, fields=None):
+        base = tcp.build_parts(tcp.base_areas())
+        for name, old, new in (fields or self.FIELDS):
+            with self.subTest(field=new.replace("{}", "<n>")[:50]):
+                code, out = tcp.run_script(tcp.edit(base, name, old, new.replace("{}", digits)))
+                self.assertNotIn("internal error", out, out[:200])
+                self.assertNotIn("Traceback", out)
+                self.assertIn(code, (0, 1), out[:200])
+
+    def test_five_thousand_ascii_digits_in_any_numeric_field_fail_a_line_and_do_not_raise(self):
+        """A1: the folder count in Whole repo was the one field that raised; the others are read through `fit`."""
+        self.sweep("9" * 5000)
+
+    def test_five_thousand_arabic_indic_digits_in_any_numeric_field_do_not_raise(self):
+        """FAULT, fails at the staged scorer (it passed at HEAD): `fit` now judges ASCII groups only, so a group of Unicode
+        digits that `\\d` still matches reaches a bare int() and raises ValueError on Python 3.11 and later.
+        Reproduction: part 1 line 1 `SWEEP IN PARTS: <5000 x U+0669> areas not read`; 18 of the 19 fields do it (all but the folder count in Whole repo). Python 3.9 has no such limit, so the test passes there."""
+        self.sweep("\u0669" * 5000)
+
+    def test_five_thousand_fullwidth_digits_in_a_few_fields_do_not_raise(self):
+        """FAULT, as above, with U+FF19."""
+        self.sweep("\uff19" * 5000, self.FIELDS[:3] + self.FIELDS[8:9] + self.FIELDS[14:15])
+
+    def test_a_negative_an_exponent_and_a_decimal_are_a_failure_line_never_a_raise(self):
+        """No field reads a sign, an exponent or a point: the regex wants digits only, so the line fails to parse."""
+        base = tcp.build_parts(tcp.base_areas())
+        for digits in ("-5", "+5", "1e3", "1.5", "0x10", "1_0", " 5", "\u00b2", "\u2460", "\u00bd"):
+            for name, old, new in self.FIELDS[:3] + self.FIELDS[10:11] + self.FIELDS[14:15]:
+                with self.subTest(digits=ascii(digits), field=new[:30]):
+                    code, out = tcp.run_script(tcp.edit(base, name, old, new.replace("{}", digits)))
+                    self.assertNotIn("internal error", out)
+                    self.assertNotIn("Traceback", out)
+                    self.assertEqual(code, 1, out[:200])
+
+    def test_a_short_count_in_arabic_indic_digits_is_read_as_a_number(self):
+        """A2: only the too-long case changed. A folder count of U+0664 U+0660 (40) reads as 40, as at 3.0.0."""
+        base = tcp.build_parts(tcp.base_areas())
+        out = self.assertProved(tcp.edit(base, "part-1.md", "web/vendor/: 40,", "web/vendor/: \u0664\u0660,"))
+        self.assertNotIn("internal error", out)
+
+    def test_areas_named_with_unicode_digits_parse_as_they_did_at_3_0_0(self):
+        """A2: a name is the part before the first colon, never a count. Superscript, Arabic-Indic, full-width and circled
+        digits, and a mix, all prove (the circled one and U+00B2 failed at HEAD, which is the fault A2 mends)."""
+        for name in ("\u00b2", "\u0663", "x\u00b2", "\u0661\u0662", "\uff14\uff10", "\u2460", "\u00bd", "cli-\u00b2", "\u0663 files"):
+            with self.subTest(name=ascii(name)):
+                areas = tcp.base_areas()
+                areas[6] = areas[6].copy(name=name)
+                self.assertProved(tcp.build_parts(areas))
+
+
 if __name__ == "__main__":
     unittest.main()

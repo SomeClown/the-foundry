@@ -1629,6 +1629,7 @@ class BreakingChangeSplitCaseTest(unittest.TestCase):
                             ("numbered with a trailing stop", "Release 1. Reads both.\nRelease 2. Renames the column."),
                             ("the live version and two real labels", "The app is on release 1.4.0. **Release 1.4.1:** reads both names. **Release 1.5.0:** drops `email`."),
                             ("labels close to the live version", "Release 1.4.0.1 reads both names. Release 1.4.1 drops `email`."),
+                            ("a label that starts like the live version", "Release 1.40 reads both names. Release 1.5.0 drops `email`."),
                             ("labels apart", "Release 1 reads both names.\n\n" + "Notes. " * 200 + "\n\nRelease 2 renames."),
                             ("first and second apart", "The first release reads both.\n\nNotes.\n\nThe second release renames.")):
             with self.subTest(hit=label):
@@ -1655,7 +1656,9 @@ class BreakingChangeSplitCaseTest(unittest.TestCase):
                             ("rollback go back", "Release 1.5.0 ships everything. To roll back, go back to release 1.4.0."),
                             ("rollback previous release", "Release 1.5.0 ships everything. The previous release 1.4.0 stays on the shelf."),
                             ("rollback replaces", "Release 1.5.0 replaces release 1.4.0 in one step."),
-                            ("the live version first", "The app is on release 1.4.0 today. Release 1.4.0 is also the rollback target.")):
+                            ("the live version first", "The app is on release 1.4.0 today. Release 1.4.0 is also the rollback target."),
+                            ("rollback to the live version without its patch number", "Release 1.5.0 ships everything. Rollback: redeploy release 1.4."),
+                            ("the live version without its patch number, then a sentence end", "Release 1.5.0 ships everything.\nRollback: redeploy release 1.4 if it fails.")):
             with self.subTest(miss=label):
                 self.assertFalse(matches(meta, hand_back(GOOD.replace("none", text, 1))))
 

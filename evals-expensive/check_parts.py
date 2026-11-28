@@ -264,7 +264,7 @@ def fit(regex, text):
     m = regex.match(text)
     try:
         for group in m.groups() if m else ():
-            if group and group.isdigit():
+            if group and group.isdecimal():
                 int(group)
     except ValueError:
         return None
@@ -715,7 +715,11 @@ def main(argv):
                     fails.append("%s: Whole repo expected %d tracked, %d skipped whole, %d untracked; found %d, %d, %d" % ((name,) + want + got))
                 for folder, count in layout["skipped_whole"].items():
                     fm = re.search(re.escape(folder) + r"`?:\s*(\d+)", w.group(3))
-                    if not fm or int(fm.group(1)) != count:
+                    try:
+                        right = bool(fm) and int(fm.group(1)) == count
+                    except ValueError:   # digits too long for int(): not a count the check can read
+                        right = False
+                    if not right:
                         fails.append("%s: Whole repo should give '%s: %d' inside the parentheses, found %r" % (name, folder, count, w.group(3)))
             rest = "\n".join(lines[whole_at:])
             absent = [p for p in layout["untracked"] if not re.search(r"(?<![\w./-])" + re.escape(p) + r"(?![\w/-])", rest)]

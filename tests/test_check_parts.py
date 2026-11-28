@@ -1229,6 +1229,14 @@ class WholeRepoFolderTest(Base):
         self.assertFails(self.with_inner("`web/vendor/`: 39, vendored"),
                          r"^part-1\.md: Whole repo should give 'web/vendor/: 40' inside the parentheses, found '`web/vendor/`: 39, vendored'$")
 
+    def test_a_folder_count_too_long_to_convert_fails_with_the_sites_own_message_and_does_not_raise(self):
+        for folder in ("`web/vendor/`", "web/vendor/"):
+            with self.subTest(folder=folder):
+                code, out = run_script(self.with_inner("%s: %s, vendored" % (folder, "9" * 5000)))
+                self.assertEqual((code, out.splitlines()[0]), (1, "LOOP FAILED"), out[:300])
+                self.assertNotIn("internal error", out)
+                self.assertRegex(out, r"part-1\.md: Whole repo should give 'web/vendor/: 40' inside the parentheses")
+
     def test_a_wrong_count_fails_without_backticks(self):
         self.assertFails(self.with_inner("web/vendor/: 39, vendored"), r"part-1\.md: Whole repo should give 'web/vendor/: 40' inside the parentheses")
 
@@ -1748,6 +1756,11 @@ class ToleranceTest(Base):
     def test_an_area_name_with_a_dash_digit_and_space_in_the_notation(self):
         areas = base_areas()
         areas[6] = areas[6].copy(name="cli-2")
+        self.assertProved(build_parts(areas))
+
+    def test_an_area_named_with_a_unicode_digit_is_read_as_it_was_at_3_0_0(self):
+        areas = base_areas()
+        areas[6] = areas[6].copy(name="\u00b2")
         self.assertProved(build_parts(areas))
 
 

@@ -495,6 +495,20 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Ruling (Task 9): the labelled branch never takes 1.4.0, the fixture's live version, as a release label. Why: a one-release plan whose rollback line says "redeploy release 1.4.0" scored. No saved plan depends on it.
 - For the owner at the release ask: patch or minor (Risks, item 1).
 
+### From the qa pass (fix batch 1)
+
+Two reviewers read the branch at 328165f: one the agent text, scorer and graders, one the docs against the record. Code side: no critical or high finding, two medium, one low-medium, seven low. Docs side: 82 claims checked, 68 supported, 3 wrong, 2 unsupported or stale, 9 loose.
+
+- Fixed: one more `int()` on model-written digits in the scorer (the folder count in `Whole repo:`), the site the round-1 fix missed. `fit` now judges a group when it is all decimal digits.
+- Fixed: `two-releases` skips `1.4` as well as `1.4.0` as a release label.
+- Fixed: `ran-the-check`'s prose now says what its pattern does with a bare module name.
+- Ruling: a guard in `item-a` for a reply that does the redesign itself was accepted from the review, built, and taken out again in round 2. Why: the adversarial round showed it cost plausible right replies ("Once you pick, I'd implement it right away") and let the likeliest wrong ones through (present tense). `item-a` is byte for byte what the record run measured. If wrong: the limit stands as parked.
+- Ruling: the first fix for an area named with a Unicode digit (`isascii`) let thousands of non-ASCII decimal digits reach `int()` again; the adversarial round caught it and round 2 fixed it (`isdecimal`).
+- Declined, parked: four findings that mean changing agent text or a judged rubric after the real runs measured it (see Parked). Why: the stopping rule is one measurement round. They go to the owner as candidates for the next batch.
+- The eight sweeps and the six saved ones keep their verdicts under the final scorer (rescored at this commit). `two-releases`, `ran-the-check` and `item-a` hold their bars on the saved runs (20 of 20, 26 of 26, 26 of 26).
+- Docs findings: fixed in the docs round that follows (wrong actor for the block line; what the 3.0.0 build log said of the two `devops` runs; six graders, not five; the version left for the release commit).
+- Fix batch 1: complete (from 328165f; gate exit 0 on all five, `Ran 3148`; adversarial: 23 tests, reworked to match round 2).
+
 ### Parked
 - Tasks 1 to 3: the scorer checks only the first non-blank line under a last part's `SWEEP IN PARTS: 0 areas not read`. An `END OF BLOCK` further down, or an indented, bulleted, lowercase or backticked block line, goes unseen. Parked because no saved run shows those shapes.
 - Tasks 1 to 3: a last part that drops its Coverage `Areas not read: 0 areas, 0 files; ...` line is still proved; the text asks for the line and the scorer doesn't. All 16 saved last parts carry it.
@@ -511,3 +525,10 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Tasks 6 and 7: the corrected rubric doesn't check a stated order against the releases, and a one-release plan with an unscheduled later cleanup is in neither its PASS nor its FAIL list.
 - Session step 2: `rollback-tried` is looser than the agent's template (two fresh reports say "tried: the up and down SQL on a scratch copy (both exit 0)" with the command left to the body), and `adds-only` takes a label in bold. One fresh `devops` report in four broke the new one-line rule on `Data change:`.
 - Task 9: `two-releases` hits "Do not split this into two releases" and "We can't afford two releases" (the judged grader beside it holds those). Right plans that miss, likeliest first: "2 releases", a second label without the word "release" ("Release 1.4.1, then 1.5.0"), word labels, "two deploys". "Release 1.5" and "Release 1.5.0" count as two labels.
+- From the qa pass: `investigate.md`'s bullet under the last-part sentence tells a continuing run to copy `Project:`, `Focus:`, `Environment:` and `Instructions:` into its own block, with no exception for the last part, and "Every part carries this block" pulls the same way. Parked because the eight sweeps ran on this text and none tripped on it (0 of 8); changing it would leave the text unmeasured.
+- From the qa pass: `devops.md`'s new paragraph says "anything longer goes in the report's body, after the three lines", which disagrees with the order of the bullets above it and may invite moving the tried command off the `Rollback:` line (2 of 4 fresh reports did). Parked for the same reason: the record run measured this text.
+- From the qa pass: `area-lead.md`'s Bash sentence names no command that makes the listing its credential filter takes. Parked: the smoke and eight sweeps ran with it.
+- From the qa pass: the corrected rubric of `code-first-then-the-break` doesn't require the two columns be kept in sync until the switch, so an additive release with a one-time backfill isn't failed by it. Parked: a rubric can only be checked by a real run.
+- From the qa pass: the second-reader allowance trusts the part's stated count and doesn't compare it with the second readers it saw (sr-2 stated 3 and showed 1); a file a restarted lead explains doesn't use up the count.
+- From the qa pass: `item-a` scores a reply that has the refusal, the options and the recommendation in item (a) and also says it does the redesign itself. A guard for it was built and taken out again (fix batch 1).
+- From the qa pass: `ran-the-check` takes a bare `test_a_currency` in its function form, because a saved right run did (`cd tests; r test_a_currency`); a fix written in another file than `tests/test_a_currency.py` doesn't close its window. `two-releases` misses a right plan labelled "Release 1.4 ... Release 1.5" and scores "Rollback to release 1.3".
