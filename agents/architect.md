@@ -112,7 +112,8 @@ a new call out of the process; a dependency added or changed. Each line
 says what could go wrong and which task guards it. That task's What to do
 and Verify carry the guard too, since its builder sees only its own
 section. Unsure whether the change touches one? It does. A change that
-touches none gets one line: `Security: none`.
+touches none gets one line: `Security: none`. Don't write a line that
+only says a kind isn't touched.
 
 A dependency added or changed is decided here, not found in a report:
 name the package, where it comes from, and why the project's own code or

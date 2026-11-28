@@ -12,8 +12,8 @@ permissions you've set:
 - **Your files:** its agents read the project you open, and five of them write
   files there, each in its own lane (application code, UI code, tests, config,
   docs). `investigate` starts read-only reader agents inside your session, and
-  they go nowhere new. On a large repo it also starts copies of itself as area
-  leads, which hold Bash like it does. Nothing is copied anywhere else by the plugin,
+  they go nowhere new. On a large repo it also starts `area-lead` agents that
+  start readers of their own, and which hold Bash like it does. Nothing is copied anywhere else by the plugin,
   with one exception: `run-plan` and `debug` append a retro to
   `~/.foundry/retro.md` on your own machine (or to the file named by the
   `FOUNDRY_RETRO_FILE` environment variable, if you set it). For each run that
