@@ -2121,5 +2121,158 @@ class BreakingChangeRubricTest(unittest.TestCase):
         self.assertIn("FAIL only for", text)
 
 
+class TwoReleasesRound3Test(unittest.TestCase):
+    """Task 9 (3.0.1): the three-branch two-releases pattern, attacked with one-release plans and right plans in other wording."""
+
+    def meta(self):
+        return grader_meta(BREAKING, "two-releases")
+
+    def hit(self, text, **kw):
+        return bool(T.matches(self.meta(), T.hand_back(T.GOOD.replace("none", text, 1), **kw)))
+
+    # A real fault: the fixture's live version is 1.4.0, and a plan that ships once names it in a rollback line.
+    def test_a_one_release_plan_with_a_rollback_line_naming_the_live_version_misses(self):
+        """FAULT, fails today: `Release 1.5.0` then `release 1.4.0` (the live version, app/VERSION) reads as two releases.
+        No saved right plan needs the live version as a label (all 20 still hit with it removed)."""
+        for label, text in (
+                ("rollback redeploy", "Release 1.5.0 ships everything. Rollback: redeploy release 1.4.0."),
+                ("go back", "Ship all in Release 1.5.0. If it fails, go back to Release 1.4.0."),
+                ("previous release", "Single release 1.5.0; the previous release 1.4.0 stays as the fallback."),
+                ("replaces", "One release 1.5.0, replacing Release 1.4.0 in production.")):
+            with self.subTest(plan=label):
+                self.assertFalse(self.hit(text))
+
+    def test_a_one_release_plan_that_names_the_live_version_without_the_word_release_misses(self):
+        for text in ("This ships in a single release, 1.5.0 (the current release is 1.4.0).",
+                     "Everything ships in one release. Rollback: revert to release 1.4.0 if it fails.",
+                     "Release 1.5.0 ships it. Release 1.5.0-rc1 is the candidate.",
+                     "Release A is the one. Release Announcement follows.",
+                     "It ships in one release. There is no need for a second release."):
+            with self.subTest(text=text):
+                self.assertFalse(self.hit(text))
+
+    # Limits.
+    def test_today_a_sentence_that_rejects_two_releases_still_scores_unless_not_is_next_to_it(self):
+        """A limit: the judged grader fails these plans. `not ` or `no ` must sit right before the words."""
+        for text in ("Do not split this into two releases.", "We can't afford two releases.",
+                     "Two releases would be safer but one is enough.",
+                     "One release; the two release notes entries are listed below.",
+                     "Two tasks before releases: write code, run it."):
+            with self.subTest(text=text):
+                self.assertTrue(self.hit(text))
+
+    def test_today_two_labels_that_differ_only_in_spelling_of_one_version_count_as_two(self):
+        """A limit: the backreference compares text, so `1.5` and `1.5.0`, or `1` and `10`, are different labels."""
+        for text in ("Release 1.5 is out. Later, Release 1.5.0 is the same thing.", "Release 1 is out. Release 10 is far off."):
+            with self.subTest(text=text):
+                self.assertTrue(self.hit(text))
+
+    def test_today_a_right_plan_in_these_wordings_misses(self):
+        """Limits (right plans that score 0): digit counts, the second label without the word, word labels, `deploys`,
+        a table, a pair, v-prefixed versions, `#1`, a line break after Release. Likeliest first: `2 releases`,
+        `Release 1.4.1, then 1.5.0`, `Release One / Release Two`, `two deploys`."""
+        for label, text in (
+                ("digit count", "Ship in 2 releases: code, then the drop."),
+                ("digit count separate", "Ship in 2 separate releases."),
+                ("second label bare", "Release 1.4.1, then 1.5.0."),
+                ("both versions after one word", "Release 1.4.1 and 1.5.0 go out a week apart."),
+                ("word labels", "Release One reads both; Release Two drops email."),
+                ("deploys", "Do it in two deploys."),
+                ("pair", "A pair of releases."),
+                ("v versions", "v1.4.1 and v1.5.0."),
+                ("hash labels", "Release #1 reads both. Release #2 drops."),
+                ("table", "| Release | What |\n| 1.4.1 | code |\n| 1.5.0 | drop |"),
+                ("releases colon", "Releases: 1.4.1, 1.5.0."),
+                ("next and after", "The next release reads both; the release after that drops email."),
+                ("a first and a later one", "A first release adds the column, and a later one drops email."),
+                ("phases", "Ship in two phases, each its own release."),
+                ("break after word", "Release\n1.4.1 reads both; Release\n1.5.0 drops.")):
+            with self.subTest(right_plan=label):
+                self.assertFalse(self.hit(text))
+
+    def test_a_right_plan_in_these_wordings_hits(self):
+        for label, text in (
+                ("lower case", "release 1.4.1 then release 1.5.0"),
+                ("phases with labels", "Phase 1 (release 1.4.1) reads both. Phase 2 (release 1.5.0) drops email."),
+                ("bold", "**Release 1.4.1** code; **Release 1.5.0** drop."),
+                ("backticks", "`Release 1.4.1` code; `Release 1.5.0` drop."),
+                ("count and versions", "Two releases: 1.4.1 and 1.5.0."),
+                ("hyphen", "A two-release plan."),
+                ("follow-up", "Release 1.4.1 reads; follow-up release 1.5.0 drops.")):
+            with self.subTest(right_plan=label):
+                self.assertTrue(self.hit(text))
+
+    # The anchor.
+    def test_text_before_the_report_and_after_its_string_never_scores(self):
+        one = "One release only."
+        talk = "Release 1 then Release 2, two releases, a later release, the first release and the second release"
+        self.assertFalse(self.hit(one, before=[talk]))
+        line = json.dumps({"type": "user", "content": T.FRAME + "  Status: DONE\n  Concerns: one release"}, separators=(",", ":"))
+        self.assertFalse(bool(T.matches(self.meta(), line[:-1] + ',"note":"' + talk + '"}')))
+        self.assertFalse(bool(T.matches(self.meta(), line + "\n" + json.dumps({"type": "assistant", "content": talk}))))
+
+    def test_a_refusal_with_no_report_scores_nothing(self):
+        trace = json.dumps({"type": "user", "content": "[Subagent hand-back] I can't help with that. two releases Release 1 Release 2"})
+        self.assertFalse(bool(T.matches(self.meta(), trace)))
+
+    def test_an_escaped_quote_inside_the_report_does_not_end_it(self):
+        self.assertTrue(self.hit('He said "ok". Release 1 first, then Release 2.'))
+
+    def test_a_label_after_an_unescaped_quote_does_not_count(self):
+        raw = json.dumps({"type": "user", "content": T.FRAME + "  one"})[:-2] + '", "x":"Release 1 Release 2"}'
+        self.assertFalse(bool(T.matches(self.meta(), raw)))
+
+    # Engines and time.
+    def test_node_and_python_agree_on_every_shape_here_and_on_non_ascii_text(self):
+        texts = [
+            "Release 1.5.0 ships everything. Rollback: redeploy release 1.4.0.", "Release 1 é中文 code. Release 2 drops.",
+            "éRelease 1 code. Releaseé 2", "Release 1é only. Release 1é", "étwo releases",
+            "Release 1.5 and Release 1.5.0", "Release 1 and Release 10", "Release 1.5.0 and Release 1.5.0-rc1",
+            "Do not split this into two releases.", "Release 1.4.1, then 1.5.0.", "Release 1.4.1 then release 1.5.0",
+            "The first release reads; the second release drops.", "There is no second release.", "Release\n1.4.1 and Release\n1.5.0",
+        ]
+        forms = []
+        for text in texts:
+            full = T.GOOD.replace("none", text, 1)
+            body = T.FRAME + "\n".join("  " + line for line in full.split("\n"))
+            forms.append(T.hand_back(full))
+            forms.append(json.dumps({"type": "user", "content": body}, separators=(",", ":"), ensure_ascii=False))
+        theirs = node_hits(self.meta()["pattern"], forms)
+        if theirs is None:
+            self.skipTest("node isn't installed")
+        mine = [bool(T.matches(self.meta(), t)) for t in forms]
+        self.assertEqual(mine, theirs)
+
+    def hostile(self):
+        unit = "Release 1.5.0 "
+        return {
+            "same label repeated": unit * 20000,
+            "distinct labels": " ".join("Release 9.%d" % i for i in range(20000)),
+            "no label at all": "x " * 200000,
+            "release then a word": "release x " * 40000,
+            "count words": "two a b c d e f " * 25000,
+            "first release repeated": "first release " * 30000,
+        }
+
+    def test_hostile_text_is_answered_in_python_within_a_generous_bound(self):
+        import time
+        for label, body in self.hostile().items():
+            trace = T.hand_back(T.GOOD.replace("none", body, 1))
+            with self.subTest(text=label):
+                t0 = time.time()
+                T.matches(self.meta(), trace)
+                self.assertLess(time.time() - t0, 10)
+
+    def test_hostile_text_is_answered_in_node_within_a_generous_bound(self):
+        import time
+        traces = [T.hand_back(T.GOOD.replace("none", body, 1)) for body in self.hostile().values()]
+        t0 = time.time()
+        got = node_hits(self.meta()["pattern"], traces)
+        if got is None:
+            self.skipTest("node isn't installed")
+        self.assertLess(time.time() - t0, 10)
+        self.assertEqual(got, [bool(T.matches(self.meta(), t)) for t in traces])
+
+
 if __name__ == "__main__":
     unittest.main()

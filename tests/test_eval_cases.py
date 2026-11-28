@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -1606,10 +1607,68 @@ class BreakingChangeSplitCaseTest(unittest.TestCase):
             with self.subTest(hit=label):
                 self.assertTrue(matches(meta, hand_back(GOOD.replace("none", text, 1))))
         for label, text in (("one numbered", "Release 1 does it all."),
-                            ("version numbers", "Version 1.4.0 becomes release 1.5.0, then release 2.0.0."),
+                            ("one version number", "Version 1.4.0 becomes release 1.5.0."),
                             ("only a second", "The second release is next year.")):
             with self.subTest(miss=label):
                 self.assertFalse(matches(meta, hand_back(GOOD.replace("none", text, 1))))
+
+    def test_two_releases_takes_the_labels_and_counts_saved_plans_used(self):
+        """Saved right plans named their releases by version, by letter, and with words between the count and the noun.
+
+        One of them, a code-first plan, said "two code releases" and labelled them "Release 1.4.1" and "Release 1.5.0",
+        and the grader read neither.
+        """
+        meta = self.grader("two-releases")
+        for label, text in (("count with a word between", "The rename is done in two code releases with the migration between them:"),
+                            ("count with two words", "It ships as three separate code releases."),
+                            ("count, upper case", "TWO CODE RELEASES"),
+                            ("versions", "1. **Release 1.4.1:** the code works with both names.\n2. **Migration 0003:** the rename.\n3. **Release 1.5.0:** drop the old name."),
+                            ("a version and a letter", "**Release 1.4.0** is live. **Release A (data first):** adds the column. **Release B:** drops it."),
+                            ("a number and a version", "Release 1 (code) reads both names. Release 1.5.0 drops `email`."),
+                            ("lettered, in a list", "- **Release A (data first):** adds the column.\n- **Release B (breaking, later):** drops it."),
+                            ("numbered with a trailing stop", "Release 1. Reads both.\nRelease 2. Renames the column."),
+                            ("the live version and two real labels", "The app is on release 1.4.0. **Release 1.4.1:** reads both names. **Release 1.5.0:** drops `email`."),
+                            ("labels close to the live version", "Release 1.4.0.1 reads both names. Release 1.4.1 drops `email`."),
+                            ("labels apart", "Release 1 reads both names.\n\n" + "Notes. " * 200 + "\n\nRelease 2 renames."),
+                            ("first and second apart", "The first release reads both.\n\nNotes.\n\nThe second release renames.")):
+            with self.subTest(hit=label):
+                self.assertTrue(matches(meta, hand_back(GOOD.replace("none", text, 1))))
+
+    def test_two_releases_misses_a_plan_with_one_release(self):
+        """Saved plans cut down to one release, and the one-release wordings made by hand."""
+        meta = self.grader("two-releases")
+        for label, text in (("one version", "Release 1.5.0 renames the column and ships the code."),
+                            ("a single release", "Everything ships in a single release."),
+                            ("one release", "This goes out as one release, with the migration applied first."),
+                            ("Release 1 alone", "Release 1 does it all: the migration and the code."),
+                            ("release notes", "Write the release notes for 1.5.0."),
+                            ("the same label twice", "Release 1.5.0 renames the column.\nRelease 1.5.0 also ships the code."),
+                            ("the same letter twice", "Release A renames the column. Release A ships the code."),
+                            ("the same label, other case", "Release 1 renames. Then release 1 ships."),
+                            ("one version after a version", "Version 1.4.0 becomes release 1.5.0."),
+                            ("not two releases", "This is not two releases; it is one rename."),
+                            ("no second release", "The first release renames the column and ships the code. There is no second release."),
+                            ("not a later release", "The rename is not a later release; it ships now."),
+                            ("two steps in one release", "The rename is done in two steps inside one release."),
+                            ("a word that starts like a label", "Release Apple is the codename. Release Planning is on Friday."),
+                            ("rollback redeploy", "Release 1.5.0 ships everything. Rollback: redeploy release 1.4.0."),
+                            ("rollback go back", "Release 1.5.0 ships everything. To roll back, go back to release 1.4.0."),
+                            ("rollback previous release", "Release 1.5.0 ships everything. The previous release 1.4.0 stays on the shelf."),
+                            ("rollback replaces", "Release 1.5.0 replaces release 1.4.0 in one step."),
+                            ("the live version first", "The app is on release 1.4.0 today. Release 1.4.0 is also the rollback target.")):
+            with self.subTest(miss=label):
+                self.assertFalse(matches(meta, hand_back(GOOD.replace("none", text, 1))))
+
+    def test_two_releases_answers_a_long_trace_of_labels_at_once(self):
+        """Many release labels and no second one must be answered at once, in both engines' backtracking."""
+        meta = self.grader("two-releases")
+        start = time.time()
+        for text in ("\n".join("Release 1.5.0 step %d" % i for i in range(5000)),
+                     " ".join("first release" for _ in range(5000)),
+                     " ".join("two a b c d e f g" for _ in range(5000)),
+                     " ".join("Release A" for _ in range(5000))):
+            self.assertFalse(matches(meta, hand_back(GOOD.replace("none", text, 1))))
+        self.assertLess(time.time() - start, 5)
 
     def test_the_judged_grader_reads_the_trace_with_the_trace_preamble_at_weight_2(self):
         meta, body = read_markdown(EVALS / self.CASE / "graders" / "code-first-then-the-break.md")
