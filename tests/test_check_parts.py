@@ -650,10 +650,20 @@ class ShapeTest(Base):
 
     def test_the_last_part_with_nothing_under_the_line_passes_and_text_under_it_fails(self):
         for stray, label in (("To read the rest, dispatch again.", "sentence"), ("END OF BLOCK", "end"), ("Project: x", "project"),
-                             ("Areas not read:", "header")):
+                             ("Focus: x", "focus"), ("Environment: x", "environment"), ("Areas not read:", "header")):
             with self.subTest(label=label):
                 parts = edit(self.parts, "part-3.md", "SWEEP IN PARTS: 0 areas not read\n", "SWEEP IN PARTS: 0 areas not read\n%s\n" % stray)
                 self.assertFails(parts, r"part-3\.md: the last part says 0 areas not read, so nothing may sit under the line")
+
+    def test_a_count_too_long_to_convert_is_a_line_the_check_cannot_read_not_an_internal_error(self):
+        huge = "9" * 5000
+        for label, name, old, new in (("sweep line", "part-1.md", "SWEEP IN PARTS: 7 areas not read", "SWEEP IN PARTS: %s areas not read" % huge),
+                                      ("counts line", "part-3.md", "failed: 0;", "failed: %s;" % huge),
+                                      ("area count", "part-3.md", " files)", " %s files)" % huge)):
+            with self.subTest(label=label):
+                code, out = run_script(edit(self.parts, name, old, new))
+                self.assertEqual((code, out.splitlines()[0]), (1, "LOOP FAILED"), out[:300])
+                self.assertNotIn("internal error", out)
 
 
 class OrderTest(Base):
@@ -3428,6 +3438,85 @@ class TranscriptReadersTest(TranscriptBase):
             if e.get("subagent_type") == READER:
                 e["parent_task_id"] = "someone-else"
         self.assertTranscriptProved(self.run_t(events))
+
+
+class TranscriptSecondReaderTest(TranscriptBase):
+    """AC-4: a part's own re-dispatched count covers one second reader per readable file it holds."""
+
+    def part_of(self, rel):
+        areas = base_areas()
+        cuts = [0] + list(BASE_CUTS) + [len(areas)]
+        for k in range(len(cuts) - 1):
+            if any(rel in a.files for a in areas[cuts[k]:cuts[k + 1]]):
+                return "part-%d.md" % (k + 1)
+        raise AssertionError(rel)
+
+    def twice(self, parts, *rels, times=1):
+        events = Transcript(parts).events   # the returned reports are the saved ones, so the counts line is the same in both
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        for rel in rels:
+            for _ in range(times):
+                events.extend(t.reader(rel, "tX"))
+        return events
+
+    def counted(self, name, n):
+        return edit(self.parts, name, "re-dispatched: 0;", "re-dispatched: %d;" % n)
+
+    def run_twice(self, parts, *rels, times=1):
+        return self.run_t(self.twice(parts, *rels, times=times), parts=parts)
+
+    def test_one_file_read_twice_in_a_part_that_says_one_is_proved_with_a_note(self):
+        # AC-4
+        rel = "api/billing/toll.py"
+        name = self.part_of(rel)
+        out = self.assertTranscriptProved(self.run_twice(self.counted(name, 1), rel))
+        self.assertIn("NOTE: transcript: %s: 1 readable files had a second reader, within its re-dispatched count of 1: %s" % (name, rel), out.splitlines())
+
+    def test_the_same_run_with_a_count_of_zero_fails_as_before(self):
+        # AC-4
+        self.assertTranscriptFails(self.run_twice(self.parts, "api/billing/toll.py"),
+                                   r"^transcript: 1 readable files had a reader dispatched more than once: api/billing/toll\.py \(2 times\)$")
+
+    def test_two_twice_read_files_in_a_part_that_says_one_both_fail(self):
+        # AC-4
+        rels = ("api/billing/toll.py", "api/billing/tow.py")
+        name = self.part_of(rels[0])
+        self.assertEqual(self.part_of(rels[1]), name)
+        out = self.assertTranscriptFails(self.run_twice(self.counted(name, 1), *rels), r"^transcript: 2 readable files had a reader dispatched more than once: ")
+        self.assertNotIn("NOTE: transcript: %s" % name, out)
+
+    def test_a_file_read_twice_in_part_2_with_only_part_1s_count_at_one_fails(self):
+        # AC-4
+        rel = next(f for f in readable_paths() if self.part_of(f) == "part-2.md")
+        self.assertTranscriptFails(self.run_twice(self.counted("part-1.md", 1), rel),
+                                   r"^transcript: 1 readable files had a reader dispatched more than once: ")
+
+    def test_a_file_read_three_times_fails_with_a_count_of_five(self):
+        # AC-4
+        rel = "api/billing/toll.py"
+        self.assertTranscriptFails(self.run_twice(self.counted(self.part_of(rel), 5), rel, times=2), r"toll\.py \(3 times\)")
+
+    def test_a_part_with_no_counts_line_gives_no_allowance_and_no_exception(self):
+        # AC-4
+        rel = "api/billing/toll.py"
+        name = self.part_of(rel)
+        parts = edit(self.parts, name, "Files listed: ", "Files listing: ")
+        code, out = self.run_twice(parts, rel)
+        self.assertEqual(code, 1, out)
+        self.assertNotIn("Traceback", out)
+        self.assertRegex(out, r"transcript: 1 readable files had a reader dispatched more than once")
+
+    def test_a_restarted_lead_is_allowed_first_and_does_not_use_up_the_count(self):
+        # AC-4
+        a, b = "api/billing/toll.py", "api/billing/tow.py"
+        parts = self.counted(self.part_of(b), 1)
+        self.base = Transcript(parts).events   # this test's own base, built from the edited parts
+        events = TranscriptReadersTest.restarted(self, files=(a,))
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 92000, str(Fixture.repo)
+        events.extend(t.reader(b, "tX"))
+        self.assertTranscriptProved(self.run_t(events, parts=parts))
 
 
 class TranscriptAreaLeadAgentTest(TranscriptBase):

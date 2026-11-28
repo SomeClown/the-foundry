@@ -22,7 +22,8 @@ Reads DIR/part-<n>.md in number order and checks, against the key and the fixtur
  10. read           across the parts: unread and failed are 0, the skipped numbers add up to the key's file_skips, and
                     the read numbers add up to the files left after the whole-folder skips minus those
  11. transcript     only with --transcript FILE, the run's `claude -p --output-format stream-json --verbose` transcript:
-                    every readable file had one file-reader task started and completed, each later top-level
+                    every readable file had one file-reader task started and completed (a second reader is allowed where
+                    the part's own re-dispatched count covers it, or a restarted lead explains it), each later top-level
                     `investigate` dispatch is CONTINUE SWEEP plus the previous part's block as saved, and (a NOTE:, never
                     a failure) no two area leads ran at the same time; and each part file is the report its top-level
                     `investigate` returned (blank lines and trailing whitespace aside), one result per part file
@@ -125,7 +126,7 @@ def read_parts(parts_dir):
         raise CantCheck("the parts folder %s does not exist" % parts_dir)
     found = []
     for name in os.listdir(parts_dir):
-        m = PART_FILE_RE.match(name)
+        m = fit(PART_FILE_RE, name)
         if m:
             found.append((int(m.group(1)), name))
     found.sort()
@@ -216,7 +217,7 @@ def check_shape(name, lines, fails, heads=None):
         fails.append("%s: line 1 is %s, so the run was a flagged single-agent read; expected a full sweep with the SWEEP IN PARTS line on line 1" % (name, FLAG))
         at += 1
     first = lines[at] if at < len(lines) else ""
-    m = SWEEP_RE.match(first)
+    m = fit(SWEEP_RE, first)
     if not m:
         fails.append("%s: expected 'SWEEP IN PARTS: <n> areas not read' as line %d, found %r" % (name, at + 1, first))
         return None
@@ -226,7 +227,7 @@ def check_shape(name, lines, fails, heads=None):
         fails.append("%s: expected the last non-blank line to be %r, found %r (the report was cut off?)" % (name, LAST_LINE, last[-1] if last else ""))
     if n == 0:
         nxt = next((line for line in lines[at + 1:] if line.strip()), "")
-        if nxt.startswith(("To read the rest", "Project:", "Instructions:", "Areas not read:", "END OF BLOCK")):
+        if nxt.startswith(("To read the rest", "Project:", "Focus:", "Environment:", "Instructions:", "Areas not read:", "END OF BLOCK")):
             fails.append("%s: the last part says 0 areas not read, so nothing may sit under the line; found %r" % (name, nxt))
         return 0, [], at + 1
     expect = [("sentence", CONTINUE_SENTENCE), ("Project:", None), ("Focus:", None), ("Environment:", None), ("Instructions:", None), ("Areas not read:", "Areas not read:")]
@@ -258,9 +259,21 @@ def check_shape(name, lines, fails, heads=None):
     return n, areas, cur + 1
 
 
+def fit(regex, text):
+    """regex.match(text), or None when a group of digits is too long for int() to convert (the line is then one the check can't read)."""
+    m = regex.match(text)
+    try:
+        for group in m.groups() if m else ():
+            if group and group.isdigit():
+                int(group)
+    except ValueError:
+        return None
+    return m
+
+
 def find_line(lines, start, regex):
     for i in range(start, len(lines)):
-        m = regex.match(lines[i].strip())
+        m = fit(regex, lines[i].strip())
         if m:
             return i, m
     return None, None
@@ -285,7 +298,7 @@ def stated_counts(read):
     """The stated file counts of a part's 'Areas read:' lines, or None when a line doesn't parse."""
     counts = []
     for line in read:
-        m = AREA_RE.match(line.strip())
+        m = fit(AREA_RE, line.strip())
         if not m:
             return None
         counts.append(int(m.group(3)))
@@ -449,6 +462,21 @@ def check_transcript(events, repo, tracked, layout, infos, fails, notes):
             allowed[restarted[path]] = allowed.get(restarted[path], 0) + 1
     for area in sorted(allowed):
         notes.append("NOTE: transcript: area %s's lead was started twice; its %d files had a second set of readers" % (area, allowed[area]))
+    # a part's own re-dispatched count covers one second reader per file; per part, so one part's count never covers another's files
+    second = {}   # part name -> (info, files with exactly two readers that the part holds)
+    for path in twice:
+        if len(dispatched[path]) != 2:
+            continue
+        holder = next((i for i in infos if path.encode("utf-8") in i["files"]), None)
+        if holder is not None:
+            second.setdefault(holder["name"], (holder, []))[1].append(path)
+    for name in sorted(second):
+        holder, paths = second[name]
+        count = holder.get("redispatched", 0)
+        if len(paths) <= count:
+            for path in paths:
+                twice.remove(path)
+            notes.append("NOTE: transcript: %s: %d readable files had a second reader, within its re-dispatched count of %d: %s" % (name, len(paths), count, short(paths)))
     if twice:
         fails.append("transcript: %d readable files had a reader dispatched more than once: %s" % (len(twice), short(["%s (%d times)" % (p, len(dispatched[p])) for p in twice])))
     outside = sorted(set(dispatched) - readable)
@@ -601,7 +629,7 @@ def main(argv):
                     rebuilt = validated[line]
                 else:
                     rebuilt = None
-                    m = AREA_RE.match(line)
+                    m = fit(AREA_RE, line)
                     if not m:
                         fails.append("%s: area line does not match '- <name>: <definition> (<n> files)': %r" % (info["name"], line))
                     else:
@@ -657,15 +685,16 @@ def main(argv):
         if not m:
             fails.append("%s: no line 'Files listed: <n>; read: <n>; skipped: <n>; re-dispatched: <n>; failed: <n>; unread: <n>' in Coverage" % name)
         else:
-            listed, read, skipped, _redisp, failed, unread = [int(x) for x in m.groups()]
+            listed, read, skipped, redispatched, failed, unread = [int(x) for x in m.groups()]
             info["listed"] = (read, skipped, failed, unread)
+            info["redispatched"] = redispatched
             if listed != read + skipped + failed + unread:
                 fails.append("%s: Files listed %d should equal read+skipped+failed+unread = %d+%d+%d+%d = %d"
                              % (name, listed, read, skipped, failed, unread, read + skipped + failed + unread))
             counts = info.get("counts", [])
             if counts and None not in counts and listed != sum(counts):
                 fails.append("%s: Files listed %d should equal the sum of its areas' counts, %d" % (name, listed, sum(counts)))
-        block_files = sum(int(AREA_RE.match(a.strip()).group(3)) for a in info["block"] if AREA_RE.match(a.strip()))
+        block_files = sum(int(fit(AREA_RE, a.strip()).group(3)) for a in info["block"] if fit(AREA_RE, a.strip()))
         _, m = find_line(lines, begin, NOT_READ_RE)
         if m:
             if (int(m.group(1)), int(m.group(2))) != (info["n"], block_files):
@@ -676,7 +705,7 @@ def main(argv):
         if whole_at is None:
             fails.append("%s: no 'Whole repo:' line in Coverage" % name)
         elif number == 1:
-            w = WHOLE_RE.match(lines[whole_at].strip())
+            w = fit(WHOLE_RE, lines[whole_at].strip())
             if not w:
                 fails.append("%s: Whole repo line should read 'Whole repo: <n> tracked files; <n> in folders skipped whole (<folder>/: <n>, <reason>; ...); <n> untracked', found %r" % (name, lines[whole_at].strip()))
             else:
@@ -740,7 +769,7 @@ def main(argv):
                 continue
             if sum(counts) + nxt[0] <= args.part_size:
                 notes.append("NOTE: %s holds %d files and left its next area, %s, which would have fit (%d + %d is at most %d); a refused spawn can end a part early"
-                             % (i["name"], sum(counts), AREA_RE.match(j["read"][0].strip()).group(1), sum(counts), nxt[0], args.part_size))
+                             % (i["name"], sum(counts), fit(AREA_RE, j["read"][0].strip()).group(1), sum(counts), nxt[0], args.part_size))
 
     # facts
     alltext = "\n".join(p[2] for p in parts)

@@ -325,7 +325,9 @@ A continuing run rebuilds each area it picked the same way.
   in the block, read nothing else, and give the error in a note that goes with the mode
   line (see "8. Coverage").
 
-The rest of the areas go back in the block, in the order given.
+The rest of the areas go back in the block, in the order given. With none left, this
+part is the last, and its block is only the line `SWEEP IN PARTS: 0 areas not read`
+(see "The Block").
 
 ### The Block
 
@@ -352,7 +354,11 @@ Areas not read:
 END OF BLOCK
 ```
 
-The last part says `SWEEP IN PARTS: 0 areas not read`, with no lines under it. A sweep
+In the last part, the `SWEEP IN PARTS` line reads `SWEEP IN PARTS: 0 areas not read`,
+and nothing of the block comes under it: no `To read the rest` sentence, no `Project:`,
+`Focus:`, `Environment:` or `Instructions:` line, no `Areas not read:` list and no
+`END OF BLOCK`. The report's sections follow it, and its Coverage still gives
+`Areas not read: 0 areas, 0 files; see SWEEP IN PARTS at the top.` A sweep
 that fits in one report never carries the block.
 
 - `Environment:` carries the git wrapper, or the find command outside git, and

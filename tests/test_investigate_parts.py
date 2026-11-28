@@ -128,12 +128,16 @@ PINS = [
     ("a dropped area isn't read, isn't under Areas read, counts for nothing, isn't back in the block", "Reading a Part", r"A dropped area isn't read, isn't under `Areas read:`, counts for nothing in `Files listed:`, and doesn't go back in the block"),
     ("a dropped area gets an Area dropped line and nothing replaces it", "Reading a Part", r"Say so in Coverage with an `Area dropped:` line, and pull nothing in to replace it"),
     ("the rest go back in the block in the order given", "Reading a Part", r"The rest of the areas go back in the block, in the order given"),
+    ("with none left the part is the last and its block is only the zero line", "Reading a Part", r"With none left, this part is the last, and its block is only the line `SWEEP IN PARTS: 0 areas not read` \(see \"The Block\"\)"),
 
     # The Block
     ("every part carries the block, which is the whole next brief", "The Block", r"Every part carries this block, and it's the whole of the next brief"),
     ("the line goes at line 1, or line 2 under the flag", "The Block", r"goes at line 1 of your report, or line 2 under `NOT A PER-FILE READ`"),
     ("the report's sections follow the block", "The Block", r"the report's sections follow it as usual"),
-    ("the last part says 0 with no lines under it", "The Block", r"The last part says `SWEEP IN PARTS: 0 areas not read`, with no lines under it"),
+    ("the last part's line reads 0 areas not read", "The Block", r"In the last part, the `SWEEP IN PARTS` line reads `SWEEP IN PARTS: 0 areas not read`"),
+    ("nothing of the block comes under the last part's line", "The Block", r"nothing of the block comes under it"),
+    ("the six things the last part leaves out", "The Block", r"no `To read the rest` sentence, no `Project:`, `Focus:`, `Environment:` or `Instructions:` line, no `Areas not read:` list and no `END OF BLOCK`"),
+    ("the last part's Coverage still gives the zero line", "The Block", r"its Coverage still gives `Areas not read: 0 areas, 0 files; see SWEEP IN PARTS at the top\.`"),
     ("a sweep that fits in one report never carries the block", "The Block", r"A sweep that fits in one report never carries the block"),
     ("work out the block's area lines before line 1 and count them", "The Block", r"Work out the block's area lines before you write line 1, and count them"),
     ("the n on line 1 is the number of area lines, no more and no fewer", "The Block", r"The `<n>` on line 1 is the number of area lines in the block, no more and no fewer"),

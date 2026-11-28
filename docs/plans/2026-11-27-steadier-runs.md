@@ -460,6 +460,7 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 
 ### Progress
 - Session step 0: done (traces and sweep fixtures copied to the work dir; `missing: 10`)
+- Tasks 1 to 3: complete (from 4077be7; gate exit 0 on all five, `Ran 2984`; adversarial: 57 tests, 1 bug fixed in round 1)
 
 ### Decisions made during the build
 - Ruling (plan): the architect's rewording of Fix B stands (Task 1). Why: the draft's sentence forbade the Coverage line every part must carry, and "first line" is false under `NOT A PER-FILE READ`. If wrong: one sentence of `investigate.md` to reword.
@@ -469,6 +470,13 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Ruling (plan): the lead's Bash sentence is the architect's wording (Task 3), which names the plumbing the lead's own commands use.
 - Ruling (plan): the head-to-head and the `agents` and `debug` record runs are part of the measurement round, as CONTRIBUTING asks.
 - Ruling (plan): the big sweeps run three at a time. Why: one at a time is about seven hours. If wrong: a spend-limit stop voids a run, which is then run again.
+- Ruling (Tasks 1 to 3): built as one batch, with one adversarial round and one commit. Why: each is small and they touch separate files, and the sweeps can't start until all three are final. If wrong: a fault is harder to pin to one task; the report keeps a section for each.
+- Ruling (Tasks 1 to 3): the scorer's failure on a count thousands of digits long (`CAN'T CHECK: internal error` on Python 3.11 and later) is a real bug, fixed in round 1 with a helper that treats such a number as a line it can't read.
+- Ruling (Tasks 1 to 3): the seven limits the tester pinned as `test_today_...` stay limits (see Parked). Why: no brief promises against them, and the two shapes real runs produced (a plain `Project:` line, the whole block) are caught. The session reads each real sweep's whole last part by hand as well.
 - For the owner at the release ask: patch or minor (Risks, item 1).
 
 ### Parked
+- Tasks 1 to 3: the scorer checks only the first non-blank line under a last part's `SWEEP IN PARTS: 0 areas not read`. An `END OF BLOCK` further down, or an indented, bulleted, lowercase or backticked block line, goes unseen. Parked because no saved run shows those shapes.
+- Tasks 1 to 3: a last part that drops its Coverage `Areas not read: 0 areas, 0 files; ...` line is still proved; the text asks for the line and the scorer doesn't. All 16 saved last parts carry it.
+- Tasks 1 to 3: a sentence added after the new last-part sentence, or a paragraph in the lead outside "Your Files" that brings the tests back, fails no pin. The pins hold a phrase, not the paragraph.
+- Tasks 1 to 3: with two counts lines in one part the first is used; a file held by two parts is judged by the first; a tracked path that isn't UTF-8 gets no allowance.

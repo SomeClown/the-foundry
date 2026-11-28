@@ -824,5 +824,420 @@ class LeadWithNoTypeTest(TranscriptBase):
                 self.assertIn("NOTE: transcript: 16 area leads ran as the-foundry:investigate", out)
 
 
+# ---- Tasks 1 and 2 of the steadier-runs batch (AC-3, AC-4) -----------------------------------------------------------
+
+import importlib.util  # noqa: E402
+import re  # noqa: E402
+
+
+def load_scorer():
+    spec = importlib.util.spec_from_file_location("check_parts_steadier_adv", str(tcp.SCRIPT))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+ZERO_LINE = "SWEEP IN PARTS: 0 areas not read\n"
+AREA_LINE = "- api-billing: `api/billing/` (3 files)"
+NOT_READ_ZERO = "Areas not read: 0 areas, 0 files; see SWEEP IN PARTS at the top."
+
+
+class LastPartBlockLinesTest(tcp.Base):
+    """AC-3: a last part says 0 areas not read and carries nothing of the block under that line."""
+
+    def setUp(self):
+        self.parts = tcp.build_parts(tcp.base_areas())
+
+    def under(self, stray, blank=False):
+        return tcp.edit(self.parts, "part-3.md", ZERO_LINE, ZERO_LINE + ("\n" if blank else "") + stray + "\n")
+
+    LINES = (
+        ("the To read the rest sentence", tcp.CONTINUE),
+        ("a short To read the rest", "To read the rest, dispatch again."),
+        ("Project", "Project: A toll-road back office, a fixture repo."),
+        ("Focus", "Focus: none"),
+        ("Environment", "Environment: use the git wrapper ./bin/git"),
+        ("Instructions", "Instructions: read it all."),
+        ("an Areas not read list", "Areas not read:\n" + AREA_LINE),
+        ("the Areas not read header alone", "Areas not read:"),
+        ("END OF BLOCK", "END OF BLOCK"),
+    )
+
+    def test_each_block_line_under_the_zero_line_of_a_last_part_fails(self):
+        """AC-3."""
+        for label, stray in self.LINES:
+            with self.subTest(line=label):
+                self.assertFails(self.under(stray), r"^part-3\.md: the last part says 0 areas not read, so nothing may sit under the line")
+
+    def test_each_block_line_after_a_blank_line_under_the_zero_line_fails(self):
+        """AC-3: the scorer looks at the next non-blank line, so a blank line in between hides nothing."""
+        for label, stray in self.LINES:
+            with self.subTest(line=label):
+                self.assertFails(self.under(stray, blank=True), r"part-3\.md: the last part says 0 areas not read")
+
+    def test_the_whole_block_pasted_under_the_zero_line_fails(self):
+        """AC-3."""
+        block = "\n".join([tcp.CONTINUE, "Project: x", "Focus: none", "Environment: none", "Instructions: none", "Areas not read:", AREA_LINE, "END OF BLOCK"])
+        self.assertFails(self.under(block), r"part-3\.md: the last part says 0 areas not read")
+
+    def test_a_right_last_part_whose_coverage_says_zero_areas_not_read_is_proved(self):
+        """AC-3: the Coverage line the text asks of a last part must not fail on that line."""
+        parts = tcp.edit(self.parts, "part-3.md", "\n" + tcp.WHOLE_LATER, "\n" + NOT_READ_ZERO + "\n" + tcp.WHOLE_LATER)
+        out = self.assertProved(parts)
+        self.assertNotIn("Areas not read", out)
+
+    def test_the_same_coverage_line_as_a_bullet_is_proved(self):
+        """AC-3."""
+        parts = tcp.edit(self.parts, "part-3.md", "\n" + tcp.WHOLE_LATER, "\n- " + NOT_READ_ZERO + "\n" + tcp.WHOLE_LATER)
+        self.assertProved(parts)
+
+    def test_a_coverage_zero_line_with_a_wrong_number_fails(self):
+        """AC-3: a last part that says 0 areas holds 0 of them, so 1 areas or 5 files in Coverage is a mismatch."""
+        for wrong in ("Areas not read: 1 areas, 0 files; see SWEEP IN PARTS at the top.", "Areas not read: 0 areas, 5 files; see SWEEP IN PARTS at the top."):
+            with self.subTest(line=wrong):
+                parts = tcp.edit(self.parts, "part-3.md", "\n" + tcp.WHOLE_LATER, "\n" + wrong + "\n" + tcp.WHOLE_LATER)
+                self.assertFails(parts, r"part-3\.md: Coverage says \d+ areas, \d+ files not read; the block holds 0 areas, 0 files")
+
+    def test_today_a_last_part_whose_coverage_drops_the_zero_line_is_proved(self):
+        """Accepted limit, today's behaviour: the text asks every last part for the Coverage zero line, but the scorer
+        requires the line only where areas are left (n > 0). Task 1's brief puts no such check on the scorer."""
+        self.assertNotIn(NOT_READ_ZERO, self.parts["part-3.md"])
+        self.assertProved(self.parts)
+
+    def test_the_flag_line_above_the_sweep_line_fails_the_flag_and_still_checks_the_block_lines(self):
+        """AC-3: NOT A PER-FILE READ on line 1 is a flagged single-agent read; a Focus line under the zero line still fails."""
+        flagged = tcp.edit(self.parts, "part-3.md", ZERO_LINE, "NOT A PER-FILE READ\n" + ZERO_LINE)
+        self.assertFails(flagged, r"^part-3\.md: line 1 is NOT A PER-FILE READ")
+        both = tcp.edit(flagged, "part-3.md", ZERO_LINE, ZERO_LINE + "Focus: x\n")
+        out = self.assertFails(both, r"^part-3\.md: line 1 is NOT A PER-FILE READ", r"part-3\.md: the last part says 0 areas not read")
+        self.assertNotIn("Traceback", out)
+
+    def test_a_blank_line_before_the_zero_line_is_not_a_failure_and_a_stray_line_under_it_still_is(self):
+        """AC-3."""
+        self.assertProved(tcp.edit(self.parts, "part-3.md", ZERO_LINE, "\n\n" + ZERO_LINE))
+        self.assertFails(tcp.edit(self.parts, "part-3.md", ZERO_LINE, "\n\n" + ZERO_LINE + "Environment: x\n"), r"the last part says 0 areas not read")
+
+    def test_today_a_block_line_that_is_not_the_next_non_blank_line_goes_unseen(self):
+        """Accepted limit, today's behaviour: only the next non-blank line under the zero line is looked at. END OF BLOCK
+        after the report's heading, an indented Project line, or a bullet, a lowercase or a backticked block line is not
+        compared with anything. The brief lists the start of each line, not a search of the whole part."""
+        cases = {
+            "after the report heading": tcp.edit(self.parts, "part-3.md", "# Investigation report (part 3)\n", "# Investigation report (part 3)\nEND OF BLOCK\n"),
+            "indented Project": self.under("  Project: x"),
+            "bulleted Focus": self.under("- Focus: x"),
+            "lowercase environment": self.under("environment: x"),
+            "backticked Instructions": self.under("`Instructions: x`"),
+        }
+        for label, parts in cases.items():
+            with self.subTest(case=label):
+                code, out = tcp.run_script(parts)
+                self.assertNotRegex(out, r"the last part says 0 areas not read")
+                self.assertNotIn("Traceback", out)
+
+
+class InProcessSecondReaderTest(unittest.TestCase):
+    """AC-4: the allowance, called directly, so a path or a count the fixture can't hold can be tried. It never raises."""
+
+    REPO = "/repo"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.mod = load_scorer()
+
+    def score(self, tracked, infos, readers, leads=()):
+        """Runs check_transcript on a hand-made transcript; returns (fails, notes). readers: relative paths, one task each."""
+        events, n = [(0, {"type": "system", "subtype": "init", "cwd": self.REPO})], 0
+        for rel in readers:
+            n += 1
+            tid = "r%d" % n
+            events.append((n, {"type": "system", "subtype": "task_started", "task_id": tid, "subagent_type": READER, "spawn_depth": 3,
+                               "prompt": "Read `%s/%s`.\nProject: x\n" % (self.REPO, rel)}))
+            events.append((n, {"type": "system", "subtype": "task_notification", "task_id": tid, "status": "completed", "summary": "Path: x"}))
+        for prompt in leads:
+            n += 1
+            tid = "l%d" % n
+            events.append((n, {"type": "system", "subtype": "task_started", "task_id": tid, "subagent_type": AREA_LEAD_AGENT, "spawn_depth": 2, "prompt": prompt}))
+            events.append((n, {"type": "system", "subtype": "task_notification", "task_id": tid, "status": "completed", "summary": "done"}))
+        fails, notes = [], []
+        layout = {"file_skips": {}, "skipped_whole": {}}
+        self.mod.check_transcript(events, self.REPO, tracked, layout, infos, fails, notes)
+        return fails, notes
+
+    def part(self, name, files, redispatched=None):
+        info = {"name": name, "lines": [], "shape": None, "files": set(f.encode("utf-8") if isinstance(f, str) else f for f in files)}
+        if redispatched is not None:
+            info["redispatched"] = redispatched
+        return info
+
+    def twice_lines(self, fails):
+        return [f for f in fails if "had a reader dispatched more than once" in f]
+
+    def test_a_count_equal_to_the_twice_read_files_passes_and_one_less_fails(self):
+        """AC-4: the boundary is 'at most', per part."""
+        files = ["a.py", "b.py", "c.py"]
+        tracked = [f.encode() for f in files]
+        readers = files + files
+        fails, notes = self.score(tracked, [self.part("part-1.md", files, 3)], readers)
+        self.assertEqual(self.twice_lines(fails), [])
+        self.assertEqual([n for n in notes if "second reader" in n],
+                         ["NOTE: transcript: part-1.md: 3 readable files had a second reader, within its re-dispatched count of 3: a.py, b.py, c.py"])
+        fails, notes = self.score(tracked, [self.part("part-1.md", files, 2)], readers)
+        self.assertEqual(len(self.twice_lines(fails)), 1)
+        self.assertIn("3 readable files had a reader dispatched more than once", self.twice_lines(fails)[0])
+        self.assertEqual([n for n in notes if "second reader" in n], [])
+
+    def test_a_count_of_two_does_not_cover_a_file_read_three_times(self):
+        """AC-4: three readers fail whatever the count."""
+        tracked = [b"a.py", b"b.py"]
+        fails, notes = self.score(tracked, [self.part("part-1.md", ["a.py", "b.py"], 2)], ["a.py", "a.py", "a.py", "b.py", "b.py"])
+        line = self.twice_lines(fails)
+        self.assertEqual(len(line), 1, fails)
+        self.assertIn("a.py (3 times)", line[0])
+        self.assertNotIn("b.py", line[0], "the file with two readers is within the count and is not named")
+
+    def test_a_file_three_times_read_does_not_use_up_the_count_of_a_file_read_twice(self):
+        """AC-4: a.py (3 readers) fails; b.py (2 readers) is covered by the part's 1."""
+        tracked = [b"a.py", b"b.py"]
+        fails, notes = self.score(tracked, [self.part("part-1.md", ["a.py", "b.py"], 1)], ["a.py", "a.py", "a.py", "b.py", "b.py"])
+        self.assertEqual(len(self.twice_lines(fails)), 1)
+        self.assertIn("1 readable files had a reader dispatched more than once: a.py (3 times)", fails[0])
+        self.assertTrue([n for n in notes if "part-1.md: 1 readable files had a second reader" in n])
+
+    def test_a_file_in_no_part_gets_no_allowance(self):
+        """AC-4."""
+        fails, notes = self.score([b"a.py", b"b.py"], [self.part("part-1.md", ["a.py"], 9), self.part("part-2.md", [], 9)], ["a.py", "b.py", "b.py"])
+        self.assertIn("b.py (2 times)", self.twice_lines(fails)[0])
+        self.assertEqual(self.twice_lines(fails)[0].count("b.py"), 1)
+        self.assertFalse([n for n in notes if "b.py" in n])
+
+    def test_a_count_in_the_wrong_part_gives_no_allowance(self):
+        """AC-4: the count of a part covers only the files that part holds, so a 9 in part 2 does not cover part 1's file."""
+        fails, notes = self.score([b"a.py", b"b.py"], [self.part("part-1.md", ["a.py"], 0), self.part("part-2.md", ["b.py"], 9)], ["a.py", "a.py", "b.py"])
+        self.assertIn("a.py (2 times)", self.twice_lines(fails)[0])
+        self.assertEqual([n for n in notes if "second reader" in n], [])
+        fails, notes = self.score([b"a.py", b"b.py"], [self.part("part-1.md", ["a.py"], 9), self.part("part-2.md", ["b.py"], 0)], ["a.py", "a.py", "b.py", "b.py"])
+        self.assertIn("1 readable files had a reader dispatched more than once: b.py (2 times)", self.twice_lines(fails)[0])
+
+    def test_each_part_is_judged_on_its_own_count_and_each_gets_its_own_note_in_part_order(self):
+        """AC-4."""
+        infos = [self.part("part-2.md", ["b.py"], 1), self.part("part-1.md", ["a.py"], 1)]
+        fails, notes = self.score([b"a.py", b"b.py"], infos, ["a.py", "a.py", "b.py", "b.py"])
+        self.assertEqual(self.twice_lines(fails), [])
+        got = [n for n in notes if "second reader" in n]
+        self.assertEqual(got, sorted(got))
+        self.assertEqual(len(got), 2)
+
+    def test_a_part_with_no_redispatched_key_gives_no_allowance_and_no_exception(self):
+        """AC-4: the key is missing from a part whose counts line wasn't read."""
+        fails, notes = self.score([b"a.py"], [self.part("part-1.md", ["a.py"], None)], ["a.py", "a.py"])
+        self.assertEqual(len(self.twice_lines(fails)), 1)
+
+    def test_a_huge_count_covers_a_file_and_does_not_raise(self):
+        """AC-4."""
+        fails, notes = self.score([b"a.py"], [self.part("part-1.md", ["a.py"], 10 ** 40)], ["a.py", "a.py"])
+        self.assertEqual(self.twice_lines(fails), [])
+        self.assertTrue([n for n in notes if "within its re-dispatched count of %d" % 10 ** 40 in n], notes)
+
+    def test_a_non_ascii_path_gets_the_allowance_and_is_named_in_the_note(self):
+        """AC-4: the scorer compares bytes, so a UTF-8 name must find its part."""
+        name = "déjà/テスト ☃.py"
+        fails, notes = self.score([name.encode("utf-8")], [self.part("part-1.md", [name], 1)], [name, name])
+        self.assertEqual(self.twice_lines(fails), [])
+        self.assertTrue([n for n in notes if n.endswith(": " + name)], notes)
+
+    def test_a_non_ascii_path_over_the_count_fails_with_its_name(self):
+        """AC-4."""
+        name = "über/é.py"
+        fails, notes = self.score([name.encode("utf-8")], [self.part("part-1.md", [name], 0)], [name, name])
+        self.assertIn("%s (2 times)" % name, self.twice_lines(fails)[0])
+
+    def test_today_a_tracked_path_that_is_not_utf8_gets_no_allowance_and_does_not_raise(self):
+        """Accepted limit, today's behaviour: the readable set is decoded with replacement characters, so a name that is
+        not UTF-8 never matches the bytes the part holds. It fails as before; it must not raise."""
+        raw = b"caf\xe9.py"
+        shown = raw.decode("utf-8", "replace")
+        fails, notes = self.score([raw], [self.part("part-1.md", [raw], 5)], [shown, shown])
+        self.assertEqual(len(self.twice_lines(fails)), 1, fails)
+        self.assertEqual([n for n in notes if "second reader" in n], [])
+
+    def test_today_a_file_that_two_parts_hold_is_judged_by_the_first_part_in_the_list(self):
+        """Accepted limit, today's behaviour: a file in two parts' sets belongs to the first part found. (That is a failure
+        elsewhere, in the area checks; this pins only which count the allowance reads.)"""
+        infos = [self.part("part-1.md", ["a.py"], 0), self.part("part-2.md", ["a.py"], 1)]
+        fails, notes = self.score([b"a.py"], infos, ["a.py", "a.py"])
+        self.assertEqual(len(self.twice_lines(fails)), 1)
+        infos.reverse()
+        fails, notes = self.score([b"a.py"], infos, ["a.py", "a.py"])
+        self.assertEqual(self.twice_lines(fails), [])
+
+    def lead_prompt(self, rel_files, area="x"):
+        return "AREA LEAD\nArea: %s\nProject: p\nFiles:\n%s\n" % (area, "\n".join("`%s/%s`" % (self.REPO, f) for f in rel_files))
+
+    def test_a_restart_that_explains_two_files_leaves_the_count_for_a_third(self):
+        """AC-4: a and b are explained by a restarted lead; c is covered by the part's 1."""
+        files = ["a.py", "b.py", "c.py"]
+        prompt = self.lead_prompt(["a.py", "b.py"])
+        fails, notes = self.score([f.encode() for f in files], [self.part("part-1.md", files, 1)], files + ["a.py", "b.py", "c.py"], leads=[prompt, prompt])
+        self.assertEqual(self.twice_lines(fails), [])
+        self.assertTrue([n for n in notes if "area x's lead was started twice; its 2 files" in n], notes)
+        self.assertTrue([n for n in notes if "part-1.md: 1 readable files had a second reader, within its re-dispatched count of 1: c.py" in n], notes)
+
+    def test_a_restart_does_not_make_the_count_cover_two_more_files(self):
+        """AC-4: a is explained; b and c are not, and 2 files are over a count of 1."""
+        files = ["a.py", "b.py", "c.py"]
+        prompt = self.lead_prompt(["a.py"])
+        fails, notes = self.score([f.encode() for f in files], [self.part("part-1.md", files, 1)], files + files, leads=[prompt, prompt])
+        self.assertIn("2 readable files had a reader dispatched more than once: b.py (2 times), c.py (2 times)", self.twice_lines(fails)[0])
+
+    def test_a_restarted_file_with_three_readers_still_fails_whatever_the_count(self):
+        """AC-4."""
+        prompt = self.lead_prompt(["a.py"])
+        fails, notes = self.score([b"a.py"], [self.part("part-1.md", ["a.py"], 9)], ["a.py"] * 3, leads=[prompt, prompt])
+        self.assertIn("a.py (3 times)", self.twice_lines(fails)[0])
+
+    def test_a_long_list_of_covered_files_is_cut_short_in_the_note_not_in_the_count(self):
+        """AC-4: the note names five paths and says how many in all."""
+        files = ["f%d.py" % i for i in range(8)]
+        fails, notes = self.score([f.encode() for f in files], [self.part("part-1.md", files, 8)], files + files)
+        self.assertEqual(self.twice_lines(fails), [])
+        note = next(n for n in notes if "second reader" in n)
+        self.assertIn("8 readable files had a second reader, within its re-dispatched count of 8: f0.py, f1.py, f2.py, f3.py, f4.py, ... (8 in all)", note)
+
+
+class SecondReaderCountLineTest(tcp.TranscriptBase):
+    """AC-4: the count is read from the part's own Files listed line, the way the scorer reads every line of Coverage."""
+
+    FILE = "api/billing/toll.py"
+
+    def part_name(self, rel):
+        areas = tcp.base_areas()
+        cuts = [0] + list(tcp.BASE_CUTS) + [len(areas)]
+        for k in range(len(cuts) - 1):
+            if any(rel in a.files for a in areas[cuts[k]:cuts[k + 1]]):
+                return "part-%d.md" % (k + 1)
+        raise AssertionError(rel)
+
+    def counts_line(self, name):
+        return re.search(r"^Files listed: .*$", self.parts[name], re.M).group(0)
+
+    def run_with(self, parts, rel=None, times=1):
+        rel = rel or self.FILE
+        events = Transcript(parts).events   # the returned reports are the saved ones
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        for _ in range(times):
+            events.extend(t.reader(rel, "tX"))
+        return self.run_t(events, parts=parts)
+
+    def reword(self, make):
+        name = self.part_name(self.FILE)
+        line = self.counts_line(name)
+        return tcp.edit(self.parts, name, line, make(line)), name
+
+    def with_count(self, value):
+        return self.reword(lambda line: line.replace("re-dispatched: 0;", "re-dispatched: %s;" % value))
+
+    def test_a_count_of_one_in_the_plain_line_covers_the_file(self):
+        """AC-4: the baseline the shapes below are measured against."""
+        parts, name = self.with_count("1")
+        out = self.assertTranscriptProved(self.run_with(parts))
+        self.assertIn("%s: 1 readable files had a second reader, within its re-dispatched count of 1: %s" % (name, self.FILE), out)
+
+    def test_the_counts_line_as_a_bullet_still_covers_the_file(self):
+        """AC-4: LISTED_RE takes a leading '- ', as it does for the other numbers."""
+        parts, _ = self.reword(lambda line: "- " + line.replace("re-dispatched: 0;", "re-dispatched: 1;"))
+        self.assertTranscriptProved(self.run_with(parts))
+
+    def test_the_counts_line_with_leading_spaces_still_covers_the_file(self):
+        """AC-4."""
+        parts, _ = self.reword(lambda line: "   " + line.replace("re-dispatched: 0;", "re-dispatched: 1;"))
+        self.assertTranscriptProved(self.run_with(parts))
+
+    def test_the_counts_line_in_backticks_is_not_read_and_covers_nothing(self):
+        """AC-4: no allowance, and the run fails on the counts line itself and on the second reader, with no exception."""
+        parts, _ = self.reword(lambda line: "`" + line.replace("re-dispatched: 0;", "re-dispatched: 1;") + "`")
+        out = self.assertTranscriptFails(self.run_with(parts), r"reader dispatched more than once", r"no line 'Files listed")
+        self.assertNotIn("Traceback", out)
+        self.assertNotIn("internal error", out)
+
+    def test_a_count_that_is_not_a_number_gives_no_allowance_and_does_not_raise(self):
+        """AC-4."""
+        for bad in ("many", "-1", "1.5", "", "one", "0x1", "1,000", "+1"):
+            with self.subTest(count=bad):
+                parts, _ = self.with_count(bad)
+                code, out = self.run_with(parts)
+                self.assertEqual(code, 1, out)
+                self.assertNotIn("internal error", out)
+                self.assertNotIn("Traceback", out)
+                self.assertRegex(out, r"readable files had a reader dispatched more than once")
+                self.assertNotIn("had a second reader, within", out)
+
+    def test_a_count_of_a_huge_number_covers_the_file_and_does_not_raise(self):
+        """AC-4: thirty digits."""
+        parts, _ = self.with_count("9" * 30)
+        out = self.assertTranscriptProved(self.run_with(parts))
+        self.assertIn("within its re-dispatched count of %s" % ("9" * 30), out)
+
+    def test_a_count_of_thousands_of_digits_does_not_end_the_run_in_an_internal_error(self):
+        """AC-4: model-written text must never reach CAN'T CHECK: internal error. int() of a very long digit string raises
+        ValueError on current Pythons (the limit is 4300 digits)."""
+        parts, _ = self.with_count("9" * 5000)
+        code, out = self.run_with(parts)
+        self.assertNotIn("internal error", out)
+        self.assertIn(code, (0, 1), out)
+
+    def test_a_count_in_other_digit_scripts_is_read_as_a_number_and_does_not_raise(self):
+        """AC-4: the regex takes any Unicode digit, and int() reads it. Arabic-Indic one covers the file, as 1 does."""
+        parts, _ = self.with_count("١")
+        out = self.assertTranscriptProved(self.run_with(parts))
+        self.assertIn("count of 1: ", out)
+
+    def test_two_counts_lines_in_one_part_use_the_first_today(self):
+        """Accepted limit, today's behaviour: the scorer reads the first Files listed line of the Coverage and nothing of a
+        second one, so a first line of 0 followed by a line of 1 gives no allowance and the reverse gives one."""
+        name = self.part_name(self.FILE)
+        line = self.counts_line(name)
+        one = line.replace("re-dispatched: 0;", "re-dispatched: 1;")
+        low_first = tcp.edit(self.parts, name, line, line + "\n" + one)
+        code, out = self.run_with(low_first)
+        self.assertEqual(code, 1, out)
+        self.assertRegex(out, r"reader dispatched more than once")
+        high_first = tcp.edit(self.parts, name, line, one + "\n" + line)
+        self.assertTranscriptProved(self.run_with(high_first))
+
+    def test_a_count_in_the_wrong_part_gives_no_allowance(self):
+        """AC-4: part 3 says 1, the file is in part 1."""
+        name = self.part_name(self.FILE)
+        other = "part-3.md" if name != "part-3.md" else "part-1.md"
+        line = self.counts_line(other)
+        parts = tcp.edit(self.parts, other, line, line.replace("re-dispatched: 0;", "re-dispatched: 1;"))
+        self.assertTranscriptFails(self.run_with(parts), r"1 readable files had a reader dispatched more than once: %s \(2 times\)" % re.escape(self.FILE))
+
+    def test_a_count_of_two_does_not_cover_a_file_read_three_times(self):
+        """AC-4."""
+        parts, _ = self.with_count("2")
+        self.assertTranscriptFails(self.run_with(parts, times=2), r"%s \(3 times\)" % re.escape(self.FILE))
+
+    def test_a_count_of_five_with_three_twice_read_files_in_a_part_that_says_two_fails(self):
+        """AC-4: over the count, all three stay failures, and the count is not spent on some of them."""
+        rels = ["api/billing/toll.py", "api/billing/tow.py", "api/billing/%s" % next(f for f in tcp.base_areas()[3].files if f not in ("api/billing/toll.py", "api/billing/tow.py") and tcp.is_readable(f)).split("/")[-1]]
+        name = self.part_name(rels[0])
+        line = self.counts_line(name)
+        parts = tcp.edit(self.parts, name, line, line.replace("re-dispatched: 0;", "re-dispatched: 2;"))
+        events = Transcript(parts).events
+        t = Transcript.__new__(Transcript)
+        t.n, t.repo = 90000, str(Fixture.repo)
+        for rel in rels:
+            events.extend(t.reader(rel, "tX"))
+        out = self.assertTranscriptFails(self.run_t(events, parts=parts), r"^transcript: 3 readable files had a reader dispatched more than once")
+        self.assertNotIn("had a second reader, within", out)
+
+    def test_a_note_never_changes_the_exit_code_or_the_first_line(self):
+        """AC-4."""
+        parts, _ = self.with_count("1")
+        code, out = self.run_with(parts)
+        self.assertEqual((code, out.splitlines()[0]), (0, "LOOP PROVED"))
+
+
 if __name__ == "__main__":
     unittest.main()
