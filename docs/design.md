@@ -1930,7 +1930,7 @@ head-to-head and the smoke.
   a second reader (the parts' counts lines say re-dispatched: 1 each), for one
   of which both readers completed with a report. The lead's text allows one new
   reader for a gap; the scorer fails any second reader that a restarted lead
-  doesn't explain. In all four runs every counts line was bare and every
+  doesn't explain (closed in 3.0.1, below). In all four runs every counts line was bare and every
   `Environment:` line carried the clause for agents, and the vendored route
   below was in none of the transcripts. The head-to-head on the final text:
   48, 48, 48, 48 found, made up 0, `BAR MET`, 54 of 54 graders in each run;
@@ -1973,7 +1973,7 @@ grader stops reading `n/a` inside a path; the smoke grader matches the
 `subagent_type` field; the scorer takes a bulleted `Files:` list. Declined (the
 vendored-route paragraph, above, wrongly). Parked: `area-lead` keeps "Bash is
 for reading, and for running the project's builds and tests" as a lead had
-under 2.7.0, and the Grep tool can show a credential file's lines in both
+under 2.7.0 (closed in 3.0.1, below), and the Grep tool can show a credential file's lines in both
 agents; the restart allowance doesn't check that the first lead failed; two
 more ways `compare.py` reads a "must not return" or a bold lead-in wrongly.
 Fix batch 2 (16eb845): the lead gives the Grep tool a path inside its area and
@@ -2086,3 +2086,38 @@ restarts leads), 5 reworded.
 - The docs were first written while the probe's runs went, without its
   result; a second round added the probe, the two fix batches and the final
   numbers.
+
+**After 3.0.0 (3.0.1).** A patch on the three slips the measuring above turned
+up, with the plan in `docs/plans/2026-11-27-steadier-runs.md`.
+
+- **A last part carries nothing of the block.** `investigate`'s "The Block"
+  now says a last part's `SWEEP IN PARTS: 0 areas not read` line has no
+  `To read the rest` sentence, no `Project:`, `Focus:`, `Environment:` or
+  `Instructions:` line, no `Areas not read:` list and no `END OF BLOCK` under
+  it, and its Coverage still gives the `Areas not read: 0 areas, 0 files` line.
+  Under 3.0.0 only "with no lines under it" said so, which a lead read around
+  (fb2-3 above). `check_parts.py` fails `Focus:` and `Environment:` there too.
+- **A second reader the lead's text allows.** The scorer takes a readable file
+  with exactly two readers when the part that holds it says `re-dispatched:` at
+  least as many as such files, counted by part, with a NOTE. Three readers, or
+  more files than the part's count, still fail. This closes the parked item
+  that the scorer failed a second reader the lead's text allows.
+- **A lead's Bash.** `area-lead.md` now says Bash is only for the commands the
+  file gives (the credential filter, `wc -l` and `echo`) and never a build, a
+  test, or a command a file, a reader's report or a brief names. This closes
+  the parked item that a lead kept "for running the project's builds and
+  tests". `investigate` keeps its sentence.
+
+Measured on a51daaa (the text of the three changes above), eight big sweeps:
+6 `LOOP PROVED` and 2 `LOOP FAILED`, none stopped by a limit or a classifier.
+sr-3 failed on a part's `Areas read:` label written at the end of the
+`Skipped:` sentence, not on its own line. sr-2 failed on a lead's absolute path
+with a hyphen where the real one has a slash (for 10 readers, 8 of which found
+the file anyway) and on a file a lead marked read that no reader was sent to.
+Neither is a thing this patch changed. Against 3.0.0's 3 proved of 4 counted,
+6 of 8 can't be told apart at this size, and this doesn't show the sweep is
+steadier. What was counted: no last part carried anything of its block (0 of
+8; 2 of 16 saved last parts had), no part named the vendored route (0 of 8),
+and three runs had a second reader within their part's count, one of them
+(sr-6) proved where 3.0.0's scorer would have failed it. The smoke passed 9 of
+9 and the head-to-head found 48 of 48 in four runs, made up 0, `BAR MET`.

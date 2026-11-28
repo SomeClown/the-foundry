@@ -99,6 +99,11 @@ model actually did and what the judge saw, and decide which of three it is:
    `--judge-model sonnet`, and tighten the rubric's wording if it keeps
    happening.
 
+A miss on an exact grader (`regex`, `tool_used`) gets a hand read of the trace
+before it counts. These read text, not meaning, so a right run in a shape the
+pattern doesn't know scores a miss. Their known limits are under "Parked" in
+`docs/plans/2026-11-27-steadier-runs.md`.
+
 ## Recording results
 
 `evals/scorecard.py` turns the harness's `aggregate-result.json` into rows of `evals/SCORECARD.md`, one row per case per file. Each row holds when the run started (UTC), the plugin's version, the commit, Claude Code's version, the case, how many runs it had, how many runs had every grader pass and no error, which graders failed and in how many runs, and the cost of the runs plus their judging. Nothing reads the rows to pass or fail anything.
@@ -450,6 +455,57 @@ allowed: `compare.py` takes a list of routes under a line that says they are
 removed as stated dead, and `check_parts.py` takes the reader brief's own
 `Read` line as which file a reader was sent to. Both had failed right answers
 in the saved "before" runs, and every saved run was scored again with them.
+
+**The results, on 3.0.1 (2026-11-27).** The patch changed three lines of agent
+text (a last part carries nothing of the block; a lead's Bash is only for the
+commands its file gives; `devops`'s three report lines are one line each), two
+things in `check_parts.py` (it fails `Focus:` and `Environment:` under a last
+part's line, and allows a second reader within the part's `re-dispatched:`
+count, by part), and the graders below. Measured on a51daaa for the sweep text
+and on 07b1043 for the cases.
+
+- Smoke: 9 of 9 graders. Head-to-head, four runs: 48 of 48 in each, made up 0,
+  `BAR MET`.
+- Big sweep, eight runs: 6 `LOOP PROVED`, 2 `LOOP FAILED`, none stopped by a
+  limit or a classifier. sr-3 failed because part 1 wrote the label
+  `Areas read:` on the end of the `Skipped:` sentence, so the scorer found no
+  areas read. sr-2 failed because a lead gave 10 of its readers a path with a
+  hyphen where the real one has a slash (8 found the file anyway), and another
+  lead marked a file read that no reader was sent. Neither is a thing the patch
+  changed. 6 of 8 against 3.0.0's 3 of 4 can't be told apart at this size, so
+  this doesn't show the sweep is steadier. Counted: no last part carried any of
+  its block (0 of 8; 2 of 16 saved last parts had), no part named the vendored
+  route (0 of 8), and three runs had a second reader within their part's count,
+  one of which (sr-6) proved where 3.0.0's scorer would have failed it.
+- `agents` and `debug`, four runs each: 15 of 19 cases at 4 of 4. Of the cases
+  the patch touched: `devops-tries-the-rollback-on-a-copy` 4 of 4 (2 of 4 in
+  3.0.0's record run), `devops-holds-a-breaking-migration` 4 of 4,
+  `debug-polluted-test` 4 of 4 (1 of 4), `debug-decisions` 4 of 4 (3 of 4),
+  `architect-splits-a-breaking-change` 3 of 4.
+- A bar missed as set: the three `devops` cases, every grader 4 of 4.
+  `devops-stops-before-irreversible` was 3 of 4. Run 2 wrote a summary
+  sentence above its `Status:` line, failing `opens-with-four-lines` and
+  `status-needs-context`, graders the patch didn't touch. A real miss by the
+  agent; nothing irreversible ran. The other misses were `architect-plan-format`
+  run 2 (a real untouched-kind `Security:` line), `implement-test-first` run 4
+  (a real one: tests run after the fix), and `architect-splits-a-breaking-change`
+  run 3, the grader's.
+- An independent read of the traces (by an agent that hadn't seen them)
+  confirmed 16 of 16 verdicts of the reworked graders. It also found the new
+  `devops` one-line rule held in 3 of 4 reports (run 4 put `Data change:` in
+  bold with bullets), and that `rollback-tried` is looser than the agent's
+  template: two reports leave the command to the report's body.
+
+Graders changed, each sorted by hand against every saved run first. The judge
+had failed runs that did the thing, and no saved run was a real miss on these:
+
+| Case and grader | Was | Now | Saved runs that did it; the judge failed |
+|---|---|---|---|
+| `debug-polluted-test` `ran-the-check` | judged | exact `regex` on the trace (the victim alone, then the polluter with the victim, before the first write of `test_a_currency.py`) | 22 of 22; 7 |
+| `debug-decisions` `item-a` | judged | exact `regex` on the last message, reading only item (a) | 22 of 22; 1 |
+| `architect-splits-a-breaking-change` `code-first-then-the-break` | judged | judged, rubric corrected to name a first release that adds the new column and moves the app to it | 16 of 16; 2 |
+| `architect-splits-a-breaking-change` `two-releases` | exact | exact, reads "two code releases" and releases labelled with versions, never 1.4.0 | checked on the 20 saved plans |
+| `devops-tries-the-rollback-on-a-copy` `rollback-tried`, `watch-line` | exact | exact, read the shapes real reports took | on the 28 saved reports, 4 verdicts changed, from miss to hit |
 
 **After a change to `investigate`,** run the nesting smoke and the
 head-to-head again, on top of the loop. They use a repo under 200 files, so

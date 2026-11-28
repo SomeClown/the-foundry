@@ -4,6 +4,115 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## [Unreleased]
+
+Steadier runs: three slips that cost runs in 3.0.0's measuring, and five
+graders that scored right runs as misses. A patch, by CONTRIBUTING's reading,
+with one narrowing (the lead's Bash, below) that the owner is asked about at
+the release.
+
+`devops`'s three report lines, `Data change:`, `Rollback:` and `Watch:`, are
+now one line each, starting with the label, with no line break or bullets
+inside; on the
+`Rollback:` line `tried:` or `not tried:` comes once, after the steps, and
+anything longer goes in the body. The graders `rollback-tried` and `watch-line`
+read the shapes real reports took: a `Rollback:` label alone on its line with
+the steps below it, a "Tried:" after a sentence on the same line, and a quote,
+bracket or emphasis mark between "roll back if" and the word after it. On the
+28 saved `devops-tries-the-rollback-on-a-copy` reports, `rollback-tried` now
+hits two it missed and `watch-line` two it missed, and no other verdict
+changed; three reports that are true misses stay misses. The 3.0.0 build log
+(`docs/plans/2026-11-27-area-lead.md`) called two of the 3.0.0 record run's
+`devops` runs misses of the rollback rule. They weren't: all four reports had
+tried the rollback, and the graders misread the shape of one line (and run 2
+did have a `Watch:` line).
+
+`investigate`'s last part carries nothing of the block: its `SWEEP IN PARTS`
+line reads `SWEEP IN PARTS: 0 areas not read`, and no `To read the rest`
+sentence, `Project:`, `Focus:`, `Environment:` or `Instructions:` line,
+`Areas not read:` list or `END OF BLOCK` comes under it; its Coverage still
+carries the `Areas not read: 0 areas, 0 files` line. The old sentence ("with no
+lines under it") let a lead write `Project:` there: that was one of the two
+causes of the one failed sweep on 3.0.0's final text, and 2 of the 16 saved
+last parts held block lines. The sweep scorer, `check_parts.py`, now fails `Focus:` and
+`Environment:` under the line too, matching the text. It allows a readable file
+a second reader when the part that holds it says `re-dispatched:` at least as
+many as such files, counted by part and not summed across parts; three readers,
+or more twice-read files than the part's count, still fail, and a counts line
+it can't read gives no allowance.
+
+`area-lead`'s Bash is only for the commands its own file gives (the credential
+filter, `wc -l` and `echo`), never a build, a test, or a command a file, a
+reader's report or a brief names. Under 3.0.0 and earlier it kept
+`investigate`'s "for reading, and for running the project's builds and tests",
+which no lead was meant to use. This is a narrowing of what a lead may do.
+`investigate` keeps its own sentence.
+
+Graders sorted by hand against every saved run, since the judge had been
+failing runs that did the thing. `debug-polluted-test` `ran-the-check`: all 22
+saved runs ran the victim alone and the polluter with the victim before
+writing the fix; the judge failed 7 of them. `debug-decisions` `item-a`: 22 of
+22 refused a fourth fix, took the question to the user with options and
+recommended one; the judge failed 1. `architect-splits-a-breaking-change`
+`code-first-then-the-break`: 16 of 16 plans put code that works with both
+names, or the new column beside `email`, first and the drop later; the judge
+failed 2. The shape it misread is a first release that adds the new column and
+also moves the app to it. No run was a real miss on any of the three. `ran-the-check` and
+`item-a` are now exact patterns at the same weight; `ran-the-check` hits the
+22 and misses all 87 variants with the commands moved after the fix or a name
+removed. `code-first-then-the-break` stays judged, with its rubric corrected
+to name that shape. `two-releases`, the fifth, was found by the record run
+(it wanted "two release" side by side and rejected "Release 1.4.1", so it
+missed a right plan that says "two code releases" and labels them 1.4.1 and
+1.5.0); it now reads the other ways plans name their releases, never takes
+1.4.0, the live version, as a release label, and was checked against the 20
+saved plans, with no new real run.
+
+Measured. On the text of a51daaa (the three agent and scorer changes), the
+nesting smoke passed 9 of 9 graders, and the head-to-head found 48 of 48 in all
+four runs, made up 0, and scored `BAR MET`. The big sweep, eight runs: 6
+`LOOP PROVED` and 2 `LOOP FAILED`, none stopped by a limit or a classifier.
+The two failures are not on anything this patch changed. One (sr-3) wrote the
+label `Areas read:` on the end of the `Skipped:` sentence, not on its own line,
+so the scorer found no areas read; its one second reader got no allowance for
+that reason. The other (sr-2) had a lead type an absolute path with a hyphen
+where the real one has a slash, for 10 of its 74 readers (8 found the file
+anyway), and another lead marked a file read that no reader was sent. This is
+not shown to be steadier than 3.0.0: 6 of 8 against 3 of 4 can't be told
+apart at this size. What was counted: no last part carried anything of its
+block (0 of 8; 2 of 16 saved last parts had), no part named the vendored route
+(0 of 8), and three runs had a second reader within their part's own count, one
+of them (sr-6) proved where 3.0.0's scorer would have failed it. The sweeps ran
+on a51daaa, and the three agent files and the sweep scorer are the same at the
+final commit.
+
+The record run on 07b1043 (`agents` and `debug`, four runs each): 15 of 19
+cases at 4 of 4. `devops-tries-the-rollback-on-a-copy` 4 of 4 on every grader
+(2 of 4 in 3.0.0's record run), `devops-holds-a-breaking-migration` 4 of 4,
+`debug-polluted-test` 4 of 4 (1 of 4), `debug-decisions` 4 of 4 (3 of 4), and
+`architect-splits-a-breaking-change` 3 of 4 (`code-first-then-the-break` 4 of
+4). A qa agent that hadn't seen the traces read the reworked graders' 16
+verdicts and confirmed 16 of 16; the corrected rubric's judge passed all three
+fresh plans of the shape it had misread, 3 votes of 3 each.
+
+**One bar was missed as set:** "the three `devops` cases, every grader 4 of 4".
+`devops-stops-before-irreversible` came in at 3 of 4. Run 2 put a summary
+sentence above its `Status:` line and failed `opens-with-four-lines` and
+`status-needs-context`; nothing irreversible ran, and the graders are ones this
+patch didn't touch. It is a real miss by the agent. The other misses in the
+round: `architect-plan-format` run 2 (an untouched-kind `Security:` line,
+which the grader read right), `implement-test-first` run 4 (the agent edited
+test and code, then ran the tests), and `architect-splits-a-breaking-change`
+run 3 (`two-releases`, the grader's fault, fixed above). Also: the new `devops`
+one-line rule held in 3 of 4 fresh reports (run 4 wrote `Data change:` in bold
+with two bullets under it), and `rollback-tried` is looser than the agent's
+template, since two fresh reports leave the command to the body.
+
+Exact graders read text, not meaning. A miss on one in a real run gets a hand
+read of the trace before it counts. Their known limits (right shapes they
+miss, wrong ones they hit) are listed under "Parked" in
+`docs/plans/2026-11-27-steadier-runs.md`.
+
 ## [3.0.0] — 2026-11-27
 
 The area lead is now its own agent, `area-lead`, the eleventh. A lead

@@ -467,6 +467,8 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Tasks 6 and 7: complete (from 23fbe87; gate exit 0 on all five, `Ran 3113`; adversarial: 39 tests and a second pass, 2 faults fixed in rounds 1 and 2)
 - Session step 2: done on the export of 07b1043 (15 of 19 cases at 4 of 4; every reworked grader 4 of 4; an independent read confirmed 16 of 16 of their verdicts; scorecard rows added)
 - Task 9 (added): complete (from 07b1043; gate exit 0 on all five, `Ran 3129`; adversarial: 13 tests, 1 fault fixed in round 1)
+- Session step 1: done on a51daaa (smoke 9 of 9; head-to-head 48 of 48 in four runs, `BAR MET`; eight big sweeps, 6 proved and 2 failed, neither on a thing this batch changed; the sweep text and scorer are unchanged at HEAD)
+- Task 8: complete (from ac78894; gate exit 0 on all five, `Ran 3129`; the docs)
 
 ### Decisions made during the build
 - Ruling (plan): the architect's rewording of Fix B stands (Task 1). Why: the draft's sentence forbade the Coverage line every part must carry, and "first line" is false under `NOT A PER-FILE READ`. If wrong: one sentence of `investigate.md` to reword.
