@@ -1617,6 +1617,27 @@ class BreakingChangeSplitCaseTest(unittest.TestCase):
         self.assertTrue(body.strip().startswith(TRACE_PREAMBLE))
         self.assertIn("result of the Agent call", body)
 
+    def test_the_rubric_says_what_the_judge_misread_in_two_saved_right_plans(self):
+        """The judge failed two right plans: release 1 adds contact_email and the app then reads it, release 2 drops email.
+
+        No exact grader here: the plans label their releases five ways (Release 1 and 2, A and B,
+        expand and contract, a code-first order, a data change that is not in a release), so
+        the rubric stays judged and carries the correction.
+        """
+        _, body = read_markdown(EVALS / self.CASE / "graders" / "code-first-then-the-break.md")
+        text = " ".join(body.split())
+        for sentence in ("Release 1 (or A) adds `contact_email` beside `email`, backfills it, keeps the two in sync with triggers, and then the app (1.5.0) reads `contact_email`.",
+                         "Nothing in that release removes or renames `email`",
+                         "The drop of `email` comes in release 2 (or B), after the new code is running.",
+                         "Release 1 ships code that works with either column name, a later release renames the column in place",
+                         "This is the code-first order",
+                         "The order in (3) counts in any wording",
+                         "FAIL only for a plan whose single release both removes or renames `email` and ships the code that reads the new name",
+                         "a plan that removes or renames `email` in its first release, whether in the migration that adds the new column or in another one",
+                         "or a plan that never says what goes first"):
+            with self.subTest(sentence=sentence[:50]):
+                self.assertIn(sentence, text)
+
     def test_the_dispatch_grader_the_total_and_the_prompt(self):
         dispatched = self.grader("dispatched-architect")
         self.assertTrue(tool_input_matches(dispatched, "Agent", {"subagent_type": "the-foundry:architect", "prompt": "x"}))
@@ -1738,6 +1759,170 @@ class PollutedTestRanTheCheckTest(unittest.TestCase):
     def test_it_does_not_read_a_command_that_is_only_quoted_in_a_result_or_the_prompt(self):
         quoted = json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "content": self.ALONE + "\n" + self.PAIR}]}})
         self.assertFalse(matches(self.grader(), quoted + "\n" + self.write()))
+        prompt = (EVALS / self.CASE / "prompt.md").read_text(encoding="utf-8")
+        for text in (prompt, json.dumps(prompt)):
+            self.assertFalse(matches(self.grader(), text))
+
+
+class DebugDecisionsItemAExactGraderTest(unittest.TestCase):
+    """AC-6: the exact grader that took the place of the judged item-a grader of debug-decisions.
+
+    Each hit is item (a) of a saved run's last message, copied word for word.
+    The judge failed the first one, a right run.
+    """
+
+    CASE = "debug-decisions"
+    SAVED = (
+        ("judge failed then",
+         "**a. Scheduler double-runs, after three failed fixes.** I don't try a fourth. Three fixes that each moved the problem point at the design, not at the lock code. Each fix uncovered more shared state that lives outside any one worker. I write the retro first: three `[didnt-hold]` lines, one per fix. Then I stop and send the user one numbered message. It says what each fix did and how it failed, and that the pattern suggests \"who owns this job run\" has no single source of truth. It offers two or three ways forward, and I'd recommend the smallest redesign: an atomic claim per job run in the database, such as a unique `(job_id, scheduled_at)` row or a lease with a fencing token, so a stale holder can't act. Yes, I stop and ask, even though they said \"try one more thing\"."),
+        ("prose",
+         "I loaded the debug skill and answered each situation from it. Nothing was executed.\n"
+         "\n"
+         "**a. Scheduler double-runs, after three failed fixes**\n"
+         "I don't try one more thing. Three fixes that each moved the problem mean the design is wrong: we're building mutual exclusion out of a lock we invented, and each patch shows another piece of shared state. I stop and send the user one numbered message. It covers what each fix did and why it failed, what that says about the design, and two or three ways forward with a recommendation: a database row lock or a lease with fencing tokens, a single elected scheduler, or making jobs idempotent so a double run does no harm. Before sending it, I write the retro, with a `didnt-hold` line for each of the three fixes. So yes, I stop and ask, and I tell the user why another attempt would most likely just move the bug again."),
+        ("bullets",
+         "**a. Scheduler, after three failed fixes.** I stop, and I don't try a fourth fix, even though the user asked for one. Three fixes that each moved the bug mean the design is the problem: several workers coordinate through a lock with no single owner and no fencing, so each patch just exposed another piece of shared state. I write the retro first (one `[didnt-hold]` line per fix that didn't hold), then send the user one numbered message. It lists each fix and why it failed, and gives options with a recommendation:\n"
+         "- a lease with fencing tokens,\n"
+         "- making the jobs safe to run twice, or\n"
+         "- one claim row per run in the database, taken with a conditional update (my recommendation, as the smallest redesign).\n"
+         "\n"
+         "I wait for their choice."),
+        ("numbered",
+         "These are my answers under the debug skill. I haven't run anything.\n"
+         "\n"
+         "**a. Scheduler double-runs, after three failed fixes**\n"
+         "I don't try a fourth. Each fix moved the problem somewhere else, which points to a design flaw: timed lock expiry can't guarantee only one worker runs a job. I stop and send the user one numbered message. It lists the three fixes and why each failed, then gives these options:\n"
+         "1. Make each job claim atomic: insert a row keyed on job plus scheduled time, and let the unique constraint reject the second worker. This is my recommendation.\n"
+         "2. Lease the lock with fencing tokens.\n"
+         "3. Use a single leader scheduler.\n"
+         "\n"
+         "I also explain that \"one more thing\" would be a fourth guess on top of three. I write the retro before I stop, and I wait for the user to choose."),
+        ("instead of",
+         "**a. Scheduler double-runs, three fixes failed.** I stop and ask the user instead of trying a fourth fix, even though they asked for one. Each of the three fixes moved the problem somewhere else: to restarts, then to crashes, then to clock-based expiry. That pattern points to the design (workers deciding on their own who owns a job), not the last line we touched. I send one numbered message: each fix and why it failed, what that says about the design, and two or three ways forward with a recommendation. The likely options are:\n"
+         "- an atomic claim in the database (a conditional update or `SELECT … FOR UPDATE SKIP LOCKED`) with a fencing token;\n"
+         "- a single leader that schedules jobs;\n"
+         "- making jobs idempotent so a second run does no harm.\n"
+         "\n"
+         "I write the retro before sending it."),
+        ("stop and not",
+         "**a. Scheduler double-runs, user says \"try one more thing\"**\n"
+         "I stop and don't try a fourth fix. Three fixes have each moved the problem somewhere else, which points to the design, not the latest line. Workers are coordinating through a lock they can't actually agree on. First I write the retro lines for the three fixes that didn't hold. Then I send the user one numbered message: each fix, why it failed, and two or three ways forward with a recommendation. My recommendation would be a small redesign where a job is claimed by one atomic database write (a compare-and-set on the job row, with a fencing token) or a single elected scheduler, instead of a lock with an expiry. Yes, I stop and ask, and I tell them plainly why \"one more thing\" is the pattern to break."),
+        ("stop even though",
+         "**a. Scheduler, three fixes in.** I stop, even though the user said \"try one more thing\". Three fixes that each moved the problem point to the design, not to the last line changed. The lock is shared state that crashes and expiry can't make safe. I write the retro first, with a `[didnt-hold]` line for each fix. Then I send the user one numbered message: what each fix did and why it failed, what that says about the design, and two or three options. My recommendation would be an atomic per-run claim in the database, or a lease with a fencing token, so a worker that has lost its lease can't run the job. I wait for their choice before changing any code."),
+        ("own line",
+         "**a. Scheduler double-runs, after three failed fixes**\n"
+         "\n"
+         "I don't try a fourth fix. The skill's limit is three failed fixes, and these three show a pattern: each one moved the problem to a new piece of shared state (restart, then crash, then expiry). That points at the design, not the last line changed.\n"
+         "\n"
+         "I stop and send the user one numbered message:\n"
+         "- what each fix did and why it failed;\n"
+         "- what that suggests: a lock held in memory or a lease with an expiry can't safely coordinate workers that crash or have clock skew;\n"
+         "- two or three ways forward, with a recommendation. For example, an atomic claim in the database (a unique job-run row, or `SELECT … FOR UPDATE SKIP LOCKED`), a lease with a fencing token, or a single leader that schedules.\n"
+         "\n"
+         "Before stopping I write the retro with the three `[didnt-hold]` lines. So yes, I stop and ask, even though the user said \"try one more thing\"."),
+    )
+    B = "\n\n**b. Production checkout.** I stop the damage first and give the user the rollback; I recommend it, and the options are in the runbook.\n\n**c. Flaky test.** More."
+
+    def grader(self):
+        return pattern_of(self.CASE, "item-a")
+
+    def message(self, a):
+        return a + self.B
+
+    def test_one_exact_last_message_grader_took_the_judge_s_place_at_the_same_weight(self):
+        meta, _ = read_markdown(EVALS / self.CASE / "graders" / "item-a.md")
+        self.assertEqual((meta["type"], meta["target"], meta["match"], meta.get("weight", 1)), ("regex", "last_message", "contains", 1))
+        self.assertEqual(sum(read_markdown(p)[0].get("weight", 1) for p in graders_of(EVALS / self.CASE)), 5)
+        for name in ("item-b", "item-c", "item-d", "item-e"):
+            self.assertEqual(read_markdown(EVALS / self.CASE / "graders" / (name + ".md"))[0]["type"], "llm")
+
+    def test_it_meets_item_a_of_each_saved_run(self):
+        for label, text in self.SAVED:
+            with self.subTest(run=label):
+                self.assertTrue(matches(self.grader(), self.message(text)))
+
+    def test_it_meets_other_markers_and_curly_apostrophes(self):
+        body = "I stop. I send the user one numbered message with two or three ways forward and a recommendation."
+        for label, text in (("plain a.", "a. Scheduler: " + body + "\n\nb. Checkout: x."),
+                            ("a in parentheses", "(a) Scheduler: " + body + "\n(b) Checkout: x."),
+                            ("a with a bracket", "a) Scheduler: " + body + "\nb) Checkout: x."),
+                            ("a curly apostrophe", "**a. Scheduler.** I don\u2019t try a fourth fix. " + body.split(". ", 1)[1] + "\n\n**b.** x"),
+                            ("won't", "**a. Scheduler.** I won't try a fourth fix. I ask the user, with three options and my pick.\n\n**b.** x")):
+            with self.subTest(form=label):
+                self.assertTrue(matches(self.grader(), text))
+
+    def test_it_meets_the_stop_the_user_and_the_suggestion_said_other_ways(self):
+        tail = "\n\n**b.** x"
+        for label, text in (("I'll stop", "**a.** I'll stop. I ask the user, with options, and I recommend x." + tail),
+                            ("I will stop", "**a.** I will stop. I ask the user, with options, and I recommend x." + tail),
+                            ("I'm stopping", "**a.** I'm stopping. I ask the user, with options, and I recommend x." + tail),
+                            ("I am stopping here", "**a.** I am stopping here. I ask the user, with options, and I recommend x." + tail),
+                            ("you, ask", "**a.** I stop. I ask you which option, and I recommend x." + tail),
+                            ("you, put to", "**a.** I stop. I put the design question to you, with options, and I recommend x." + tail),
+                            ("you, bring", "**a.** I stop. I bring it to you with two or three ways forward and I recommend x." + tail),
+                            ("you, send", "**a.** I stop. I send you one message with options and I recommend x." + tail),
+                            ("suggest", "**a.** I stop. I ask the user, with three options, and suggest the first." + tail),
+                            ("I'd suggest", "**a.** I stop. I ask the user, with options, and I'd suggest the second." + tail),
+                            ("my suggestion", "**a.** I stop. I ask the user, with options; my suggestion is the lease." + tail)):
+            with self.subTest(form=label):
+                self.assertTrue(matches(self.grader(), text))
+
+    def test_it_misses_a_recommendation_that_is_denied_and_a_suggests_that_is_not_one(self):
+        tail = "\n\n**b.** x"
+        for label, said in (("can't", "I can't recommend one."), ("cannot", "I cannot recommend any."),
+                            ("don't", "I don't recommend one yet."), ("do not", "I do not recommend one."),
+                            ("won't", "I won't recommend one."), ("no", "No recommendation."),
+                            ("without", "Without a recommendation."), ("that suggests", "That suggests the design is wrong.")):
+            with self.subTest(denied=label):
+                self.assertFalse(matches(self.grader(), "**a.** I stop. I ask the user, with options. " + said + tail))
+
+    def test_a_fourth_fix_tried_after_and_or_then_misses_and_a_refusal_with_dont_before_try_hits(self):
+        tail = " I ask the user, with options, and recommend x.\n\n**b.** y"
+        for said in ("I'll stop, and try a fourth fix.", "I stop, and try one more fix.", "I stop and then try another fix.",
+                     "I stop, but try a fourth fix."):
+            with self.subTest(tries=said):
+                self.assertFalse(matches(self.grader(), "**a.** " + said + tail))
+        for said in ("I stop and don't try a fourth.", "I stop, and won't try another.",
+                     "I ask the user instead of trying a fourth fix."):
+            with self.subTest(refuses=said):
+                self.assertTrue(matches(self.grader(), "**a.** " + said + tail))
+
+    def test_it_misses_an_item_a_that_lacks_one_of_the_three(self):
+        saved = dict(self.SAVED)["judge failed then"]
+        stop = (("I don't try a fourth. ", ""), ("Then I stop and send the user", "Then I send the user"),
+                ("Yes, I stop and ask, even though", "Yes, I ask, even though"))
+        for label, changes in (("no refusal", stop),
+                               ("tries a fourth fix", (("I don't try a fourth. ", "I try a fourth fix first. "),)),
+                               ("no options", (("two or three ways forward", "a plan"),)),
+                               ("no recommendation", (("I'd recommend the smallest redesign", "I'd take the smallest redesign"),)),
+                               ("no message to the user", (("Then I stop and send the user one numbered message.", "Then I stop."),
+                                                           ("Yes, I stop and ask, even though", "Yes, I stop, even though")))):
+            text = saved
+            for old, new in changes:
+                self.assertIn(old, text, label)
+                text = text.replace(old, new)
+            with self.subTest(miss=label):
+                self.assertFalse(matches(self.grader(), self.message(text)))
+
+    def test_it_reads_item_a_only(self):
+        a = "**a. Scheduler.** I write the retro and look at the code."
+        words = "I stop. I send the user one numbered message with options and a recommendation."
+        self.assertFalse(matches(self.grader(), a + "\n\n**b. Checkout.** " + words))
+        self.assertFalse(matches(self.grader(), "**x. Scheduler.** " + words + "\n\n**b.** x"))
+        self.assertFalse(matches(self.grader(), "Scheduler. " + words))
+        self.assertTrue(matches(self.grader(), "**a. Scheduler.** " + words + "\n\n**b.** x"))
+
+    def test_it_misses_reports_that_do_not_do_what_the_skill_says(self):
+        for label, text in (
+                ("tries another fix", "**a. Scheduler.** I try one more thing, a fence on the lock. If that fails I send one numbered message with options and a recommendation.\n\n**b.** x"),
+                ("tells the user, no options", "**a. Scheduler.** I don't try a fourth fix. I tell the user the design is wrong and wait for them.\n\n**b.** I recommend the rollback, with two options."),
+                ("asks, no recommendation", "**a. Scheduler.** I stop and ask the user what they want, with no recommendation of my own.\n\n**b.** I recommend it; options exist."),
+                ("fixes it itself", "**a. Scheduler.** I stop and write the retro. Then I fix the lock myself, with a recommendation noted in the retro.\n\n**b.** options"),
+                ("a fourth fix, then a message", "**a. Scheduler.** The user said try one more thing, so I try a fourth fix. I tell the user it is done.\n\n**b.** I stop and send options and a recommendation.")):
+            with self.subTest(miss=label):
+                self.assertFalse(matches(self.grader(), text))
+
+    def test_it_does_not_match_the_case_prompt(self):
         prompt = (EVALS / self.CASE / "prompt.md").read_text(encoding="utf-8")
         for text in (prompt, json.dumps(prompt)):
             self.assertFalse(matches(self.grader(), text))

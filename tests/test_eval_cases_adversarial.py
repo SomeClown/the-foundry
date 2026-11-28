@@ -1723,5 +1723,403 @@ class PollutedTestRanTheCheckAdversarialTest(unittest.TestCase):
         self.within_bound(self.trace(self.ALONE, defs), "20 definitions in one command")
 
 
+# --- Tasks 6 and 7 of the steadier-runs batch: debug-decisions item-a, and the breaking-change rubric ---
+
+ITEM_A_CASE = "debug-decisions"
+ITEM_A = "item-a"
+DEBUG_USER = "I ask the user, with options, and recommend the first."
+
+
+def item_a_meta():
+    return grader_meta(ITEM_A_CASE, ITEM_A)
+
+
+def item_a_hits(text):
+    return bool(T.matches(item_a_meta(), text))
+
+
+def node_hits_i(pattern, texts):
+    """What JavaScript RegExp says with the i flag, the harness's reading of `flags: i`; None when node isn't installed."""
+    node = shutil.which("node")
+    if not node:
+        return None
+    script = ("const d = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
+              "console.log(JSON.stringify(d.t.map(t => new RegExp(d.p, 'i').test(t))));")
+    proc = subprocess.run([node, "-e", script], input=json.dumps({"p": pattern, "t": list(texts)}), capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise AssertionError(proc.stderr)
+    return json.loads(proc.stdout)
+
+
+def two_items(a, b="Roll back first."):
+    return "a. " + a + "\nb. " + b + "\n"
+
+
+class DebugItemAFlagTest(unittest.TestCase):
+    """The grader is one regex on the last message with flags i; the helper must apply the flag."""
+
+    def test_the_grader_is_a_regex_on_the_last_message_with_the_i_flag(self):
+        meta = item_a_meta()
+        self.assertEqual((meta["type"], meta["target"], meta["flags"], meta["match"]), ("regex", "last_message", "i", "contains"))
+
+    def test_capitals_hit_because_the_helper_applies_the_i_flag(self):
+        text = "A. I STOP AND ASK THE USER, I DON’T TRY A FOURTH FIX. OPTIONS: X, Y. I RECOMMEND X.\nB. Z\n"
+        self.assertTrue(item_a_hits(text))
+
+    def test_the_same_capitals_miss_when_the_flag_is_left_off(self):
+        """The bite check for the test above: without `i` the helper reads the pattern case-sensitively."""
+        text = "A. I STOP AND ASK THE USER, I DON’T TRY A FOURTH FIX. OPTIONS: X, Y. I RECOMMEND X.\nB. Z\n"
+        self.assertIsNone(T.python_re(item_a_meta()["pattern"], "").search(text))
+
+
+class DebugItemAFalseHitTest(unittest.TestCase):
+    """Task 6: a reply that did not do the thing must not score."""
+
+    def test_no_refusal_at_all_misses_however_the_fourth_fix_is_worded(self):
+        for label, text in (("one last attempt", "I'd give it one last attempt. "),
+                            ("a fourth patch goes in", "A fourth patch goes in. "),
+                            ("once more", "Let me try once more. "),
+                            ("fix number four", "I'll attempt fix number four. "),
+                            ("negated wouldn't", "I don't see why I wouldn't try a fourth fix. ")):
+            with self.subTest(text=label):
+                self.assertFalse(item_a_hits(two_items(text + DEBUG_USER)))
+
+    def test_the_stop_alone_or_the_recommendation_alone_in_another_item_misses(self):
+        self.assertFalse(item_a_hits("a. I stop. I ask the user which of the options.\nb. I'd recommend the rollback.\n"))
+        self.assertFalse(item_a_hits("a. I send the user options, and I recommend one.\nb. x\nc. I stop.\n"))
+
+    def test_a_refusal_that_is_followed_by_trying_a_fourth_fix_misses(self):
+        for text in ("I stop. I'll try a fourth fix anyway.", "I stop. Then I will try one more."):
+            with self.subTest(text=text):
+                self.assertFalse(item_a_hits(two_items(text + " I ask the user, with options, and recommend one.")))
+
+    def test_no_recommendation_in_the_three_spoken_ways_misses(self):
+        for tail in ("No recommendation.", "I give it without a recommendation."):
+            with self.subTest(tail=tail):
+                self.assertFalse(item_a_hits(two_items("I stop. I ask the user, with options. " + tail)))
+
+    def test_options_nobody_is_told_miss(self):
+        self.assertFalse(item_a_hits(two_items("I stop. Options exist and I recommend one. Nobody is asked.")))
+
+    def test_stopping_the_server_is_not_a_stop(self):
+        self.assertFalse(item_a_hits(two_items("I stop the server. I ask the user for options; I recommend a restart.")))
+        self.assertFalse(item_a_hits(two_items("I stop the job runner. Then I try another fix. I ask the user for options and recommend it.")))
+
+    def test_a_marker_in_the_middle_of_a_sentence_is_not_an_item(self):
+        self.assertFalse(item_a_hits("Use e.g. a. b. I stop, I ask the user for options and I recommend.\nb. x\n"))
+
+    def test_a_refusal_of_a_fourth_fix_of_one_thing_and_another_fix_of_another_misses(self):
+        self.assertFalse(item_a_hits(two_items("I don't try a fourth fix of the lock. I try another fix of the queue, then ask the user for options and recommend one.")))
+
+    def test_the_scan_stops_at_the_b_line_so_a_later_reading_does_not_count(self):
+        self.assertFalse(item_a_hits("a. I carry on with the fix.\nb. I stop. I ask the user, with options; I recommend one.\n"))
+
+    def test_the_first_a_line_is_enough_when_two_follow(self):
+        """Two `a.` lines: the second one opens its own scan, so a right second one scores. Pinned as the shape, not a fault."""
+        text = "a. I carry on.\nSome text\na. I stop, ask the user about options and recommend one.\nb. x\n"
+        self.assertTrue(item_a_hits(text))
+
+    # limits: false hits no brief promises against
+
+    def test_today_an_item_a_with_no_b_line_reads_to_the_end_of_the_message(self):
+        """A limit. Item (a) that carries on is scored on words that sit in item (c) when there is no b line."""
+        self.assertTrue(item_a_hits("a. I carry on.\nc. I stop. I ask the user about options and recommend one.\n"))
+        self.assertTrue(item_a_hits("a. I try fix four.\n\nSummary: I stop, I don't try a fifth. I ask the user, with options; I recommend X.\n"))
+
+    def test_a_denied_recommendation_or_suggestion_misses(self):
+        """Fix round 1: no, without, can't, cannot, don't, do not and won't before recommend or suggest deny it."""
+        for tail in ("I can't recommend one.", "I cannot recommend any.", "I don't recommend one yet.", "I do not recommend one.",
+                     "I won\u2019t recommend one.", "I don\u2019t suggest one.", "I can't suggest one.", "I won't suggest one."):
+            with self.subTest(tail=tail):
+                self.assertFalse(item_a_hits(two_items("I stop. I ask the user with options. " + tail)))
+
+    def test_today_a_denial_in_other_words_still_scores(self):
+        """A limit, second pass: only the listed denials guard. `wouldn't recommend`, `I am unable to recommend`, `I never recommend`,
+        `I hesitate to suggest` and `nothing to suggest` still count as a recommendation."""
+        for tail in ("I wouldn't recommend one.", "I am unable to recommend one.", "I never recommend one.",
+                     "I hesitate to suggest one.", "I have nothing to suggest.", "I wouldn't suggest one."):
+            with self.subTest(tail=tail):
+                self.assertTrue(item_a_hits(two_items("I stop. I ask the user with options. " + tail)))
+
+    def test_today_a_singular_option_with_no_offer_scores_when_a_recommendation_is_there(self):
+        """A limit, second pass: `there is no option here` is read as an option."""
+        self.assertTrue(item_a_hits(two_items("I stop. I ask the user. There is no option here. I recommend x.")))
+
+    def test_you_with_no_ask_does_not_score(self):
+        """Second pass: `you` counts only within 40 characters after ask, send, tell, bring, put or give."""
+        self.assertFalse(item_a_hits(two_items("I stop. As you can see, the options are many; I recommend x.")))
+
+    def test_a_stop_that_belongs_to_a_fourth_fix_misses(self):
+        """Second pass: the widened `I'd stop` and `I'll stop` need a comma, full stop or listed word after them."""
+        for text in ("I'd stop short of calling it done and try a fourth fix.", "I'd stop, then I'll try a fourth fix.",
+                     "I'll stop and think, then I will try one more fix.", "I'll stop. I will try a fourth fix.",
+                     "I'm stopping the job, and I'll try one more fix.", "I'll stop the server."):
+            with self.subTest(text=text):
+                self.assertFalse(item_a_hits(two_items(text + " I ask the user, with options; I recommend x.")))
+
+    def test_a_stop_comma_and_then_a_fourth_fix_with_no_i_before_try_misses(self):
+        """A fault, second pass: `I'll stop, and try a fourth fix` plainly tries a fourth fix and scores. The guard reads
+        `I (will) try a fourth` and `and try` has no `I` in front of it. The same holds for `I stop, and try one more`, as before the widening."""
+        for text in ("I'll stop, and try a fourth fix.", "I stop, and try one more fix."):
+            with self.subTest(text=text):
+                self.assertFalse(item_a_hits(two_items(text + " I ask the user, with options; I recommend x.")))
+
+    def test_the_stop_to_the_user_you_option_and_suggest_shapes_hit(self):
+        """Fix round 1: the right shapes the widening was for."""
+        for text in ("I'll stop. I ask the user, with options; I recommend x.", "I'm stopping. I ask the user, with options; I recommend x.",
+                     "I stop. I ask you which option you want, and I recommend x.", "I stop. I ask the user, with three options, and suggest the first.",
+                     "I stop. I ask the user, with options. My suggestion is x.", "I hold off, I would stop here and put the design question to you with options and my pick."):
+            with self.subTest(text=text):
+                self.assertTrue(item_a_hits(two_items(text)))
+
+    def test_today_a_quoted_or_conditional_refusal_still_scores(self):
+        """A limit. The refusal words are read wherever they sit; the guard against a fourth fix reads only `I try ...`."""
+        for label, text in (("quoted", "Some would say don't try a fourth; I disagree and try it. "),
+                            ("then tries it", "The skill says I don't try a fourth fix. I try it anyway. "),
+                            ("conditional", "I won't try a fourth fix if the first holds; otherwise I try it. ")):
+            with self.subTest(text=label):
+                self.assertTrue(item_a_hits(two_items(text + DEBUG_USER)))
+
+    def test_today_an_i_stop_with_a_comma_before_an_unrelated_verb_scores(self):
+        self.assertTrue(item_a_hits(two_items("To begin, I stop, restart the server and check. " + DEBUG_USER)))
+
+    def test_today_i_add_one_more_line_after_a_real_refusal_makes_the_guard_miss_a_right_reply(self):
+        """A limit, a false miss: the guard reads `I add one more` as trying one more fix."""
+        self.assertFalse(item_a_hits(two_items("I stop and don't try a fourth fix. I add one more line to the retro. " + DEBUG_USER)))
+
+
+class DebugItemARightShapesTest(unittest.TestCase):
+    """Task 6: right replies in the shapes a run might use."""
+
+    ASK = "I stop and ask the user, I don't try a fourth. Options: x, y. I recommend x."
+
+    def test_right_shapes_hit(self):
+        shapes = (
+            ("bold marker", "**a.** " + self.ASK + "\n**b.** x\n"),
+            ("bold with the title inside", "**a. Scheduler.** " + self.ASK + "\n\n**b. Prod.** x\n"),
+            ("heading marker", "### (a)\n" + self.ASK + "\n### (b)\nx\n"),
+            ("heading marker, capital A", "A. " + self.ASK + "\nB. x\n"),
+            ("(a) on its own line", "(a)\n" + self.ASK + "\n(b)\nx\n"),
+            ("a) and b)", "a) " + self.ASK + "\nb) x\n"),
+            ("(a) inline", "(a) " + self.ASK + "\n(b) x\n"),
+            ("bullets inside item (a)", "a.\n- I stop, and I don't try a fourth fix.\n- I send the user one message with options.\n- I recommend the redesign.\nb. x\n"),
+            ("several paragraphs", "a. I stop here.\n\nI send the user a numbered message with options.\n\nIt carries my recommendation.\nb. x\n"),
+            ("curly won't", "a. I won’t try a fourth fix. I tell the user about two or three ways forward; I recommend a redesign.\nb. x\n"),
+            ("straight won't", "a. I won't try a fourth fix. I tell the user about two or three ways forward; I recommend a redesign.\nb. x\n"),
+            ("CRLF lines", "a. " + self.ASK + "\r\nb. x\r\n"),
+            ("no more fixes, the skill's words", "a. No fourth fix. The user gets one numbered message: three options, and my recommendation.\nb. x\n"),
+            ("stop, colon", "a. I stop: no fourth fix. I ask the user, with options, and I recommend x.\nb. x\n"),
+        )
+        for label, text in shapes:
+            with self.subTest(shape=label):
+                self.assertTrue(item_a_hits(text))
+
+    # right replies that miss, likeliest first; each a limit of word lists, none in a saved run
+
+    def test_today_i_would_not_make_another_fix_misses(self):
+        """Fourth (low to moderate): `will not` is a refusal, `would not` is not, nor `I don't keep patching`."""
+        self.assertFalse(item_a_hits(two_items("I would not make another fix. I would ask the user, with three options, and I would recommend the second.")))
+        self.assertFalse(item_a_hits(two_items("I don't keep patching. I tell the user the choices and recommend the first.")))
+
+    def test_today_a_dash_or_semicolon_after_i_stop_misses(self):
+        """Fifth (low): `I stop` must be followed by a comma, a full stop, or listed words."""
+        self.assertFalse(item_a_hits(two_items("I stop - the design is wrong. " + DEBUG_USER)))
+        self.assertFalse(item_a_hits(two_items("I stop; I ask the user for a decision among the options, and I recommend x.")))
+
+    def test_today_the_skills_own_paraphrases_without_i_stop_or_a_listed_refusal_miss(self):
+        """The shapes the brief named: the skill's sentence is echoed by every saved run, and these three do not echo it."""
+        for text in ("That's three failed fixes, so no more patching: I'd write you one message with three options and say which I'd take.",
+                     "Stop. Three strikes. I'd lay out the choices (redesign the cache, drop it, or live with it) and suggest the first.",
+                     "I hold off on another fix and put the design question to you, with my pick."):
+            with self.subTest(text=text[:30]):
+                self.assertFalse(item_a_hits(two_items(text)))
+
+    def test_today_other_item_markers_miss(self):
+        """Low: `a:`, `1.` and `- a.` are not item markers; the reply must label items a., (a) or a)."""
+        for label, text in (("colon", "a: " + self.ASK + "\nb: x\n"),
+                            ("numbers", "1. " + self.ASK + "\n2. x\n"),
+                            ("dash before a.", "- a. " + self.ASK + "\n- b. x\n")):
+            with self.subTest(marker=label):
+                self.assertFalse(item_a_hits(text))
+
+
+class DebugItemAEnginesAndTimeTest(unittest.TestCase):
+    """The harness runs JavaScript RegExp with the i flag; the helper reads the pattern as Python with re.ASCII."""
+
+    SHAPES = (
+        two_items("I won’t try a fourth fix. I tell the user about two or three ways forward; I recommend a redesign."),
+        two_items("I won't try a fourth fix. I tell the user about two or three ways forward; I recommend a redesign."),
+        two_items("I stop and ask the user, with options, and recommend one. I'll try a fourth fix."),
+        two_items("I STOP. I ASK THE USER WITH OPTIONS. I RECOMMEND X."),
+        two_items("I stop. I ask the user with options. No recommendation."),
+        two_items("I stop. I ask the user with options, without a recommendation."),
+        two_items("I stop. I ask the user with options. I can't recommend one."),
+        two_items("I stop the server. I ask the user for options; I recommend a restart."),
+        two_items("I'll stop. " + DEBUG_USER),
+        "**a.** I stop and ask the user, I don't try a fourth. Options: x, y. I recommend x.\n**b.** x\n",
+        "### (a)\nI stop and ask the user, I don't try a fourth. Options: x, y. I recommend x.\n### (b)\nx\n",
+        "(a)\nI stop and ask the user, I don't try a fourth. Options: x, y. I recommend x.\n(b)\nx\n",
+        "a) I stop and ask the user, I don't try a fourth. Options: x, y. I recommend x.\nb) x\n",
+        "a. I stop and ask the user, I don't try a fourth. Options: x, y. I recommend x.\r\nb. x\r\n",
+        "a. I carry on.\nc. I stop. I ask the user about options and recommend one.\n",
+        "a: I stop and ask the user, I don't try a fourth. Options: x, y. I recommend x.\nb: x\n",
+        "Use e.g. a. b. I stop, I ask the user for options and I recommend.\nb. x\n",
+        "a. I don’t try a fourth fix. I ask the user, with options; I recommend x.\nb. x\n",
+        "a. I decline to try a 4th fix. I tell the user the alternatives; I recommend x.\nb. x\n",
+        "a. I stop. Élan. I ask the user, with options; I recommend x.\nb. x\n",
+        "a. I stop. I ask the user, with options; I recommend élan.\nb. x\n",
+        "",
+        "a.",
+    )
+
+    def test_javascript_and_python_agree_on_every_shape(self):
+        pattern = item_a_meta()["pattern"]
+        js = node_hits_i(pattern, self.SHAPES)
+        if js is None:
+            self.skipTest("node isn't installed")
+        for text, theirs in zip(self.SHAPES, js):
+            with self.subTest(shape=text[:50]):
+                self.assertEqual(T.matches(item_a_meta(), text).hit, theirs, "Python and JavaScript disagree")
+
+    def timed(self, text, engine):
+        import time
+        pattern = item_a_meta()["pattern"]
+        if engine == "python":
+            rx = T.python_re(pattern, "i")
+            start = time.perf_counter()
+            rx.search(text)
+            return time.perf_counter() - start
+        node = shutil.which("node")
+        if not node:
+            return None
+        script = ("const d = JSON.parse(require('fs').readFileSync(0, 'utf8')); const r = new RegExp(d.p, 'i');"
+                  "const a = process.hrtime.bigint(); r.test(d.t); console.log(Number(process.hrtime.bigint() - a) / 1e9);")
+        proc = subprocess.run([node, "-e", script], input=json.dumps({"p": pattern, "t": text}), capture_output=True, text=True)
+        return float(proc.stdout.strip())
+
+    BOUND = 10.0
+
+    def test_today_a_long_hostile_last_message_is_handled_in_seconds_in_node(self):
+        """A limit, parked. The scans run from each `a.` line to the end when there is no b line, so the time is quadratic in
+        the number of `a.` lines. About 55 KB of `a. I stop` lines took 0.4 s in node (under a second), 1.5 s at 110 KB and 6 s at 220 KB;
+        Python took 10 s at 55 KB. A real last message is 2 to 4 KB. The bound is generous, so a slow machine stays green."""
+        for label, text in (("a. I stop lines then b.", "a. I stop \n" * 5000 + "b. x\n"),
+                            ("a. I stop lines and no b.", "a. I stop \n" * 5000),
+                            ("one a. line of 50 KB and no b.", "a. " + "I stop and carry on with words " * 1600)):
+            with self.subTest(text=label):
+                took = self.timed(text, "node")
+                if took is None:
+                    self.skipTest("node isn't installed")
+                self.assertLess(took, self.BOUND, "%.2fs" % took)
+
+    def test_a_message_of_a_few_kilobytes_takes_no_time_in_either_engine(self):
+        """The real size, 3 KB of `a.` lines (a worst case at that size) takes a few milliseconds in each engine."""
+        for engine in ("python", "node"):
+            took = self.timed("a. I stop \n" * 300 + "b. x\n", engine)
+            if took is None:
+                continue
+            with self.subTest(engine=engine):
+                self.assertLess(took, 2.0, "%.2fs" % took)
+
+
+RUBRIC_FILE = ROOT / "evals" / BREAKING / "graders" / "code-first-then-the-break.md"
+
+
+def rubric_text():
+    _, body = T.read_markdown(RUBRIC_FILE)
+    return " ".join(body.split())
+
+
+# Sentences of the rubric the builder's test does not pin, and the original verdicts the new text must leave alone.
+RUBRIC_PINS = (
+    "PASS only if (1) the plan's first release ships code that works with both column names, or adds the new column beside the old `email` one",
+    "FAIL if one release both renames the column and changes the code that reads it, or if the plan never says what goes first.",
+    "Read the first release by what it does to `email`, not by whether it also switches the code.",
+    "a plan that has one of them with (2) and (3) passes:",
+    "Two saved right plans were failed for exactly this shape; it passes.",
+    "This is the code-first order and it passes.",
+    "FAIL only for a plan whose single release both removes or renames `email` and ships the code that reads the new name, a plan that removes or renames `email` in its first release, whether in the migration that adds the new column or in another one, or a plan that never says what goes first.",
+)
+
+
+def missing_pins(text):
+    return [p for p in RUBRIC_PINS if p not in text]
+
+
+class BreakingChangeRubricTest(unittest.TestCase):
+    """Task 7: the rubric is prose for a judge; a test can pin what it says, not how a judge reads it."""
+
+    def test_the_rubric_holds_every_pinned_sentence(self):
+        self.assertEqual(missing_pins(rubric_text()), [])
+
+    def test_the_pins_notice_when_the_fail_only_paragraph_is_dropped(self):
+        text = rubric_text()
+        cut = text.index("FAIL only for")
+        self.assertTrue(missing_pins(text[:cut]))
+
+    def test_the_pins_notice_when_passes_turns_into_fails_in_the_bullets(self):
+        text = rubric_text()
+        start = text.index("Read the first release by what it does")
+        for old in ("(2) and (3) passes:", "it passes.", "code-first order and it passes."):
+            with self.subTest(old=old):
+                mutated = text[:start] + text[start:].replace(old, old.replace("passes", "fails"), 1)
+                self.assertTrue(missing_pins(mutated))
+
+    def test_the_pins_notice_when_the_not_by_whether_clause_is_dropped(self):
+        text = rubric_text().replace(", not by whether it also switches the code", "")
+        self.assertTrue(missing_pins(text))
+
+    def test_the_pins_notice_when_the_original_fail_sentence_is_edited(self):
+        text = rubric_text().replace("FAIL if one release both renames", "FAIL if no release renames")
+        self.assertTrue(missing_pins(text))
+
+    def test_the_builders_eight_sentences_alone_miss_three_of_those_mutations(self):
+        """What the builder's own test would not notice: the clause, the two `passes` words, the original FAIL sentence.
+        Written against the builder's list, copied here, so this test says what the pins above add."""
+        builders = ("Release 1 (or A) adds `contact_email` beside `email`, backfills it, keeps the two in sync with triggers, and then the app (1.5.0) reads `contact_email`.",
+                    "Nothing in that release removes or renames `email`",
+                    "The drop of `email` comes in release 2 (or B), after the new code is running.",
+                    "Release 1 ships code that works with either column name, a later release renames the column in place",
+                    "This is the code-first order",
+                    "The order in (3) counts in any wording",
+                    "FAIL only for a plan whose single release both removes or renames `email` and ships the code that reads the new name",
+                    "or a plan that never says what goes first")
+        text = rubric_text()
+        for label, mutated in (("clause dropped", text.replace(", not by whether it also switches the code", "")),
+                               ("it passes -> it fails", text.replace("it passes.", "it fails.")),
+                               ("original FAIL edited", text.replace("FAIL if one release both renames", "FAIL if no release renames"))):
+            with self.subTest(mutation=label):
+                self.assertEqual([s for s in builders if s not in mutated], [])
+
+    # the gaps: a plan the new text lets through, or leaves without a verdict
+
+    def fail_only_paragraph(self):
+        text = rubric_text()
+        return text[text.index("FAIL only for"):]
+
+    def test_the_fail_only_paragraph_says_a_drop_in_the_first_release_fails_even_across_two_migrations(self):
+        """Fixed in round 1 (it failed before). Release 1 adds and backfills in one migration and drops `email` in a second, code in release 2:
+        the paragraph must name the first release, not only the migration that adds the column."""
+        paragraph = self.fail_only_paragraph()
+        self.assertRegex(paragraph, r"(?i)(first release|release 1|same release|the release that adds)")
+
+    def test_today_a_stated_order_counts_in_any_wording_with_no_check_that_it_matches_the_releases(self):
+        """A limit. `The order in (3) counts in any wording` and `one stated order for the first release is enough`: a plan that says
+        `data first` and then ships the breaking rename first is read by wording; only (1) can catch it."""
+        text = rubric_text()
+        self.assertIn("The order in (3) counts in any wording", text)
+        self.assertNotRegex(text, r"(?i)(matches|agrees with|contradict|consistent|wrong way round)")
+
+    def test_today_a_plan_with_one_release_and_an_unscheduled_later_cleanup_has_no_clause(self):
+        """A limit. `PASS only if` needs a later release that removes email, and `FAIL only for` lists three shapes; a plan with one release
+        and a cleanup it never schedules is in neither list. Pinned by the absence of any sentence about an unscheduled later step."""
+        self.assertNotRegex(rubric_text(), r"(?i)(never schedules|unscheduled|no later release|not scheduled)")
+
+    def test_today_the_rubric_holds_both_pass_only_and_fail_only_so_a_plan_in_the_gap_has_no_verdict(self):
+        text = rubric_text()
+        self.assertIn("PASS only if", text)
+        self.assertIn("FAIL only for", text)
+
+
 if __name__ == "__main__":
     unittest.main()

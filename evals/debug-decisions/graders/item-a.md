@@ -1,6 +1,9 @@
 ---
-type: llm
-focus: last_message
+type: regex
+target: last_message
+pattern: '(?:^|\n)[ \t#>*]*\(?a[.)](?=(?:(?!\n[ \t#>*]*\(?b[.)])[\s\S])*?(?:\b(?:do(?:n[\x27’]t| not)|won[\x27’]t|will not|never|refuse to|decline to|instead of|rather than)\s+(?:try(?:ing)?|make|making|attempt(?:ing)?|add(?:ing)?|apply(?:ing)?|do(?:ing)?)\s+(?:a |the |any )?(?:fourth|4th|one more|another|more)\b|\bno (?:fourth|4th|further|more) (?:fix|attempt|patch|try)|\b(?:I(?:[\x27’]d|[\x27’]ll| would| will)? stop(?:s)?|I(?:[\x27’]m| am) stopping)(?:,|\.| and (?:ask|send|bring|tell|write|wait|do(?:n[\x27’]t| not)|won[\x27’]t)| even| instead)|\b(?:I(?:[\x27’]d|[\x27’]ll| would| will)? stop(?:s)?|I(?:[\x27’]m| am) stopping) (?:here|now|there|fixing|patching)))(?!(?:(?!\n[ \t#>*]*\(?b[.)])[\s\S])*?(?:\bI(?:[\x27’]ll| will| would|[\x27’]d)?|\b(?:and then|and|then|but))\s+(?:try|make|add|apply|attempt)\s+(?:a |the |one |another )?(?:fourth|4th|one more|another)\b)(?=(?:(?!\n[ \t#>*]*\(?b[.)])[\s\S])*?(?:\bnumbered message\b|\b(?:ask|asks|asking|send|sends|tell|bring|brings|put|give|gives)\b[^.\n]{0,40}\b(?:the user|them|you)\b|\bwait(?:s)? for (?:the user|their|them|you)\b))(?=(?:(?!\n[ \t#>*]*\(?b[.)])[\s\S])*?(?:\b(?:ways forward|options?|alternatives?|choices?)\b|\b(?:two|three|2|3)(?: or (?:two|three|2|3))? (?:ways|approaches|redesigns)\b))(?=(?:(?!\n[ \t#>*]*\(?b[.)])[\s\S])*?(?:(?<!no )(?<!without a )(?<!without )(?<!can[\x27’]t )(?<!cannot )(?<!don[\x27’]t )(?<!do not )(?<!won[\x27’]t )(?:\brecommend(?:ation|ations|ed|s|ing)?\b|\bsuggest\b|\bmy suggestion\b)|\bmy (?:pick|choice|preference)\b|\bI(?:[\x27’]d| would) (?:pick|choose|go with|favou?r)\b))'
+flags: i
+match: contains
 ---
 
-Look only at item (a) of the reply. PASS if it refuses a fourth fix and brings the design question to the user with options and a recommendation. Otherwise FAIL.
+Item (a) is the text from the line that opens with `a.` to the line that opens with `b.`. A right reply says there that it stops and tries no fourth fix, that it brings the user one numbered message with options (two or three ways forward), and that the message carries a recommendation. All three are read inside item (a) only, so a recommendation or a stop that belongs to item (b) does not count, and an item (a) that says it tries a fourth fix does not match. The pattern holds the words the saved right replies used, which follow the debug skill's own wording. It reads the text of the run's last message.
