@@ -282,7 +282,7 @@ has, under whatever permissions you've given your session. Here's the long
 version, so you don't have to take my word for it:
 
 - **Shell commands in your project.** Every agent but `file-reader` has Bash,
-  because an agent that can't run the tests can only guess. The read-only
+  because an agent that can't run the tests can only guess (`area-lead`'s Bash is limited to the credential filter, `wc -l` and `echo`, and it runs no build or test). The read-only
   agents (`investigate`, `area-lead`, `architect`, `qa`, `uiux`) have no file-editing tools
   at all, and their instructions forbid changing anything through Bash;
   `file-reader` has only `Read`. (Plan mode can enforce that for `investigate` and `architect` if you add it to your own copies; see the permission policy above.)
