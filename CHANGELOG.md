@@ -4,7 +4,7 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [3.0.0] — 2026-11-27
 
 The area lead is now its own agent, `area-lead`, the eleventh. A lead
 used to be `investigate` told to act as a copy of itself, so every lead
