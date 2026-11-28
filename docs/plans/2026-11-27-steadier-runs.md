@@ -463,6 +463,7 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Tasks 1 to 3: complete (from 4077be7; gate exit 0 on all five, `Ran 2984`; adversarial: 57 tests, 1 bug fixed in round 1)
 - Session step 1: started on the export of a51daaa (sweeps `sr-1` to `sr-3`, the smoke, the head-to-head)
 - Task 4: complete (from a51daaa; gate exit 0 on all five, `Ran 3020`; adversarial: 33 tests, 5 faults fixed in round 1, 1 ruled a limit)
+- Task 5: complete (from c63d277; gate exit 0 on all five, `Ran 3060`; adversarial: 31 tests, no fix round, limits pinned)
 
 ### Decisions made during the build
 - Ruling (plan): the architect's rewording of Fix B stands (Task 1). Why: the draft's sentence forbade the Coverage line every part must carry, and "first line" is false under `NOT A PER-FILE READ`. If wrong: one sentence of `investigate.md` to reword.
@@ -478,6 +479,9 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Ruling (Task 4): the brief's patterns were used as written and gave the verdict list on the 28 saved reports. The adversarial round then found five real faults, fixed in round 1: a denial word after `tried` scored a try through the older branch; the new branch read past the report's closing quote; an escaped double quote after "roll back if" was missed; the test helper read `\w` as Unicode where the harness's JavaScript reads ASCII (the helper now compiles with `re.ASCII`); and a run of backticks after the label took quadratic time.
 - Ruling (Task 4): the older same-line branch of `rollback-tried` still reads past the report's closing quote. Why a limit: it was there before this change, and what follows a report on a trace line is the harness's own fields. Parked.
 - Ruling (Task 4): the pin on the new `devops` paragraph notices "before the steps" but doesn't hold "after the steps" as a phrase. Parked with the other phrase-pin limits.
+- Ruling (Task 5): all 22 saved `debug-polluted-test` runs did the check; the judge failed 7 of them wrongly and none was a real miss. The session read the disputed run (the record run's run 1) itself: the victim alone and the polluter-then-victim pair both ran before the fix was written. The plan's note that run 1 "looks like a real miss" was wrong.
+- Ruling (Task 5): `ran-the-check` is now one exact pattern on the trace at the same weight (weights are whole numbers, so it isn't split). It hits 22 of 22 saved runs in both engines and misses all 87 variants with the commands moved after the fix or a name removed. If wrong: a right run in a shape the pattern doesn't read is scored a miss; a miss on this grader in a real run gets a hand read before it counts.
+- Ruling (Task 5): the right-run shapes that miss, the command-text false hits and two slow hostile inputs are limits (see Parked). Why: none appears in the 22 saved runs, and the harness's engine stays under a second on the hostile inputs.
 - For the owner at the release ask: patch or minor (Risks, item 1).
 
 ### Parked
@@ -488,3 +492,6 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Task 4: `rollback-tried`'s older branch reads past the closing quote of the report's JSON string; wording that denies a try without a denial word ("I did not run it; the script would exit 0") still scores through it; `exit 0.5` reads as exit 0; with no `Watch:` line, a `Tried` label anywhere below a bare `Rollback:` scores.
 - Task 4: a lone `_` after "roll back if" hits `watch-line`. A report holding a literal U+2028 can score differently in Python and JavaScript (16 of 3,000 fuzzed shapes, all with that character).
 - Task 4: three rewordings of the new `devops` paragraph fail no pin ("may span several lines"; the "Anything longer" sentence dropped; "comes once or more, anywhere").
+- Task 5: `ran-the-check` reads command text, not results. Right-run shapes it misses, likeliest first: the file-path form (`-m unittest tests/test_c_report.py`); a Bash call whose `description` comes before `command`; `-k`; a function body using `$1`; quoted module names; `while read` or `xargs`; a Python script or `pytest`.
+- Task 5: command text inside a Bash call counts even as a comment, an `echo` or a printed here-document. Only a Write or Edit with `file_path` first (or after `replace_all`) closes the window; `sed -i`, `cat >`, MultiEdit and a Write with `content` first don't.
+- Task 5: one command with 66 uncalled function definitions takes about 4 s in Python (0.45 s in node), and a 2.7 MB trace with no Write about 2.5 s (0.8 s in node).

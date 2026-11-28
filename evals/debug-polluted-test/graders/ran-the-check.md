@@ -1,13 +1,8 @@
 ---
-type: llm
-focus: trace
+type: regex
+target: trace
+pattern: '^(?=(?:(?!"name":"(?:Write|Edit)","input":\{(?:"[a-z_]+":(?:true|false),)?"file_path":"[^"]*test_a_currency\.py")[\s\S])*?"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?-m[ \t]+unittest(?:[ \t]+-[-\w=]+)*[ \t]+tests\.test_c_report(?:\.ReportTest(?:\.test_report_header_uses_dollars)?)?(?:[ \t]+-[-\w=]+)*[ \t]*(?:\\n|\\"|"|[|;&)<>]|\d>))(?=(?:(?!"name":"(?:Write|Edit)","input":\{(?:"[a-z_]+":(?:true|false),)?"file_path":"[^"]*test_a_currency\.py")[\s\S])*?(?:"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?-m[ \t]+unittest(?:[ \t]+-[-\w=]+)*[ \t]+tests\.test_a_currency(?:\.EuroTest(?:\.test_euro_invoices_show_eur)?)?(?:[ \t]+-[-\w=]+)*[ \t]+tests\.test_c_report(?:\.ReportTest(?:\.test_report_header_uses_dollars)?)?(?:[ \t]+-[-\w=]+)*[ \t]*(?:\\n|\\"|"|[|;&)<>]|\d>)|"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?(\w+)\(\)[ \t]*\{(?:[^"\\]|\\.)*?-m[ \t]+unittest(?:[ \t]+-[-\w=]+)*[ \t]+(?:\\"|\x27)?\$(?:@|\{\w+\[@\]\})(?:\\"|\x27)?[ \t]+tests\.test_c_report(?:\.ReportTest(?:\.test_report_header_uses_dollars)?)?(?:[^"\\]|\\.)*?\}(?:[^"\\]|\\.)*?(?:\\n|;|&&|\|\||\$\(|\()[ \t]*\1[ \t]+(?:tests\.)?test_a_currency(?:\.EuroTest(?:\.test_euro_invoices_show_eur)?)?(?:[ \t]+-[-\w=]+)*[ \t]*(?:\\n|\\"|"|[|;&)<>]|\d>)|"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?for[ \t]+(\w+)[ \t]+in[ \t]+(?:[^;"\\]|\\.)*?\btest_a_currency\b(?:[^;"\\]|\\.)*?;[ \t]*do\b(?:[^"\\]|\\.)*?-m[ \t]+unittest(?:[ \t]+-[-\w=]+)*[ \t]+tests\.\$\{?\2\}?[ \t]+tests\.test_c_report(?:\.ReportTest(?:\.test_report_header_uses_dollars)?)?(?:[ \t]+-[-\w=]+)*[ \t]*(?:\\n|\\"|"|[|;&)<>]|\d>)|"name":"Bash","input":\{"command":"(?:[^"\\]|\\.)*?(\w+)\(\)[ \t]*\{(?:[^"\\]|\\.)*?-m[ \t]+unittest(?:[ \t]+-[-\w=]+)*[ \t]+(?:\\"|\x27)?\$(?:@|\{\w+\[@\]\})(?:\\"|\x27)?[ \t]+tests\.test_c_report(?:\.ReportTest(?:\.test_report_header_uses_dollars)?)?(?:[^"\\]|\\.)*?\}(?:[^"\\]|\\.)*?for[ \t]+(\w+)[ \t]+in[ \t]+(?:[^;"\\]|\\.)*?\btest_a_currency\b(?:[^;"\\]|\\.)*?;[ \t]*do\b(?:[^"\\]|\\.)*?(?:\\n|;|&&|\|\||\$\(|\()[ \t]*\3[ \t]+(?:tests\.)?\$\{?\4\}?(?:[ \t]+-[-\w=]+)*[ \t]*(?:\\n|\\"|"|[|;&)<>]|\d>)))'
+match: contains
 ---
 
-PASS only if, before the final write-up names the polluter, the trace shows both of these runs:
-- test_report_header_uses_dollars run with no other test, and passing;
-- a run holding only test_a_currency's tests and then test_report_header_uses_dollars, in that
-  order, with the victim failing. A loop or a script that starts each such run as its own process
-  counts.
-Calling test_a_currency the suspect, or the likely polluter, before these runs doesn't count as
-naming it. FAIL if either run is missing, holds other test files, or comes only after the final
-write-up.
+A right run, before it first writes or edits `tests/test_a_currency.py`, has run two things as `python3 -m unittest` commands: the victim alone (`tests.test_c_report`, or the victim's own id), and the polluter's tests with nothing else but then the victim (`tests.test_a_currency ... tests.test_c_report`). The pair may be one command, a shell function that puts the victim last and is called with the polluter, or a loop over modules. The pattern starts at the top of the trace and cannot cross the first Write or Edit call on that file, so a run that did both only after writing the fix does not match. The run's output is not read: in this fixture the victim passes alone and fails after the polluter. A half of the suite plus the victim, the victim before the polluter, and module names that are not under `tests.` do not count.

@@ -1630,5 +1630,118 @@ class BreakingChangeSplitCaseTest(unittest.TestCase):
             self.assertFalse(matches(self.grader("two-releases"), text))
 
 
+class PollutedTestRanTheCheckTest(unittest.TestCase):
+    """AC-6: the exact grader that took the place of the judged ran-the-check grader of debug-polluted-test.
+
+    The commands are copied from saved runs. Each result line is left out: in
+    this fixture the victim passes alone and fails after the polluter.
+    """
+
+    CASE = "debug-polluted-test"
+    ALONE = "python3 -B -m unittest tests.test_c_report -q; echo \"alone exit=$?\""
+    ALONE_ID = "python3 -B -m unittest -v tests.test_c_report.ReportTest.test_report_header_uses_dollars 2>&1 | tail -4"
+    PAIR = "python3 -B -m unittest -v tests.test_a_currency tests.test_c_report.ReportTest.test_report_header_uses_dollars 2>&1 | grep -E '\\.\\.\\. |^Ran'"
+    FUNCTION = ("r(){ python3 -B -m unittest \"$@\" tests.test_c_report -q >/dev/null 2>&1 && echo \"pass: $*\" || echo \"FAIL: $*\"; }\n"
+                "r tests.test_a0_parse tests.test_a1_empty tests.test_a_currency\n"
+                "r tests.test_b0_total tests.test_b1_dollar_sign tests.test_b2_rounding\n"
+                "r tests.test_a_currency")
+    ARRAY = ("cd /w; r(){ args=(); for m in \"$@\"; do args+=(tests.$m); done; python3 -B -m unittest \"${args[@]}\" tests.test_c_report -q 2>&1 | tail -1; }\n"
+             "r test_a0_parse test_a1_empty test_a_currency\nr test_a_currency\nr test_e_invoice")
+    LOOP = ("for t in test_a0_parse test_a1_empty test_a_currency; do echo \"--- $t + c\"; "
+            "python3 -B -m unittest tests.$t tests.test_c_report -q 2>&1 | tail -1; done")
+    LOOP_CALL = ("run(){ python3 -B -m unittest \"$@\" tests.test_c_report -q 2>&1 | tail -1; }\n"
+                 "for t in test_a0_parse test_a1_empty test_a_currency; do echo \"$t :\"; run tests.$t; done")
+    SUBSHELL = ("cd /w && run(){ python3 -B -m unittest \"$@\" tests.test_c_report -q 2>&1 | tail -1; }\n"
+                "echo \"A: $(run tests.test_a0_parse tests.test_a1_empty tests.test_a_currency)\"; echo \"a_currency: $(run tests.test_a_currency)\"")
+    ONE_LINE = ("python3 -B -m unittest tests.test_c_report -q; echo ---; for m in test_a0_parse test_a_currency test_b0_total; do "
+                "python3 -B -m unittest tests.$m tests.test_c_report -q >/dev/null 2>&1; echo \"$m then c_report: exit=$?\"; done")
+
+    def grader(self):
+        return pattern_of(self.CASE, "ran-the-check")
+
+    @staticmethod
+    def bash(command):
+        block = {"type": "tool_use", "id": "t", "name": "Bash", "input": {"command": command}}
+        return json.dumps({"type": "assistant", "message": {"content": [block]}}, separators=(",", ":"))
+
+    @staticmethod
+    def write(path="/w/tests/test_a_currency.py", tool="Write"):
+        inputs = {"file_path": path, "content": "x"} if tool == "Write" else {"replace_all": False, "file_path": path, "old_string": "a", "new_string": "b"}
+        block = {"type": "tool_use", "id": "t", "name": tool, "input": inputs}
+        return json.dumps({"type": "assistant", "message": {"content": [block]}}, separators=(",", ":"))
+
+    def trace(self, *steps):
+        """Each step is a command, or a line already built (it starts with a brace)."""
+        out = [json.dumps({"type": "system", "subtype": "init"})]
+        for step in steps:
+            out.append(step if step.startswith("{") else self.bash(step))
+            out.append(json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "content": "OK"}]}}))
+        return "\n".join(out) + "\n"
+
+    def test_one_exact_trace_grader_took_the_judge_s_place_at_the_same_weight(self):
+        meta, _ = read_markdown(EVALS / self.CASE / "graders" / "ran-the-check.md")
+        self.assertEqual((meta["type"], meta["target"], meta["match"], meta.get("weight", 1)), ("regex", "trace", "contains", 1))
+        self.assertEqual(sum(read_markdown(p)[0].get("weight", 1) for p in graders_of(EVALS / self.CASE)), 4)
+
+    def test_it_meets_the_victim_alone_and_the_pair_in_each_form_a_saved_run_took(self):
+        for label, pair in (("one command", self.PAIR), ("function", self.FUNCTION), ("array function", self.ARRAY),
+                            ("loop", self.LOOP), ("loop calling a function", self.LOOP_CALL),
+                            ("function in a subshell", self.SUBSHELL)):
+            for alone in (self.ALONE, self.ALONE_ID):
+                with self.subTest(form=label, alone=alone[-20:]):
+                    self.assertTrue(matches(self.grader(), self.trace(alone, pair, self.write())))
+                    self.assertTrue(matches(self.grader(), self.trace(pair, alone, self.write("/w/tests/test_a_currency.py", "Edit"))))
+
+    def test_it_meets_one_command_that_holds_both_and_a_run_that_never_wrote_the_file(self):
+        self.assertTrue(matches(self.grader(), self.trace(self.ONE_LINE, self.write())))
+        self.assertTrue(matches(self.grader(), self.trace(self.ALONE, self.PAIR)))
+
+    def test_it_misses_a_run_with_only_one_of_the_two(self):
+        half = "python3 -B -m unittest tests.test_a0_parse tests.test_a1_empty tests.test_a_currency tests.test_c_report -q 2>&1 | tail -1"
+        state = "python3 -B -c \"import unittest\\nunittest.TextTestRunner().run(unittest.defaultTestLoader.loadTestsFromName('tests.test_a_currency'))\""
+        for label, steps in (("pair only", (self.PAIR,)), ("alone only", (self.ALONE,)),
+                             ("alone and the half", (self.ALONE, half)),
+                             ("alone and a state dump of the polluter", (self.ALONE, state)),
+                             ("the polluter alone", (self.ALONE, "python3 -B -m unittest tests.test_a_currency -q")),
+                             ("alone and a pair with a third module", (self.ALONE, "python3 -B -m unittest tests.test_a_currency tests.test_b0_total tests.test_c_report -q")),
+                             ("the victim first", (self.ALONE, "python3 -B -m unittest tests.test_c_report tests.test_a_currency -q")),
+                             ("the whole suite", (self.ALONE, "python3 -B -m unittest discover -s tests -q"))):
+            with self.subTest(run=label):
+                self.assertFalse(matches(self.grader(), self.trace(*steps, self.write())))
+
+    def test_it_misses_a_victim_that_only_ran_with_other_tests(self):
+        for other in ("python3 -B -m unittest tests.test_c_report tests.test_a_currency -q",
+                      "python3 -B -m unittest tests.test_c_report tests.test_e_invoice 2>&1 | tail -1",
+                      "python3 -B -m unittest tests.test_e_invoice tests.test_c_report -q"):
+            with self.subTest(command=other):
+                self.assertFalse(matches(self.grader(), self.trace(other, self.PAIR, self.write())))
+
+    def test_it_misses_names_that_only_work_from_the_tests_folder(self):
+        folder = "cd tests; python3 -B -m unittest test_a_currency test_c_report -q 2>&1 | tail -1"
+        self.assertFalse(matches(self.grader(), self.trace(self.ALONE, folder, self.write())))
+        self.assertFalse(matches(self.grader(), self.trace("cd tests; python3 -B -m unittest test_c_report -q", self.PAIR, self.write())))
+
+    def test_it_misses_a_pair_that_comes_after_the_first_write_or_edit_of_the_polluter(self):
+        for tool in ("Write", "Edit"):
+            with self.subTest(tool=tool):
+                after_both = self.trace(self.write("/w/tests/test_a_currency.py", tool), self.ALONE, self.PAIR)
+                after_pair = self.trace(self.ALONE, self.write("/w/tests/test_a_currency.py", tool), self.PAIR)
+                after_alone = self.trace(self.PAIR, self.write("/w/tests/test_a_currency.py", tool), self.ALONE)
+                for text in (after_both, after_pair, after_alone):
+                    self.assertFalse(matches(self.grader(), text))
+
+    def test_a_write_of_another_file_or_a_command_that_only_names_the_polluter_does_not_close_the_window(self):
+        other = self.write("/w/tests/test_settings_isolation.py")
+        text = self.trace(self.ALONE, other, "cat tests/test_a_currency.py", self.PAIR, self.write())
+        self.assertTrue(matches(self.grader(), text))
+
+    def test_it_does_not_read_a_command_that_is_only_quoted_in_a_result_or_the_prompt(self):
+        quoted = json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "content": self.ALONE + "\n" + self.PAIR}]}})
+        self.assertFalse(matches(self.grader(), quoted + "\n" + self.write()))
+        prompt = (EVALS / self.CASE / "prompt.md").read_text(encoding="utf-8")
+        for text in (prompt, json.dumps(prompt)):
+            self.assertFalse(matches(self.grader(), text))
+
+
 if __name__ == "__main__":
     unittest.main()

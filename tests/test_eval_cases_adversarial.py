@@ -1282,5 +1282,446 @@ class RollbackTriedTimingTest(unittest.TestCase):
                 self.assertLess(took, self.LIMIT, "%.2fs" % took)
 
 
+class PollutedTestRanTheCheckAdversarialTest(unittest.TestCase):
+    """Task 5 of the 3.0.1 patch: the exact trace grader that replaced the judged ran-the-check grader of debug-polluted-test.
+
+    A false hit scores a run that did not run the check; a false miss fails a
+    run that did. Where the grader reads only text (commands, never results or
+    what a shell would do) the limit is pinned as test_today_...: a later
+    widening or tightening makes that test fail, and the person widening
+    decides. The commands are shell text a model might write; nothing here
+    runs them.
+    """
+
+    CASE = "debug-polluted-test"
+    ALONE = "python3 -B -m unittest tests.test_c_report -q"
+    PAIR = "python3 -B -m unittest tests.test_a_currency tests.test_c_report -q"
+    WRITE_PATH = "/w/tests/test_a_currency.py"
+
+    def grader(self):
+        return T.pattern_of(self.CASE, "ran-the-check")
+
+    # --- trace builders, in the shape the saved traces hold ---
+
+    @staticmethod
+    def line(*blocks):
+        return json.dumps({"type": "assistant", "message": {"content": list(blocks)}}, separators=(",", ":"))
+
+    def bash(self, command, **more):
+        inputs = {"command": command}
+        inputs.update(more)
+        return self.line({"type": "tool_use", "id": "t", "name": "Bash", "input": inputs})
+
+    def bash_described(self, command):
+        return self.line({"type": "tool_use", "id": "t", "name": "Bash", "input": {"description": "run it", "command": command}})
+
+    def call(self, name, inputs):
+        return self.line({"type": "tool_use", "id": "t", "name": name, "input": inputs})
+
+    def write(self, path=None, content="x"):
+        return self.call("Write", {"file_path": path or self.WRITE_PATH, "content": content})
+
+    def edit(self, path=None):
+        return self.call("Edit", {"replace_all": False, "file_path": path or self.WRITE_PATH, "old_string": "a", "new_string": "b"})
+
+    @staticmethod
+    def result(text):
+        return json.dumps({"type": "user", "message": {"content": [{"type": "tool_result", "content": text}]}})
+
+    def trace(self, *steps, **kw):
+        out = [json.dumps({"type": "system", "subtype": "init"})]
+        for step in steps:
+            out.append(step if step.startswith("{") else self.bash(step))
+            out.append(self.result(kw.get("result", "OK")))
+        return "\n".join(out) + "\n"
+
+    def hit(self, text):
+        return bool(T.matches(self.grader(), text))
+
+    def both_engines(self, texts):
+        """The Python answers and node's for the same texts; node's is None when node isn't installed."""
+        return [self.hit(t) for t in texts], node_hits(self.grader()["pattern"], texts)
+
+    # --- 1. a false hit: the commands are only text ---
+
+    def test_a_command_only_quoted_in_a_prompt_prose_result_or_other_tool_is_not_a_run(self):
+        escaped_pair = json.dumps({"type": "tool_use", "name": "Bash", "input": {"command": self.PAIR}}, separators=(",", ":"))
+        escaped_alone = json.dumps({"type": "tool_use", "name": "Bash", "input": {"command": self.ALONE}}, separators=(",", ":"))
+        texts = {
+            "prose block": self.line({"type": "text", "text": "I will run " + self.ALONE + " then " + self.PAIR}) + "\n",
+            "a result holds both": self.trace("ls", result=self.ALONE + "\n" + self.PAIR) + self.write() + "\n",
+            "a result holds an escaped Bash call for the pair, the alone run is real": self.trace(self.ALONE, self.write(), result="see " + escaped_pair),
+            "a result holds both escaped Bash calls": self.trace("ls", self.write(), result=escaped_alone + "\n" + escaped_pair),
+            "a result holds both escaped Bash calls, no write": self.trace("ls", result=escaped_alone + escaped_pair),
+            "the prose holds both escaped": self.line({"type": "text", "text": escaped_alone + escaped_pair}) + "\n",
+            "an Agent call's prompt holds both": self.trace(self.call("Agent", {"prompt": self.ALONE + " ; " + self.PAIR}), self.write()),
+            "a Write of another file holds both": self.trace(self.write("/w/run.sh", self.ALONE + "\n" + self.PAIR + "\n"), self.write()),
+            "a Read result of a script holds both": self.trace(self.call("Read", {"file_path": "/w/run.sh"}), self.write(), result=self.ALONE + "\n" + self.PAIR),
+            "a history dump in a result": self.trace("history", self.write(), result="  1  " + self.ALONE + "\n  2  " + self.PAIR),
+        }
+        for label, text in sorted(texts.items()):
+            with self.subTest(text=label):
+                self.assertFalse(self.hit(text))
+
+    def test_a_quote_made_to_look_like_a_bash_call_inside_a_tool_result_is_not_one(self):
+        """Inside a result the quotes are backslash-quote, so the pattern's plain quotes cannot start on them."""
+        fake = '{"type":"tool_use","name":"Bash","input":{"command":"' + self.PAIR + '"}}'
+        text = self.trace(self.ALONE, self.write(), result=fake)
+        self.assertIn('\\"name\\":\\"Bash\\"', text)
+        self.assertFalse(self.hit(text))
+
+    # --- 2. the window ---
+
+    def test_a_pair_run_after_the_first_write_or_edit_of_the_polluter_does_not_count_in_any_key_order(self):
+        edits = {
+            "Write, file_path first": self.write(),
+            "Edit, replace_all first": self.edit(),
+            "Edit, file_path first": self.call("Edit", {"file_path": self.WRITE_PATH, "old_string": "a", "new_string": "b"}),
+            "Edit, with replace_all true": self.call("Edit", {"replace_all": True, "file_path": self.WRITE_PATH, "old_string": "a", "new_string": "b"}),
+            "Edit, file_path first then replace_all": self.call("Edit", {"file_path": self.WRITE_PATH, "replace_all": False, "old_string": "a", "new_string": "b"}),
+        }
+        for label, step in sorted(edits.items()):
+            with self.subTest(change=label):
+                self.assertFalse(self.hit(self.trace(self.ALONE, step, self.PAIR)))
+                self.assertFalse(self.hit(self.trace(self.PAIR, step, self.ALONE)))
+
+    def test_a_write_whose_path_has_the_polluter_in_a_longer_name_does_not_close_the_window_when_it_ends_otherwise(self):
+        for path in ("/w/tests/test_a_currency.py.bak", "/w/tests/test_a_currency.pyc", "/w/tests/test_a_currency.txt", "/w/tests/test_a_currency_extra.py"):
+            with self.subTest(path=path):
+                self.assertTrue(self.hit(self.trace(self.ALONE, self.write(path), self.PAIR)))
+
+    def test_today_a_write_of_a_file_whose_name_only_ends_the_same_closes_the_window(self):
+        """A limit, on the safe side: `[^"]*test_a_currency.py` takes old_test_a_currency.py and another folder's copy, so a pair run after them is a miss."""
+        for path in ("/w/tests/old_test_a_currency.py", "/w/other/test_a_currency.py", "/w/tests/xtest_a_currency.py"):
+            with self.subTest(path=path):
+                self.assertFalse(self.hit(self.trace(self.ALONE, self.write(path), self.PAIR)))
+
+    def test_today_a_write_with_the_content_key_before_the_path_does_not_close_the_window(self):
+        """A limit, a false hit: the window knows `file_path` first, or after one boolean key. Every saved Write has it first."""
+        reordered = self.call("Write", {"content": "x", "file_path": self.WRITE_PATH})
+        self.assertTrue(self.hit(self.trace(self.ALONE, reordered, self.PAIR)))
+        text_first = self.call("Edit", {"old_string": "a", "file_path": self.WRITE_PATH, "new_string": "b"})
+        self.assertTrue(self.hit(self.trace(self.ALONE, text_first, self.PAIR)))
+
+    def test_today_other_ways_to_change_the_polluter_do_not_close_the_window(self):
+        """Limits, false hits: only Write and Edit calls close it. MultiEdit, NotebookEdit and a shell write do not."""
+        changes = {
+            "MultiEdit": self.call("MultiEdit", {"file_path": self.WRITE_PATH, "edits": []}),
+            "NotebookEdit": self.call("NotebookEdit", {"notebook_path": self.WRITE_PATH, "new_source": "x"}),
+            "sed -i": "sed -i '' 's/a/b/' tests/test_a_currency.py",
+            "cat >": "cat > tests/test_a_currency.py <<'X'\nx = 1\nX",
+            "tee": "printf x | tee tests/test_a_currency.py",
+            "python write": "python3 -c \"open('tests/test_a_currency.py','w').write('x')\"",
+        }
+        for label, step in sorted(changes.items()):
+            with self.subTest(change=label):
+                self.assertTrue(self.hit(self.trace(self.ALONE, step, self.PAIR)))
+
+    # --- 3. a false hit: text inside a Bash call ---
+
+    def test_today_a_command_inside_a_comment_an_echo_or_a_here_document_still_counts(self):
+        """Limits, false hits: the grader reads command text, never what a shell would run."""
+        forms = {
+            "comment": "ls  # " + self.PAIR,
+            "double-quoted echo": 'echo "' + self.PAIR + '"',
+            "bare echo": "echo " + self.PAIR,
+            "here-document printed": "cat <<'EOF'\n" + self.PAIR + "\nEOF",
+            "grep for it": 'grep -rn "python3 -m unittest tests.test_a_currency tests.test_c_report" README.md',
+            "never reached": "false && " + self.PAIR,
+        }
+        for label, step in sorted(forms.items()):
+            with self.subTest(form=label):
+                self.assertTrue(self.hit(self.trace(self.ALONE, step, self.write())))
+
+    def test_today_a_polluter_loop_that_ends_before_the_victim_run_still_counts(self):
+        """A limit, a false hit: `done` does not end the scan for the loop's body."""
+        text = self.trace(self.ALONE, "for t in test_a_currency; do echo $t; done; python3 -m unittest tests.$t tests.test_c_report", self.write())
+        self.assertTrue(self.hit(text))
+
+    def test_the_polluter_in_an_echo_inside_the_loop_list_is_not_in_the_list(self):
+        loop = "for t in test_b0; do echo test_a_currency; python3 -m unittest tests.$t tests.test_c_report; done"
+        self.assertFalse(self.hit(self.trace(self.ALONE, loop, self.write())))
+
+    # --- 4. near-miss commands ---
+
+    def test_a_near_miss_command_is_not_the_pair_or_the_alone_run(self):
+        run = "python3 -m unittest "
+        near_pairs = {
+            "a third module between": run + "tests.test_a_currency tests.test_b0_x tests.test_c_report -q",
+            "a third module after": run + "tests.test_a_currency tests.test_c_report tests.test_e_invoice -q",
+            "a third module before": run + "tests.test_b0_x tests.test_a_currency tests.test_c_report -q",
+            "the victim first": run + "tests.test_c_report tests.test_a_currency -q",
+            "a longer polluter name": run + "tests.test_a_currency_extra tests.test_c_report -q",
+            "a longer victim name": run + "tests.test_a_currency tests.test_c_report_old -q",
+            "another class of the polluter": run + "tests.test_a_currency.OtherTest tests.test_c_report -q",
+            "another test of the victim": run + "tests.test_a_currency tests.test_c_report.ReportTest.test_other -q",
+            "the polluter alone": run + "tests.test_a_currency -q",
+            "discover": run + "discover -s tests -q",
+            "the polluter twice then nothing": run + "tests.test_a_currency tests.test_a_currency",
+            "no tests prefix": run + "test_a_currency test_c_report",
+            "a different tool": "python3 -m pytest tests.test_a_currency tests.test_c_report",
+        }
+        for label, command in sorted(near_pairs.items()):
+            with self.subTest(pair=label):
+                self.assertFalse(self.hit(self.trace(self.ALONE, command, self.write())))
+
+    def test_a_near_miss_alone_run_does_not_count_when_the_pair_is_real(self):
+        run = "python3 -m unittest "
+        near_alones = {
+            "the victim inside a longer list": run + "tests.test_c_report tests.test_e_invoice -q",
+            "a longer victim name": run + "tests.test_c_report_old -q",
+            "another victim test": run + "tests.test_c_report.ReportTest.test_other -q",
+            "the polluter then the victim": run + "tests.test_a_currency tests.test_c_report -q",
+            "a half then the victim": run + "tests.test_a0_parse tests.test_a1_empty tests.test_c_report -q",
+        }
+        for label, command in sorted(near_alones.items()):
+            with self.subTest(alone=label):
+                self.assertFalse(self.hit(self.trace(command, self.PAIR, self.write())))
+
+    def test_the_pair_split_over_two_bash_calls_is_not_a_pair(self):
+        text = self.trace(self.ALONE, "python3 -m unittest tests.test_a_currency -q", "python3 -m unittest tests.test_c_report -q", self.write())
+        self.assertFalse(self.hit(text))
+
+    def test_a_loop_or_function_that_never_meets_the_polluter_is_not_the_pair(self):
+        func = 'r(){ python3 -m unittest "$@" tests.test_c_report -q; }'
+        forms = {
+            "a loop whose list lacks it": "for t in test_a0 test_a1; do python3 -m unittest tests.$t tests.test_c_report; done",
+            "a function never called": func,
+            "a function called with another module": func + "\nr tests.test_b0",
+            "a function called with two modules": func + "\nr tests.test_a_currency tests.test_b0",
+            "a function called with a longer name": func + "\nr tests.test_a_currency_extra",
+            "a call before the definition": "r tests.test_a_currency\n" + func,
+            "a call that is a comment": func + "\n# r tests.test_a_currency\nr tests.test_b0",
+        }
+        for label, step in sorted(forms.items()):
+            with self.subTest(form=label):
+                self.assertFalse(self.hit(self.trace(self.ALONE, step, self.write())))
+
+    def test_the_victim_alone_in_one_call_and_the_pair_in_the_same_call_counts(self):
+        self.assertTrue(self.hit(self.trace(self.ALONE + " && " + self.PAIR, self.write())))
+        self.assertTrue(self.hit(self.trace(self.ALONE + "; " + self.PAIR)))
+
+    # --- 5. a false miss: right runs that hit today ---
+
+    def test_a_right_run_in_the_plain_variations_hits(self):
+        def pair(prefix, run="python3 -m unittest", flags="", tail=""):
+            return (prefix + run + flags + " tests.test_a_currency tests.test_c_report" + tail,
+                    prefix + run + flags + " tests.test_c_report" + tail)
+        forms = {
+            "python, not python3": pair("", run="python -m unittest"),
+            "-B": pair("", run="python3 -B -m unittest"),
+            "-v": pair("", flags=" -v"),
+            "-q": pair("", flags=" -q"),
+            "--failfast": pair("", flags=" --failfast"),
+            "-b": pair("", flags=" -b"),
+            "a cd prefix": pair("cd /w && "),
+            "a cd prefix with a semicolon": pair("cd /w; "),
+            "an env var prefix": pair("PYTHONDONTWRITEBYTECODE=1 "),
+            "a venv python": pair("", run=".venv/bin/python -m unittest"),
+            "python3.11": pair("", run="python3.11 -m unittest"),
+            "an absolute python": pair("", run="/usr/bin/python3 -m unittest"),
+            "2>&1 piped to tail": pair("", tail=" 2>&1 | tail -3"),
+            "2>/dev/null": pair("", tail=" 2>/dev/null"),
+            "a subshell": pair("(", tail=")"),
+            "command substitution": pair("x=$(", tail="); echo $x"),
+            "backgrounded": pair("", tail=" &"),
+            "a following command after a semicolon": pair("", tail="; echo done"),
+            "a following command after &&": pair("", tail=" && echo done"),
+            "a following newline": pair("", tail="\necho $?"),
+        }
+        for label, (pair_cmd, alone_cmd) in sorted(forms.items()):
+            with self.subTest(form=label):
+                self.assertTrue(self.hit(self.trace(alone_cmd, pair_cmd, self.write())))
+                self.assertTrue(self.hit(self.trace(pair_cmd, alone_cmd, self.write())))
+
+    def test_the_victim_by_its_test_id_in_both_runs_hits(self):
+        vid = "tests.test_c_report.ReportTest.test_report_header_uses_dollars"
+        self.assertTrue(self.hit(self.trace("python3 -m unittest " + vid, "python3 -m unittest tests.test_a_currency " + vid, self.write())))
+        euro = "tests.test_a_currency.EuroTest.test_euro_invoices_show_eur"
+        self.assertTrue(self.hit(self.trace(self.ALONE, "python3 -m unittest " + euro + " " + vid, self.write())))
+
+    def test_a_pair_over_a_loop_of_modules_with_the_dollar_brace_form_hits(self):
+        loop = "for m in test_a_currency test_b0; do python3 -m unittest tests.${m} tests.test_c_report; done"
+        self.assertTrue(self.hit(self.trace(self.ALONE, loop, self.write())))
+
+    # --- 6. a false miss: right runs that miss today, most likely first ---
+
+    def test_today_the_file_path_form_misses(self):
+        """Known miss, likely: `python3 -m unittest tests/test_c_report.py` (a model told to run the test file may type it). The saved runs all used module names."""
+        alone = "python3 -m unittest tests/test_c_report.py"
+        pair = "python3 -m unittest tests/test_a_currency.py tests/test_c_report.py"
+        self.assertFalse(self.hit(self.trace(alone, self.PAIR, self.write())))
+        self.assertFalse(self.hit(self.trace(self.ALONE, pair, self.write())))
+        self.assertFalse(self.hit(self.trace(alone, pair, self.write())))
+
+    def test_today_a_description_key_before_the_command_misses(self):
+        """Known miss, likely if the harness ever sends it: a Bash call with `description` first has no `"command":` straight after the input brace. All 171 saved Bash calls have the command first."""
+        self.assertFalse(self.hit(self.trace(self.bash_described(self.ALONE), self.bash_described(self.PAIR), self.write())))
+        self.assertFalse(self.hit(self.trace(self.ALONE, self.bash_described(self.PAIR), self.write())))
+        self.assertTrue(self.hit(self.trace(self.bash(self.ALONE, description="run it"), self.bash(self.PAIR, description="run it"), self.write())))
+
+    def test_today_a_k_filter_after_a_module_misses(self):
+        """Known miss: a flag that takes a value (`-k NAME`) after the victim, or in front of it with the name."""
+        self.assertFalse(self.hit(self.trace("python3 -m unittest tests.test_c_report -k test_report_header_uses_dollars", self.PAIR, self.write())))
+        self.assertFalse(self.hit(self.trace("python3 -m unittest -k test_report_header_uses_dollars", self.PAIR, self.write())))
+        self.assertFalse(self.hit(self.trace(self.ALONE, "python3 -m unittest tests.test_a_currency tests.test_c_report -k header", self.write())))
+
+    def test_today_a_function_with_the_polluter_as_one_numbered_argument_misses(self):
+        """Known miss: the function body must hold `$@` (or an array) before the victim; `$1` and `${1}` do not."""
+        func = "r(){ python3 -m unittest $1 tests.test_c_report -q; }\nr tests.test_a_currency"
+        self.assertFalse(self.hit(self.trace(self.ALONE, func, self.write())))
+        keyword = 'function r { python3 -m unittest "$@" tests.test_c_report -q; }\nr tests.test_a_currency'
+        self.assertFalse(self.hit(self.trace(self.ALONE, keyword, self.write())))
+
+    def test_today_quoted_module_names_and_a_backtick_substitution_miss(self):
+        """Known misses: `'tests.test_a_currency'`, the double-quoted form, and a pair inside backticks."""
+        quoted = "python3 -m unittest 'tests.test_a_currency' 'tests.test_c_report'"
+        double = 'python3 -m unittest "tests.test_a_currency" "tests.test_c_report"'
+        tick = "x=`python3 -m unittest tests.test_a_currency tests.test_c_report`"
+        for label, command in (("single quotes", quoted), ("double quotes", double), ("backticks", tick)):
+            with self.subTest(form=label):
+                self.assertFalse(self.hit(self.trace(self.ALONE, command, self.write())))
+
+    def test_today_the_loop_forms_beyond_a_name_list_miss(self):
+        """Known misses: a loop over full `tests.` names, a while-read loop, xargs, and a loop that calls a named function without a `$@` body."""
+        forms = {
+            "a loop over full names": "for m in tests.test_a_currency tests.test_b0; do python3 -m unittest $m tests.test_c_report; done",
+            "while read": "printf 'tests.test_a_currency\\n' | while read m; do python3 -m unittest $m tests.test_c_report; done",
+            "xargs": "echo tests.test_a_currency | xargs python3 -m unittest tests.test_c_report",
+            "xargs with a placeholder": "echo tests.test_a_currency | xargs -I{} python3 -m unittest {} tests.test_c_report",
+        }
+        for label, command in sorted(forms.items()):
+            with self.subTest(form=label):
+                self.assertFalse(self.hit(self.trace(self.ALONE, command, self.write())))
+
+    def test_today_a_python_script_pytest_and_discover_forms_miss(self):
+        """Known misses: loading the two modules from a Python script, pytest, and discover with a file pattern."""
+        script = ("python3 -c \"import unittest;s=unittest.defaultTestLoader.loadTestsFromNames(['tests.test_a_currency','tests.test_c_report']);"
+                  "unittest.TextTestRunner().run(s)\"")
+        forms = {
+            "python script": (self.ALONE, script),
+            "pytest": ("python3 -m pytest tests/test_c_report.py", "python3 -m pytest tests/test_a_currency.py tests/test_c_report.py"),
+            "pytest by id": ("python3 -m pytest tests/test_c_report.py::ReportTest::test_report_header_uses_dollars", "python3 -m pytest tests/test_a_currency.py tests/test_c_report.py"),
+            "discover with a pattern": (self.ALONE, "python3 -m unittest discover -s tests -p 'test_a_currency.py'"),
+        }
+        for label, (alone, pair) in sorted(forms.items()):
+            with self.subTest(form=label):
+                self.assertFalse(self.hit(self.trace(alone, pair, self.write())))
+
+    # --- 7. the two engines ---
+
+    def engine_cases(self):
+        cases = {}
+        cases["right run"] = self.trace(self.ALONE, self.PAIR, self.write())
+        cases["pair after the write"] = self.trace(self.ALONE, self.write(), self.PAIR)
+        cases["edit closes"] = self.trace(self.PAIR, self.ALONE, self.edit(), self.PAIR)
+        cases["escaped bash in a result"] = self.trace(self.ALONE, self.write(), result=json.dumps({"name": "Bash", "input": {"command": self.PAIR}}))
+        cases["third module"] = self.trace(self.ALONE, "python3 -m unittest tests.test_a_currency tests.test_b0 tests.test_c_report", self.write())
+        cases["function"] = self.trace(self.ALONE, 'r(){ python3 -m unittest "$@" tests.test_c_report -q; }\nr tests.test_a_currency', self.write())
+        cases["array function"] = self.trace(self.ALONE, 'r(){ a=(); for m in "$@"; do a+=(tests.$m); done; python3 -m unittest "${a[@]}" tests.test_c_report; }\nr test_a_currency', self.write())
+        cases["loop"] = self.trace(self.ALONE, "for t in test_a0 test_a_currency; do python3 -m unittest tests.$t tests.test_c_report; done", self.write())
+        cases["loop calling a function"] = self.trace(self.ALONE, 'run(){ python3 -m unittest "$@" tests.test_c_report; }\nfor t in test_a_currency; do run tests.$t; done', self.write())
+        cases["loop, no polluter"] = self.trace(self.ALONE, "for t in a b; do python3 -m unittest tests.$t tests.test_c_report; done", self.write())
+        cases["victim id"] = self.trace("python3 -m unittest -v tests.test_c_report.ReportTest.test_report_header_uses_dollars", self.PAIR, self.write())
+        cases["multiline command"] = self.trace(self.ALONE + "\ncd /w\n" + self.PAIR + "\necho $?", self.write())
+        cases["quote in a command"] = self.trace(self.ALONE, 'cd "/w" && ' + self.PAIR + ' 2>&1 | grep "OK\\|FAIL"', self.write())
+        cases["unicode in a command"] = self.trace(self.ALONE, "echo '✓ é' && " + self.PAIR, self.write())
+        cases["no write at all"] = self.trace(self.ALONE, self.PAIR)
+        cases["empty"] = ""
+        return cases
+
+    def test_javascript_and_python_agree_on_the_adversarial_traces(self):
+        cases = self.engine_cases()
+        names = sorted(cases)
+        py, js = self.both_engines([cases[n] for n in names])
+        if js is None:
+            self.skipTest("node isn't installed")
+        self.assertEqual([(n, v) for n, v in zip(names, js)], [(n, v) for n, v in zip(names, py)])
+        self.assertTrue(py[names.index("right run")])
+        self.assertFalse(py[names.index("pair after the write")])
+
+    def test_javascript_and_python_agree_on_the_right_run_variations_and_near_misses(self):
+        run = "python3 -m unittest "
+        commands = [run + "tests.test_a_currency tests.test_c_report", run + "-v tests.test_a_currency tests.test_c_report",
+                    run + "tests.test_c_report tests.test_a_currency", "python -m unittest tests.test_a_currency tests.test_c_report 2>&1 | tail",
+                    run + "tests/test_a_currency.py tests/test_c_report.py", "echo " + run + "tests.test_a_currency tests.test_c_report",
+                    "r(){ " + run + '"$@" tests.test_c_report; }; r tests.test_a_currency', "(" + run + "tests.test_a_currency tests.test_c_report)"]
+        texts = [self.trace(self.ALONE, c, self.write()) for c in commands]
+        py, js = self.both_engines(texts)
+        if js is None:
+            self.skipTest("node isn't installed")
+        self.assertEqual(js, py)
+
+    def test_javascript_and_python_agree_on_every_saved_shape_the_builders_tests_use(self):
+        """The same shapes, built a second way: a Bash call's JSON written by hand, with the escapes a shell string takes."""
+        hand = ('{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t","name":"Bash","input":{"command":"%s"}}]}}')
+        pair = r"cd \"/w\" && python3 -m unittest tests.test_a_currency tests.test_c_report 2>&1 | tail -3"
+        alone = "python3 -m unittest tests.test_c_report"
+        wr = self.write()
+        texts = [hand % alone + "\n" + hand % pair + "\n" + wr + "\n", hand % alone + "\n" + wr + "\n" + hand % pair + "\n"]
+        py, js = self.both_engines(texts)
+        if js is None:
+            self.skipTest("node isn't installed")
+        self.assertEqual(js, py)
+        self.assertEqual(py[1], False)
+
+    # --- 8. time ---
+
+    LIMIT = 1.0
+
+    def timed_python(self, text):
+        import time
+        pattern = T.python_re(self.grader()["pattern"])
+        start = time.perf_counter()
+        pattern.search(text)
+        return time.perf_counter() - start
+
+    def timed_node(self, text):
+        node = shutil.which("node")
+        if not node:
+            return None
+        script = ("const d = JSON.parse(require('fs').readFileSync(0, 'utf8')); const r = new RegExp(d.p);"
+                  "const a = process.hrtime.bigint(); r.test(d.t); console.log(Number(process.hrtime.bigint() - a) / 1e9);")
+        proc = subprocess.run([node, "-e", script], input=json.dumps({"p": self.grader()["pattern"], "t": text}), capture_output=True, text=True)
+        return float(proc.stdout.strip())
+
+    def under_a_second(self, text, what):
+        for engine, took in (("python", self.timed_python(text)), ("node", self.timed_node(text))):
+            if took is None:
+                continue
+            with self.subTest(engine=engine, trace=what):
+                self.assertLess(took, self.LIMIT, "%.2fs" % took)
+
+    def test_a_trace_holding_the_largest_saved_shape_takes_no_time_to_hit_or_miss(self):
+        """About 140 KB of Bash calls, a hit and (with the polluter renamed) a miss."""
+        filler = [self.ALONE + "; echo " + "x" * 200 for _ in range(300)]
+        miss = self.trace(*filler)
+        self.under_a_second(miss, "140 KB, a miss")
+        self.under_a_second(self.trace(*(filler + [self.PAIR, self.write()])), "140 KB, a hit")
+
+    BOUND = 5.0
+
+    def within_bound(self, text, what):
+        for engine, took in (("python", self.timed_python(text)), ("node", self.timed_node(text))):
+            if took is None:
+                continue
+            with self.subTest(engine=engine, trace=what):
+                self.assertLess(took, self.BOUND, "%.2fs" % took)
+
+    def test_today_half_a_megabyte_of_bash_calls_with_no_write_is_handled_in_seconds(self):
+        """A limit, parked. 500 KB of victim-alone runs and no write takes about 0.5 s in Python and 0.15 s in node; the bound is generous so a slow machine stays green.
+        Larger hostile traces are slow: 2.7 MB takes about 2.5 s in Python and 0.8 s in node (linear, every Bash call is scanned from the top). Real saved traces are under 150 KB and take 0.00 s."""
+        alone = [self.ALONE + "; echo " + "x" * 200] * 1100
+        text = self.trace(*alone)
+        self.assertGreater(len(text), 450000)
+        self.within_bound(text, "500 KB of victim-alone runs")
+
+    def test_today_twenty_uncalled_function_definitions_in_one_command_are_handled_in_seconds(self):
+        """A limit, parked. 20 definitions of a `$@` function that is never called take about 0.1 s in Python and well under that in node.
+        The function branch backtracks about n^4 on the definitions: 30 take 0.45 s, 66 take about 4 s, 4000 bytes of them 6.7 s in Python (node 0.45 s). Only hostile input has that many."""
+        defs = 'r(){ python3 -m unittest "$@" tests.test_c_report; } ' * 20
+        self.within_bound(self.trace(self.ALONE, defs), "20 definitions in one command")
+
+
 if __name__ == "__main__":
     unittest.main()
