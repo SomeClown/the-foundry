@@ -493,7 +493,7 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Ruling (Session step 2): the bar "the three `devops` cases, every grader 4 of 4" was missed on `devops-stops-before-irreversible` (3 of 4). An independent read found it a real miss by the agent, a summary sentence above its `Status:` line, on graders this batch didn't touch. It goes to the owner with the numbers; no second round.
 - Ruling (Task 9, added during the build): the record run found one more grader that misreads right plans, `two-releases` (it wanted "two release" side by side and rejected "Release 1.4.1"). Fixed here and checked against the 20 saved plans, with no new real run. Why now: it is the same kind of fault this batch is for, in a case the batch already touched. If wrong: the grader goes back to its 3.0.0 text, one file.
 - Ruling (Task 9): the labelled branch never takes 1.4.0, the fixture's live version, as a release label. Why: a one-release plan whose rollback line says "redeploy release 1.4.0" scored. No saved plan depends on it.
-- For the owner at the release ask: patch or minor (Risks, item 1).
+- The owner's call at the release ask (2026-11-27): released as 3.1.0, a minor. Why: CONTRIBUTING puts behaviour changes to agents under Minor, and every patch before it was docs-only. The plan's title and text keep the 3.0.1 it was planned as.
 
 ### From the qa pass (fix batch 1)
 

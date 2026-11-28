@@ -4,7 +4,7 @@ All notable changes to The Foundry. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/); versioning policy is in
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## [Unreleased]
+## [3.1.0] — 2026-11-27
 
 Steadier runs: three slips that cost runs in 3.0.0's measuring, and six
 graders that scored right runs as misses (five now exact patterns, one a
