@@ -179,6 +179,8 @@ Rollback: <the steps>; tried: `<command>` (exit <n>) | not tried: <why>
 Watch: <what to look at>; for <how long>; roll back if <condition>
 ```
 
+Write each of the three as one line that starts with its label, with no line break or bullets inside it. On the `Rollback:` line, `tried:` or `not tried:` comes once, after the steps. Anything longer goes in the report's body, after the three lines.
+
 With no running service and no data change, one line instead:
 `Data change: none; nothing to watch: no running service`.
 

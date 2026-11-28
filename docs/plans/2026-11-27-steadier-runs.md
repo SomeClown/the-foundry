@@ -461,6 +461,8 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 ### Progress
 - Session step 0: done (traces and sweep fixtures copied to the work dir; `missing: 10`)
 - Tasks 1 to 3: complete (from 4077be7; gate exit 0 on all five, `Ran 2984`; adversarial: 57 tests, 1 bug fixed in round 1)
+- Session step 1: started on the export of a51daaa (sweeps `sr-1` to `sr-3`, the smoke, the head-to-head)
+- Task 4: complete (from a51daaa; gate exit 0 on all five, `Ran 3020`; adversarial: 33 tests, 5 faults fixed in round 1, 1 ruled a limit)
 
 ### Decisions made during the build
 - Ruling (plan): the architect's rewording of Fix B stands (Task 1). Why: the draft's sentence forbade the Coverage line every part must carry, and "first line" is false under `NOT A PER-FILE READ`. If wrong: one sentence of `investigate.md` to reword.
@@ -473,6 +475,9 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Ruling (Tasks 1 to 3): built as one batch, with one adversarial round and one commit. Why: each is small and they touch separate files, and the sweeps can't start until all three are final. If wrong: a fault is harder to pin to one task; the report keeps a section for each.
 - Ruling (Tasks 1 to 3): the scorer's failure on a count thousands of digits long (`CAN'T CHECK: internal error` on Python 3.11 and later) is a real bug, fixed in round 1 with a helper that treats such a number as a line it can't read.
 - Ruling (Tasks 1 to 3): the seven limits the tester pinned as `test_today_...` stay limits (see Parked). Why: no brief promises against them, and the two shapes real runs produced (a plain `Project:` line, the whole block) are caught. The session reads each real sweep's whole last part by hand as well.
+- Ruling (Task 4): the brief's patterns were used as written and gave the verdict list on the 28 saved reports. The adversarial round then found five real faults, fixed in round 1: a denial word after `tried` scored a try through the older branch; the new branch read past the report's closing quote; an escaped double quote after "roll back if" was missed; the test helper read `\w` as Unicode where the harness's JavaScript reads ASCII (the helper now compiles with `re.ASCII`); and a run of backticks after the label took quadratic time.
+- Ruling (Task 4): the older same-line branch of `rollback-tried` still reads past the report's closing quote. Why a limit: it was there before this change, and what follows a report on a trace line is the harness's own fields. Parked.
+- Ruling (Task 4): the pin on the new `devops` paragraph notices "before the steps" but doesn't hold "after the steps" as a phrase. Parked with the other phrase-pin limits.
 - For the owner at the release ask: patch or minor (Risks, item 1).
 
 ### Parked
@@ -480,3 +485,6 @@ Work dir: `.git/foundry-run/steadier-runs/work/`
 - Tasks 1 to 3: a last part that drops its Coverage `Areas not read: 0 areas, 0 files; ...` line is still proved; the text asks for the line and the scorer doesn't. All 16 saved last parts carry it.
 - Tasks 1 to 3: a sentence added after the new last-part sentence, or a paragraph in the lead outside "Your Files" that brings the tests back, fails no pin. The pins hold a phrase, not the paragraph.
 - Tasks 1 to 3: with two counts lines in one part the first is used; a file held by two parts is judged by the first; a tracked path that isn't UTF-8 gets no allowance.
+- Task 4: `rollback-tried`'s older branch reads past the closing quote of the report's JSON string; wording that denies a try without a denial word ("I did not run it; the script would exit 0") still scores through it; `exit 0.5` reads as exit 0; with no `Watch:` line, a `Tried` label anywhere below a bare `Rollback:` scores.
+- Task 4: a lone `_` after "roll back if" hits `watch-line`. A report holding a literal U+2028 can score differently in Python and JavaScript (16 of 3,000 fuzzed shapes, all with that character).
+- Task 4: three rewordings of the new `devops` paragraph fail no pin ("may span several lines"; the "Anything longer" sentence dropped; "comes once or more, anywhere").

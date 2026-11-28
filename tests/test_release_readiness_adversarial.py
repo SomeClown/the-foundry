@@ -590,5 +590,80 @@ class OutcomeCheckTest(unittest.TestCase):
                 self.assertEqual(fx.check(), fresh)
 
 
+NOTE_START = "Write each of the three as one line"
+NOTE_END = "With no running service and no data change"
+
+
+class OneLineNoteWeakeningTest(TextBase):
+    """AC-1: the paragraph under devops's report fence, weakened or turned around one way at a time."""
+
+    def note(self):
+        text = self.base["devops"]
+        return text[text.index(NOTE_START):text.index(NOTE_END)]
+
+    def swap(self, old, new):
+        """The devops text with the note's `old` replaced by `new`; the note must hold `old` exactly once."""
+        self.assertEqual(R.fold(self.note()).count(old), 1, "the note doesn't hold %r once" % old)
+        texts = dict(self.base)
+        text = texts["devops"]
+        start = text.index(NOTE_START)
+        end = text.index(NOTE_END)
+        texts["devops"] = text[:start] + R.fold(self.note()).replace(old, new) + "\n\n" + text[end:]
+        self.assertNotEqual(texts["devops"], text)
+        return texts
+
+    def test_the_real_note_holds_the_whole_contract(self):
+        """AC-1: the note says one line, label first, no break or bullets, tried or not tried once, after the steps, longer goes below."""
+        note = R.fold(self.note())
+        for part in ("one line that starts with its label", "no line break or bullets inside it",
+                     "`tried:` or `not tried:` comes once, after the steps", "goes in the report's body, after the three lines"):
+            self.assertIn(part, note)
+
+    def test_tried_once_after_the_steps_turned_to_before_the_steps_is_noticed(self):
+        """AC-1: `tried:` or `not tried:` once after the steps on the Rollback line; `before` turns it round."""
+        self.assertNoticed(self.swap("comes once, after the steps", "comes once, before the steps"), "after flipped to before")
+
+    def test_tried_comes_once_turned_to_twice_is_noticed(self):
+        """AC-1: the once is the contract."""
+        self.assertNoticed(self.swap("comes once, after", "comes twice, after"), "once to twice")
+
+    def test_the_label_first_clause_dropped_is_noticed(self):
+        """AC-1: each of the three starts with its label."""
+        self.assertNoticed(self.swap("as one line that starts with its label", "as one line"), "label-first clause")
+
+    def test_the_tried_once_sentence_dropped_is_noticed(self):
+        """AC-1: the whole second sentence."""
+        sentence = "On the `Rollback:` line, `tried:` or `not tried:` comes once, after the steps. "
+        self.assertNoticed(self.swap(sentence, ""), "tried-once sentence")
+
+    def test_the_note_moved_above_the_fence_or_below_the_one_line_form_is_noticed(self):
+        """AC-1: the note sits straight under the fence, before the one-line form."""
+        report = self.base["devops"]
+        start, end = report.index(NOTE_START), report.index(NOTE_END)
+        note = report[start:end]
+        without = report[:start] + report[end:]
+        fence = without.index("```\nData change:")
+        above = dict(self.base, devops=without[:fence] + note + without[fence:])
+        self.assertNoticed(above, "note above the fence")
+        after_form = without.index("`Data change: none; nothing to watch: no running service`.") + len("`Data change: none; nothing to watch: no running service`.")
+        below = dict(self.base, devops=without[:after_form] + "\n\n" + note.strip() + without[after_form:])
+        self.assertNoticed(below, "note under the one-line form")
+
+    def test_today_the_no_line_break_or_bullets_clause_can_be_turned_round_unnoticed(self):
+        """Limit, pinned: the pin holds two phrases; `with no line break or bullets inside it` can become `may span several lines`."""
+        texts = self.swap(", with no line break or bullets inside it", ", and may span several lines")
+        self.assertEqual(R.problems(texts), [])
+
+    def test_today_the_body_after_the_three_lines_sentence_can_be_dropped_unnoticed(self):
+        """Limit, pinned: `Anything longer goes in the report's body, after the three lines.` isn't held."""
+        texts = self.swap(" Anything longer goes in the report's body, after the three lines.", "")
+        self.assertEqual(R.problems(texts), [])
+
+    def test_today_tried_once_can_become_once_or_more_unnoticed(self):
+        """Limit, pinned: the pin is `comes once`, a prefix of `comes once or more`."""
+        texts = self.swap("comes once, after the steps", "comes once or more, anywhere")
+        self.assertEqual(R.problems(texts), [])
+
+
 if __name__ == "__main__":
     unittest.main()

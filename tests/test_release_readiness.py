@@ -76,6 +76,10 @@ def problems(texts):
             found.append("devops's Rollback line doesn't hold %r" % ROLLBACK_SHAPE)
         if WATCH_SHAPE not in lines[2]:
             found.append("devops's Watch line doesn't hold %r" % WATCH_SHAPE)
+    one_line = fold(report[fence.end():].split("With no running service", 1)[0]) if fence else ""
+    found += lacks("devops's report fence note", one_line, ("one line that starts with its label", "`tried:` or `not tried:` comes once"))
+    if "before the steps" in one_line:
+        found.append("devops's report fence note puts tried: before the steps")
     slot = "If you stopped before a change that breaks the code running now"
     folded = fold(report)
     found += lacks("devops's What to Report Back", folded, ("`Data change: none; %s`" % NO_SERVICE, slot))
@@ -196,6 +200,14 @@ class MutationTest(unittest.TestCase):
         """AC-4, AC-12: the Watch line in the fence names a roll back if condition."""
         texts = self.mutated("devops", lambda t: t.replace("roll back if <condition>", "<condition>", 1))
         self.caught(texts, "Watch line")
+
+    def test_the_one_line_note_dropped_fails(self):
+        """AC-1: the note under the report fence keeps each of the three lines to one line."""
+        def drop(t):
+            i = t.index("Write each of the three as one line")
+            j = t.index("With no running service and no data change")
+            return t[:i] + t[j:]
+        self.caught(self.mutated("devops", drop), "report fence note")
 
     def test_the_stop_slot_removed_fails(self):
         """AC-2, AC-12: the report names the stop before a breaking change."""

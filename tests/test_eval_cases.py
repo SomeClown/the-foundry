@@ -114,7 +114,7 @@ def pattern_of(case, name):
 
 
 def python_re(pattern, flags=""):
-    return re.compile(pattern, (re.M if "m" in flags else 0) | (re.I if "i" in flags else 0))
+    return re.compile(pattern, (re.M if "m" in flags else 0) | (re.I if "i" in flags else 0) | re.ASCII)
 
 
 class Verdict(object):
@@ -1184,6 +1184,36 @@ class RollbackOnACopyCaseTest(MigrationCaseChecks, unittest.TestCase):
                 self.assertFalse(matches(meta, hand_back(self.report(line))))
         outside = hand_back(self.report(down), before=["Rollback: down.\nTried: a copy (exit 0)"])
         self.assertFalse(matches(meta, outside))
+
+    def test_rollback_tried_reads_a_label_alone_and_a_try_after_a_sentence_end(self):
+        """AC-2: the rel-agents run 1 and run 2 shapes hit; a label with nothing under it and the not-tried shapes miss."""
+        meta = self.grader("rollback-tried")
+        alone = ("Rollback:\n- Run `python3 migrate.py down`. It runs `ALTER TABLE customers DROP COLUMN phone`.\n"
+                 "- Or restore the backup `data/shop.db.bak-1`.\n- tried: the up and down SQL on a scratch copy (both exit 0)\nWatch: ok")
+        after_a_stop = ("Rollback: restore `data/shop.db.bak-1`, or run `python3 migrate.py down`. I haven't tried either on production."
+                        " Tried: the up and down SQL on a scratch copy of the database (both exit 0), and the backup matched.\n"
+                        "- **Not tried:** a rollback of the code.\nWatch: ok")
+        for label, line in (("label alone, bullets below", alone), ("a try after a sentence end", after_a_stop)):
+            with self.subTest(hit=label):
+                self.assertTrue(matches(meta, hand_back(self.report(line))))
+        for label, line in (("label alone, nothing before Watch", "Rollback:\nWatch: ok (exit 0)"),
+                            ("not tried, then Tried: nothing", "Rollback: down; not tried: no copy. Tried: nothing (exit 0)"),
+                            ("tried: not tried after a stop", "Rollback: restore. I haven't tried it. Tried: not tried (exit 0)")):
+            with self.subTest(miss=label):
+                self.assertFalse(matches(meta, hand_back(self.report(line))))
+
+    def test_watch_line_reads_a_condition_in_marks_and_misses_marks_alone(self):
+        """AC-2: rel-agents run 2 and the 22231bc run 4 Watch lines hit; marks with no word after roll back if miss."""
+        watch = self.grader("watch-line")
+        for label, line in (("rel-agents run 2", "Watch: I checked health once, right after the change, and it printed `ok`. Whoever stays watching"
+                                                  " should keep the health check going for 30 minutes. Roll back if `app/health.py` prints anything but ok."),
+                            ("22231bc run 4", "**Watch:** Run `python3 app/health.py` and check the service log for errors. Keep watching for"
+                                              " 30 minutes (the runbook gives no window). Roll back if `health.py` prints anything other than `ok`.")):
+            with self.subTest(hit=label):
+                self.assertTrue(matches(watch, hand_back(self.report(line))))
+        for label, line in (("a backtick alone", "Watch: x; roll back if `"), ("emphasis alone", "Watch: x; roll back if **")):
+            with self.subTest(miss=label):
+                self.assertFalse(matches(watch, hand_back(self.report(line))))
 
     def test_adds_only_and_watch_line_match_their_lines_and_miss_the_others(self):
         adds, watch = self.grader("adds-only"), self.grader("watch-line")

@@ -986,5 +986,301 @@ class BreakingChangeAdversarialTest(unittest.TestCase):
                 self.assertTrue(self.hit(text))
 
 
+ROLLBACK_GRADER = "rollback-tried"
+WATCH_GRADER = "watch-line"
+
+
+def trace_forms(report):
+    """The same report as the harness might hold it: backslash-n in JSON (ASCII escapes, then raw non-ASCII as in
+    the saved traces) and with real line breaks."""
+    full = T.GOOD + "\n\n" + report
+    body = T.FRAME + "\n".join("  " + line for line in full.split("\n"))
+    return (("json, ascii escapes", T.hand_back(full)),
+            ("json, raw non-ascii", json.dumps({"type": "user", "content": body}, separators=(",", ":"), ensure_ascii=False)),
+            ("real line breaks", body))
+
+
+def node_hits(pattern, texts):
+    """What JavaScript RegExp, the harness's engine, says for each text; None when node isn't installed."""
+    node = shutil.which("node")
+    if not node:
+        return None
+    script = ("const d = JSON.parse(require('fs').readFileSync(0, 'utf8'));"
+              "console.log(JSON.stringify(d.t.map(t => new RegExp(d.p).test(t))));")
+    proc = subprocess.run([node, "-e", script], input=json.dumps({"p": pattern, "t": list(texts)}), capture_output=True, text=True)
+    if proc.returncode != 0:
+        raise AssertionError(proc.stderr)
+    return json.loads(proc.stdout)
+
+
+class RollbackTriedFalseHitTest(unittest.TestCase):
+    """AC-2: a Tried label after a sentence end, or a label alone on its line, must not score a try that wasn't made."""
+
+    def scored(self, name, report):
+        meta = grader_meta(COPY_CASE, name)
+        return {label: bool(T.matches(meta, text)) for label, text in trace_forms(report)}
+
+    def assertMisses(self, report, name=ROLLBACK_GRADER):
+        for label, hit in self.scored(name, report).items():
+            self.assertFalse(hit, "%s scores a try on %r (%s)" % (name, report, label))
+
+    def assertHits(self, report, name=ROLLBACK_GRADER):
+        for label, hit in self.scored(name, report).items():
+            self.assertTrue(hit, "%s misses %r (%s)" % (name, report, label))
+
+    def test_a_denial_word_after_tried_is_no_try_even_when_an_exit_0_follows(self):
+        """AC-2: `Tried: nothing`, `Tried: not yet`, `; tried: no`, `Tried: never` are denials; an exit 0 later on the line is a plan."""
+        for text in ("Rollback: down. Tried: nothing (exit 0)",
+                     "Rollback: down. Tried: not yet (exit 0 expected)",
+                     "Rollback: down; tried: no (exit 0)",
+                     "Rollback: down. Tried: never (exit 0)",
+                     "Rollback: down. **Tried:** none, exit 0 is what it should print"):
+            with self.subTest(text=text):
+                self.assertMisses(text)
+
+    def test_a_not_tried_label_before_a_later_tried_label_is_no_try(self):
+        """AC-2: the brief's miss shapes, from both sides of the stop."""
+        for text in ("Rollback: down; not tried: no copy. Tried: n/a (exit 0)",
+                     "Rollback: down. not tried: no copy. Tried: ran it on the live file (exit 0)",
+                     "Rollback: down. I haven't tried it. Tried: not tried (exit 0)",
+                     "Rollback:\n- not tried: no copy (exit 0)\nWatch: x; roll back if y"):
+            with self.subTest(text=text):
+                self.assertMisses(text)
+
+    def test_a_non_zero_exit_first_and_a_zero_exit_for_another_command_is_no_try(self):
+        """AC-2: `exit 1` then another command's `exit 0` isn't a clean try of the rollback."""
+        self.assertMisses("Rollback: down. Tried: `python3 migrate.py down` (exit 1), then `ls` (exit 0)")
+
+    def test_exit_01_and_exit_0x1_are_not_exit_0(self):
+        """AC-2: the count is 0, not a number that starts with it."""
+        for text in ("Rollback: down. Tried: `python3 migrate.py down` (exit 01)",
+                     "Rollback: down. Tried: `python3 migrate.py down` (exit 0x1)"):
+            with self.subTest(text=text):
+                self.assertMisses(text)
+
+    def test_a_tried_label_after_the_watch_line_is_no_answer_for_a_rollback_alone(self):
+        """AC-2: the label below Watch belongs to something else."""
+        self.assertMisses("Rollback:\nWatch: x; roll back if y\nTried: `python3 migrate.py down` (exit 0)")
+
+    def test_a_rollback_alone_with_nothing_or_no_try_under_it_misses(self):
+        """AC-2: a label alone needs a try under it."""
+        for text in ("Rollback:\nWatch: ok (exit 0)",
+                     "Rollback:\n- restore the backup\n- run `python3 migrate.py down` (exit 0)\nWatch: x; roll back if y",
+                     "Rollback:",
+                     "**Rollback:**\nWatch: x"):
+            with self.subTest(text=text):
+                self.assertMisses(text)
+
+    def test_a_rollback_alone_with_a_try_in_a_bullet_hits_whatever_the_order(self):
+        """AC-2: the rel-agents run 1 shape, with a not-tried bullet before or after the tried one."""
+        for text in ("Rollback:\n- not tried: a code rollback\n- tried: the down SQL on a copy (exit 0)\nWatch: x; roll back if y",
+                     "Rollback:\n- tried: the down SQL on a copy (exit 0)\n- not tried: a code rollback\nWatch: x; roll back if y",
+                     "Rollback:\n1. restore the backup\n2. `Tried`: the down SQL on a copy (exit 0)\nWatch: x; roll back if y"):
+            with self.subTest(text=text):
+                self.assertHits(text)
+
+    def test_a_label_in_bold_or_ticks_after_a_stop_still_hits(self):
+        """AC-2: a right answer scoring wrong: `**Tried:**`, a tick before the label, `exit status 0`."""
+        for text in ("Rollback: restore it. **Tried:** the down SQL on a copy (exit status 0)",
+                     "Rollback: restore it; `Tried:` the down SQL on a copy, exited 0",
+                     "Rollback: restore it! Tried: `python3 migrate.py down` on a copy, exit code `0`"):
+            with self.subTest(text=text):
+                self.assertHits(text)
+
+    def test_a_tried_after_the_string_ends_on_the_same_line_is_no_try(self):
+        """AC-2: the report's JSON string ends at a quote; a later field on that line isn't the Rollback line."""
+        meta = grader_meta(COPY_CASE, ROLLBACK_GRADER)
+
+        def line(report, extra):
+            head = T.FRAME + "\n".join("  " + l for l in (T.GOOD + "\n\n" + report).split("\n"))
+            return '{"type":"user","content":' + json.dumps(head) + extra + "}"
+        # "haven't tried" keeps the older same-line branch out, so only the first branch could read the later field.
+        inside = line("Rollback: restore it. I haven't tried it. Tried: ran it (exit 0)", "")
+        self.assertTrue(T.matches(meta, inside), "control: the same words inside the string score")
+        after = line("Rollback: restore it. I haven't tried it", ',"note":"x. Tried: ran it (exit 0)"')
+        self.assertFalse(T.matches(meta, after), "a Tried label in the next JSON field on the line scores for the report")
+
+    def test_today_a_tried_after_the_string_ends_scores_through_the_older_branch(self):
+        """Limit, pinned: the older second branch also reads past the closing quote, for `tried` then `exit 0` in a later field."""
+        head = T.FRAME + "\n".join("  " + l for l in (T.GOOD + "\n\nRollback: restore it").split("\n"))
+        text = '{"type":"user","content":' + json.dumps(head) + ',"note":"it was tried (exit 0)"}'
+        self.assertTrue(T.matches(grader_meta(COPY_CASE, ROLLBACK_GRADER), text))
+
+    def test_today_wording_that_denies_a_try_without_a_denial_word_still_scores(self):
+        """Limit, pinned: the guards read a list of words, not meaning; these say no try and still hit (the older second branch)."""
+        for text in ("Rollback: down. Tried: I did not run it; the script would exit 0",
+                     "Rollback: down. Tried: on production? No. exit 0",
+                     "Rollback: down. Tried: skipped, it should exit 0",
+                     "Rollback: down. Tried: cannot, it would exit 0",
+                     'Rollback: down. Tried: "it should exit 0"'):
+            with self.subTest(text=text):
+                self.assertHits(text)
+
+    def test_today_exit_0_followed_by_a_dot_digit_scores(self):
+        """Limit, pinned: `exit 0.5` ends the count at a word edge, so it reads as exit 0."""
+        self.assertHits("Rollback: down. Tried: `python3 migrate.py down` (exit 0.5)")
+
+    def test_today_a_tried_line_in_the_body_with_no_watch_line_scores_for_a_label_alone(self):
+        """Limit, pinned: with no Watch line to stop at, a Tried label anywhere below a bare `Rollback:` counts."""
+        self.assertHits("Rollback:\n\nNotes\n\nTried: the down SQL on a copy (exit 0)")
+
+    def test_today_a_lone_underscore_after_roll_back_if_hits_watch_line(self):
+        """Limit, pinned: `_` is in the mark class and is also a word character, so one underscore is a condition."""
+        self.assertHits("Watch: x; roll back if _", name=WATCH_GRADER)
+
+
+class WatchLineMarksTest(unittest.TestCase):
+    """AC-2: `watch-line` takes marks before the word and still misses marks alone."""
+
+    def scored(self, line):
+        meta = grader_meta(COPY_CASE, WATCH_GRADER)
+        return {label: bool(T.matches(meta, text)) for label, text in trace_forms(line)}
+
+    def test_roll_back_if_followed_only_by_marks_misses(self):
+        """AC-2: a lone backtick, `**`, a paren, a bracket, a quote of either kind, then the line ends."""
+        for mark in ("`", "**", "(", "[", "'", "“", "‘", "``", "*`"):
+            with self.subTest(mark=mark):
+                for label, hit in self.scored("Watch: x; roll back if " + mark).items():
+                    self.assertFalse(hit, "marks alone scored (%s)" % label)
+
+    def test_roll_back_if_on_the_next_line_misses(self):
+        """AC-2: the condition has to be on the Watch line."""
+        for text in ("Watch: x; roll back if\nthe thing fails", "Watch: x; roll back if `\nthe thing fails",
+                     "Watch: x; roll back if\n- it fails"):
+            with self.subTest(text=text):
+                for label, hit in self.scored(text).items():
+                    self.assertFalse(hit, "a condition on the next line scored (%s)" % label)
+
+    def test_marks_then_a_word_hit(self):
+        """AC-2: the marks the brief names, each in front of a word."""
+        for text in ("Watch: x; roll back if `ok` is missing", "Watch: x; roll back if (the log shows errors)",
+                     "Watch: x; roll back if **the log** shows errors", "Watch: x; Roll back if: `ok` is missing",
+                     "Watch: x; roll back if 'ok' is missing", "Watch: x; roll back if [ok] is missing",
+                     "Watch: x; roll back if _ok_ is missing", "Watch: x; roll back if “ok” is missing",
+                     "Watch: x; roll back if ‘ok’ is missing"):
+            with self.subTest(text=text):
+                for label, hit in self.scored(text).items():
+                    if label == "json, ascii escapes" and not text.isascii():
+                        continue
+                    self.assertTrue(hit, "marks then a word missed (%s)" % label)
+
+    def test_a_double_quote_before_the_word_hits_in_a_json_trace(self):
+        """AC-2: in the trace a double quote is written as backslash then quote; the brief names the quote mark."""
+        for text in ('Watch: x; roll back if "ok" is missing', 'Watch: x; Roll back if: "it fails"'):
+            with self.subTest(text=text):
+                for label, hit in self.scored(text).items():
+                    self.assertTrue(hit, "a double-quoted condition missed (%s)" % label)
+
+    def test_roll_back_if_with_a_space_before_the_marks_and_a_space_after_misses(self):
+        """AC-2: `** x`: the marks must sit against the word."""
+        for label, hit in self.scored("Watch: x; roll back if ** x").items():
+            self.assertFalse(hit, "marks, a space, then a word scored (%s)" % label)
+
+
+class EnginesAgreeOnTheNewPatternsTest(unittest.TestCase):
+    """The harness runs JavaScript RegExp; the helper reads the pattern as Python `re`."""
+
+    SHAPES = (
+        "Rollback: down. Tried: nothing (exit 0)", "Rollback: down; tried: no (exit 0)",
+        "Rollback: down; not tried: no copy. Tried: n/a (exit 0)", "Rollback: restore. I haven't tried it. Tried: not tried (exit 0)",
+        "Rollback: restore it. **Tried:** the down SQL on a copy (exit 0)", "Rollback:\nWatch: ok (exit 0)",
+        "Rollback:\n- not tried: x\n- tried: the down SQL on a copy (exit 0)\nWatch: x; roll back if y",
+        "Rollback:\nWatch: x; roll back if y\nTried: `a` (exit 0)", "Rollback: down. Tried: `a` (exit 1), then `b` (exit 0)",
+        "Rollback: down. Tried: `a` (exit 01)", "Rollback: down. Tried: `a` (exit 0x1)", "Rollback: down. Tried: `a` (exit 0.5)",
+        "Watch: x; roll back if `", "Watch: x; roll back if **", "Watch: x; roll back if `ok` is missing",
+        "Watch: x; roll back if\nthe thing fails", 'Watch: x; Roll back if: "it fails"', "Watch: x; roll back if “ok”",
+        "Watch: x; roll back if _ok_", "Watch: x; roll back if (", "Watch: x; roll back if ‘",
+    )
+
+    def test_javascript_and_python_agree_on_the_ascii_shapes(self):
+        for name in (ROLLBACK_GRADER, WATCH_GRADER):
+            meta = grader_meta(COPY_CASE, name)
+            labelled = [(shape + " / " + label, text) for shape in self.SHAPES for label, text in trace_forms(shape)]
+            js = node_hits(meta["pattern"], [t for _, t in labelled])
+            if js is None:
+                self.skipTest("node isn't installed")
+            for (label, text), theirs in zip(labelled, js):
+                with self.subTest(grader=name, shape=label):
+                    self.assertEqual(T.python_re(meta["pattern"]).search(text) is not None, theirs)
+
+    def test_javascript_and_python_agree_when_a_non_ascii_letter_follows_the_marker(self):
+        """A word character in Python is any letter; in JavaScript only ASCII: `roll back if élan` splits them."""
+        shapes = ((WATCH_GRADER, "Watch: x; roll back if élan drops"), (WATCH_GRADER, "Watch: x; roll back if `élan` drops"))
+        for name, shape in shapes:
+            meta = grader_meta(COPY_CASE, name)
+            labelled = trace_forms(shape)
+            js = node_hits(meta["pattern"], [t for _, t in labelled])
+            if js is None:
+                self.skipTest("node isn't installed")
+            for (label, text), theirs in zip(labelled, js):
+                with self.subTest(grader=name, shape=shape, form=label):
+                    self.assertEqual(T.python_re(meta["pattern"]).search(text) is not None, theirs,
+                                     "Python and JavaScript disagree: the helper reads the pattern with Unicode word characters")
+
+
+class RollbackTriedTimingTest(unittest.TestCase):
+    """A grader that takes seconds on a hostile line stalls a scoring run."""
+
+    LIMIT = 1.0
+
+    def timed_python(self, name, text):
+        import time
+        pattern = T.python_re(grader_meta(COPY_CASE, name)["pattern"])
+        start = time.perf_counter()
+        pattern.search(text)
+        return time.perf_counter() - start
+
+    def timed_node(self, name, text):
+        node = shutil.which("node")
+        if not node:
+            return None
+        script = ("const d = JSON.parse(require('fs').readFileSync(0, 'utf8')); const r = new RegExp(d.p);"
+                  "const a = process.hrtime.bigint(); r.test(d.t); console.log(Number(process.hrtime.bigint() - a) / 1e9);")
+        payload = json.dumps({"p": grader_meta(COPY_CASE, name)["pattern"], "t": text})
+        proc = subprocess.run([node, "-e", script], input=payload, capture_output=True, text=True)
+        return float(proc.stdout.strip())
+
+    def hostile(self):
+        lines = {
+            "tried x 5000 chars": "Rollback: " + "tried " * 834,
+            "sentence ends and Tried: x": "Rollback: down" + ". Tried: x " * 500,
+            "sentence ends and Tried: no": "Rollback: down" + ". Tried: no " * 500,
+            "dots": "Rollback: " + ". " * 2500,
+            "semicolons": "Rollback: " + "; " * 2500,
+            "not tried": "Rollback: " + "not tried " * 500,
+            "exit words": "Rollback: " + "exit " * 1000,
+            "stars": "Rollback: " + "* " * 2500,
+            "bullets": "Rollback:\n" + "- run it\n" * 600,
+            "tried bullets": "Rollback:\n" + "- tried x\n" * 600,
+            "backticks before the label": "`" * 5000 + "Rollback: x",
+        }
+        return {name: trace_forms(line)[1][1] for name, line in lines.items()}
+
+    def test_no_hostile_rollback_line_takes_a_second_in_either_engine(self):
+        for name, text in sorted(self.hostile().items()):
+            for engine, took in (("python", self.timed_python(ROLLBACK_GRADER, text)), ("node", self.timed_node(ROLLBACK_GRADER, text))):
+                if took is None:
+                    continue
+                with self.subTest(line=name, engine=engine):
+                    self.assertLess(took, self.LIMIT, "%.2fs on %s" % (took, name))
+
+    def test_five_thousand_backticks_after_the_rollback_label_take_under_a_second(self):
+        """The label may now stand alone, so `Rollback:` and a long run of ticks backtracks quadratically (about 2s in Python at 5000)."""
+        text = trace_forms("Rollback:" + "`" * 5000)[1][1]
+        for engine, took in (("python", self.timed_python(ROLLBACK_GRADER, text)), ("node", self.timed_node(ROLLBACK_GRADER, text))):
+            if took is None:
+                continue
+            with self.subTest(engine=engine):
+                self.assertLess(took, self.LIMIT, "%.2fs" % took)
+
+    def test_watch_line_takes_under_a_second_on_a_long_mark_run(self):
+        text = trace_forms("Watch: x; roll back if " + "`*(" * 2000)[1][1]
+        for engine, took in (("python", self.timed_python(WATCH_GRADER, text)), ("node", self.timed_node(WATCH_GRADER, text))):
+            if took is None:
+                continue
+            with self.subTest(engine=engine):
+                self.assertLess(took, self.LIMIT, "%.2fs" % took)
+
+
 if __name__ == "__main__":
     unittest.main()
